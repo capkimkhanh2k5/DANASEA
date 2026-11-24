@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   LifeBuoy, 
   Search, 
@@ -27,6 +28,8 @@ import { vendorEquipmentService } from "../../../services/vendorEquipmentService
 import { DEMO_EQUIPMENT_DATA, VENDOR_USER_MAP } from "../../../data/demoEquipmentMap";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { toast } from "../../../store/useToastStore";
+import { extractErrorMessage } from "../../../utils/errorHandler";
+import { formatDisplayCode } from "../../../utils/displayCode";
 
 export interface EquipmentItem {
   id: string;
@@ -142,10 +145,10 @@ export function Equipment() {
 
             return {
               id: eq.id,
-              code: `#EQ-${eq.id.slice(0, 6).toUpperCase()}`,
+              code: `#${formatDisplayCode(eq.id, 'EQ')}`,
               name: eq.name,
               category,
-              serialNumber: `SN-${eq.id.slice(0, 8).toUpperCase()}`,
+              serialNumber: `SN-${formatDisplayCode(eq.id, 'EQ').replace('EQ-', '')}`,
               totalQuantity: eq.capacity || 1,
               inUseQuantity: status === "OPERATIONAL" ? Math.max(1, Math.floor((eq.capacity || 1) * 0.5)) : 0,
               assignedService: resolveAssignedService(eq.compatibilityGroup, eq.name),
@@ -184,10 +187,10 @@ export function Equipment() {
 
             return {
               id: d.id,
-              code: `#EQ-${d.id.slice(0, 6).toUpperCase()}`,
+              code: `#${formatDisplayCode(d.id, 'EQ')}`,
               name: d.name,
               category,
-              serialNumber: `SN-${d.id.slice(0, 8).toUpperCase()}`,
+              serialNumber: `SN-${formatDisplayCode(d.id, 'EQ').replace('EQ-', '')}`,
               totalQuantity: d.capacity,
               inUseQuantity: d.status === "OPERATIONAL" ? Math.max(1, Math.floor(d.capacity * 0.5)) : 0,
               assignedService: resolveAssignedService(d.compatibilityGroup, d.name),
@@ -251,6 +254,51 @@ export function Equipment() {
     lastMaintenance: new Date().toISOString().split("T")[0],
     nextInspection: new Date(Date.now() + 180 * 86400000).toISOString().split("T")[0],
   }));
+
+  // Maintenance Modal State
+  const [maintenanceItem, setMaintenanceItem] = useState<EquipmentItem | null>(null);
+  const [maintStart, setMaintStart] = useState("");
+  const [maintEnd, setMaintEnd] = useState("");
+  const [maintReason, setMaintReason] = useState("");
+  const [maintUrgent, setMaintUrgent] = useState(false);
+  const [isSubmittingMaint, setIsSubmittingMaint] = useState(false);
+
+  const handleOpenMaintenance = (item: EquipmentItem) => {
+    setMaintenanceItem(item);
+    const now = new Date();
+    const tom = new Date(now.getTime() + 86400000);
+    setMaintStart(now.toISOString().slice(0, 16));
+    setMaintEnd(tom.toISOString().slice(0, 16));
+    setMaintReason(`Bảo dưỡng định kỳ động cơ và thân vỏ cho ${item.name}`);
+    setMaintUrgent(false);
+  };
+
+  const handleSaveMaintenance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!maintenanceItem || !maintReason.trim()) return;
+    setIsSubmittingMaint(true);
+    try {
+      await vendorEquipmentService.scheduleMaintenance(maintenanceItem.id, {
+        start: maintStart,
+        end: maintEnd,
+        urgent: maintUrgent,
+        reason: maintReason.trim(),
+      });
+      setItems((prev) =>
+        prev.map((it) =>
+          it.id === maintenanceItem.id
+            ? { ...it, status: "MAINTENANCE", lastMaintenance: maintStart.slice(0, 10) }
+            : it
+        )
+      );
+      toast.success(`Đã lên lịch bảo dưỡng thành công cho ${maintenanceItem.name}!`);
+      setMaintenanceItem(null);
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Lên lịch bảo dưỡng thất bại"));
+    } finally {
+      setIsSubmittingMaint(false);
+    }
+  };
 
   // Filtered Items
   const filteredItems = useMemo(() => {
@@ -479,14 +527,14 @@ export function Equipment() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm border-collapse">
             <thead>
-              <tr className="bg-[#f8f9fa] border-b border-slate-200/80 text-slate-500 font-semibold text-xs uppercase tracking-wider">
-                <th className="py-3.5 px-4 w-[140px]">MÃ THIẾT BỊ</th>
-                <th className="py-3.5 px-4">TÊN PHƯƠNG TIỆN / THIẾT BỊ</th>
-                <th className="py-3.5 px-4 w-[180px]">PHÂN LOẠI</th>
-                <th className="py-3.5 px-4 text-center w-[120px]">SỐ LƯỢNG</th>
-                <th className="py-3.5 px-4 w-[150px]">HẠN KIỂM ĐỊNH</th>
-                <th className="py-3.5 px-4 text-center w-[130px]">TRẠNG THÁI</th>
-                <th className="py-3.5 px-4 text-right w-[80px]">THAO TÁC</th>
+              <tr className="bg-[#f8f9fa] border-b border-slate-200/80 text-slate-600 font-semibold text-xs">
+                <th className="py-3.5 px-4 w-[140px]">Mã thiết bị</th>
+                <th className="py-3.5 px-4">Tên phương tiện / thiết bị</th>
+                <th className="py-3.5 px-4 w-[180px]">Phân loại</th>
+                <th className="py-3.5 px-4 text-center w-[120px]">Số lượng</th>
+                <th className="py-3.5 px-4 w-[150px]">Hạn kiểm định</th>
+                <th className="py-3.5 px-4 text-center w-[130px]">Trạng thái</th>
+                <th className="py-3.5 px-4 text-right w-[80px]">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -531,7 +579,7 @@ export function Equipment() {
                         {item.category === "VESSEL" && <Anchor className="w-3.5 h-3.5 text-sky-600" />}
                         {item.category === "SAFETY" && <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />}
                         {item.category === "SPORTS" && <LifeBuoy className="w-3.5 h-3.5 text-amber-600" />}
-                        {item.category === "NAVIGATION" && <Calendar className="w-3.5 h-3.5 text-indigo-600" />}
+                        {item.category === "NAVIGATION" && <Calendar className="w-3.5 h-3.5 text-teal-600" />}
                         <span>{CATEGORY_LABELS[item.category]}</span>
                       </div>
                     </td>
@@ -565,13 +613,22 @@ export function Equipment() {
 
                     {/* Actions */}
                     <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => handleOpenEdit(item)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                        title="Chỉnh sửa thiết bị"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleOpenMaintenance(item)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
+                          title="Lên lịch bảo dưỡng phương tiện"
+                        >
+                          <Wrench className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(item)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                          title="Chỉnh sửa thiết bị"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -642,7 +699,7 @@ export function Equipment() {
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Tên phương tiện / thiết bị *
                 </label>
                 <input
@@ -657,7 +714,7 @@ export function Equipment() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Phân loại
                   </label>
                   <select
@@ -673,7 +730,7 @@ export function Equipment() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Trạng thái vận hành
                   </label>
                   <select
@@ -690,7 +747,7 @@ export function Equipment() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Số lượng tổng
                   </label>
                   <input
@@ -703,7 +760,7 @@ export function Equipment() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Số khung / Serial
                   </label>
                   <input
@@ -717,7 +774,7 @@ export function Equipment() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Dịch vụ tour liên kết
                 </label>
                 {vendorServices.length > 0 ? (
@@ -746,7 +803,7 @@ export function Equipment() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Bảo dưỡng gần nhất
                   </label>
                   <input
@@ -758,7 +815,7 @@ export function Equipment() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Hạn kiểm định tiếp theo
                   </label>
                   <input
@@ -791,6 +848,95 @@ export function Equipment() {
             </form>
           </div>
         </div>
+      )}
+      {/* Modal: Schedule Maintenance */}
+      {maintenanceItem && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-2xs p-4 animate-in fade-in duration-100">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4 text-xs animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-slate-700 shrink-0" />
+                <h4 className="font-bold text-slate-900 text-sm">Lên lịch bảo dưỡng thiết bị</h4>
+              </div>
+              <button
+                onClick={() => setMaintenanceItem(null)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveMaintenance} className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] text-slate-500 block mb-1">Thời gian bắt đầu:</label>
+                  <input
+                    type="datetime-local"
+                    value={maintStart}
+                    onChange={(e) => setMaintStart(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-500 block mb-1">Dự kiến hoàn thành:</label>
+                  <input
+                    type="datetime-local"
+                    value={maintEnd}
+                    onChange={(e) => setMaintEnd(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] text-slate-500 block mb-1">Nội dung bảo dưỡng / Hạng mục kiểm tra:</label>
+                <textarea
+                  rows={3}
+                  value={maintReason}
+                  onChange={(e) => setMaintReason(e.target.value)}
+                  placeholder="Ví dụ: Thay dầu nhớt động cơ, kiểm tra hệ thống lái, vá vỏ composite..."
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none leading-relaxed"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center gap-2 p-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xl">
+                <input
+                  type="checkbox"
+                  id="maint-urgent"
+                  checked={maintUrgent}
+                  onChange={(e) => setMaintUrgent(e.target.checked)}
+                  className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                />
+                <label htmlFor="maint-urgent" className="text-xs text-amber-900 cursor-pointer select-none">
+                  Bảo dưỡng khẩn cấp (Tạm dừng gán phương tiện vào các ca sắp tới)
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <AtlasButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMaintenanceItem(null)}
+                >
+                  Hủy
+                </AtlasButton>
+                <AtlasButton
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={isSubmittingMaint || !maintReason.trim()}
+                >
+                  {isSubmittingMaint ? "Đang lưu..." : "Xác nhận lên lịch"}
+                </AtlasButton>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

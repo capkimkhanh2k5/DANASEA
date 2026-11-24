@@ -21,6 +21,7 @@ import {
   AtlasButton,
   AtlasPagination
 } from '../../../components/vendor/atlas/AtlasDesignSystem';
+import { formatDisplayCode } from '../../../utils/displayCode';
 
 interface ReviewItem {
   id: string;
@@ -94,7 +95,7 @@ export function VendorReviews() {
           id: r.id,
           customerName: r.customerName || 'Du khách DANASEA',
           avatarText: (r.customerName || 'DK').slice(0, 2).toUpperCase(),
-          orderCode: r.subOrderId ? `#VE-${r.subOrderId.slice(0, 8).toUpperCase()}` : '#DON-HANG',
+          orderCode: r.subOrderId ? `#${formatDisplayCode(r.subOrderId, 'SUB')}` : '#DON-HANG',
           serviceName: r.serviceName?.trim() || (r.serviceId && serviceMap.get(r.serviceId)) || 'Trải nghiệm du lịch biển',
           slotTime: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '',
           rating: r.rating || 5,

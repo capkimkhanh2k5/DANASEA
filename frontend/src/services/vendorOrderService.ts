@@ -26,6 +26,15 @@ export const vendorOrderService = {
   },
 
   /**
+   * V10: Lấy chi tiết đơn hàng con (Sub-order) theo ID
+   * GET /api/vendor/sub-orders/{id}
+   */
+  async getSubOrder(subOrderId: string): Promise<VendorSubOrderDto> {
+    const response = await apiClient.get<VendorSubOrderDto>(`/vendor/sub-orders/${subOrderId}`);
+    return response.data;
+  },
+
+  /**
    * V10: Lấy danh sách chi tiết các lượt đặt vé (Booking Items) của Vendor
    */
   async getVendorBookings(params?: GetVendorBookingsParams): Promise<PageResponse<VendorBookingItemDto>> {

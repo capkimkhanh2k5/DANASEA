@@ -66,4 +66,17 @@ export const disputeService = {
     const response = await apiClient.post<DisputeResponse>(`/vendor/disputes/${id}/responses`, req);
     return response.data;
   },
+
+  /**
+   * Tải lên tệp bằng chứng tranh chấp (JPEG, PNG, WEBP, PDF tối đa 5MB)
+   * POST /api/disputes/evidence
+   */
+  async uploadEvidence(file: File): Promise<{ fileUrl: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post<{ fileUrl: string }>('/disputes/evidence', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };

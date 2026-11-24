@@ -9,6 +9,35 @@ import {
   Layers
 } from 'lucide-react';
 import type { CopilotArtifact } from '../../../types/vendorAi';
+import {
+  formatAssessmentStatusLabel,
+  formatContentReasonLabel,
+} from '../../../pages/admin/Copilot/copilotArtifactHelpers';
+
+const BADGE_TIER_LABELS: Record<string, string> = {
+  NONE: 'Chưa xếp hạng',
+  STANDARD: 'Tiêu chuẩn',
+  VERIFIED: 'Đã xác minh',
+  BRONZE: 'Đồng',
+  SILVER: 'Bạc',
+  GOLD: 'Vàng',
+  PLATINUM: 'Bạch kim',
+};
+
+const REVIEW_PILLAR_LABELS: Record<string, string> = {
+  GUIDE: 'Hướng dẫn viên',
+  SAFETY: 'An toàn',
+  PUNCTUALITY: 'Đúng giờ',
+  VALUE: 'Giá trị',
+};
+
+const SERVICE_STATUS_LABELS: Record<string, string> = {
+  PUBLISHED: 'Đang mở bán',
+  DRAFT: 'Bản nháp',
+  PENDING_REVIEW: 'Chờ duyệt',
+  REJECTED: 'Bị từ chối',
+  PAUSED: 'Tạm dừng',
+};
 
 interface CopilotArtifactCardProps {
   artifact: CopilotArtifact;
@@ -36,8 +65,8 @@ export function CopilotArtifactCard({ artifact }: CopilotArtifactCardProps) {
             <TrendingUp className="w-3.5 h-3.5 text-sky-600" />
             <span>Chỉ số kinh doanh gian hàng</span>
           </div>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
-            Hạng: {badgeTier}
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700" title={badgeTier}>
+            Hạng: {BADGE_TIER_LABELS[badgeTier.toUpperCase()] || badgeTier}
           </span>
         </div>
 
@@ -95,8 +124,10 @@ export function CopilotArtifactCard({ artifact }: CopilotArtifactCardProps) {
 
         <div className="grid grid-cols-2 gap-2">
           {Object.entries(pillars).map(([pillarKey, p]) => (
-            <div key={pillarKey} className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-700">{pillarKey}</span>
+            <div key={pillarKey} className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between" title={pillarKey}>
+              <span className="text-[11px] font-medium text-slate-700">
+                {REVIEW_PILLAR_LABELS[pillarKey.toUpperCase()] || pillarKey}
+              </span>
               <span className="text-xs font-bold text-slate-900 font-mono tabular-nums">
                 {p?.scoreOutOf10 ?? 0}/10
               </span>
@@ -221,11 +252,12 @@ export function CopilotArtifactCard({ artifact }: CopilotArtifactCardProps) {
             <span>Thẩm định nội dung bài đăng</span>
           </div>
           <span
+            title={status}
             className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
               needsReview ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
             }`}
           >
-            {status}
+            {formatAssessmentStatusLabel(status)}
           </span>
         </div>
 
@@ -244,8 +276,8 @@ export function CopilotArtifactCard({ artifact }: CopilotArtifactCardProps) {
         {reasonCodes.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {reasonCodes.map((code) => (
-              <span key={code} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                {code}
+              <span key={code} title={code} className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                {formatContentReasonLabel(code)}
               </span>
             ))}
           </div>
@@ -280,8 +312,10 @@ export function CopilotArtifactCard({ artifact }: CopilotArtifactCardProps) {
         {entries.length > 0 && (
           <div className="grid grid-cols-2 gap-1.5">
             {entries.map(([statusKey, countVal]) => (
-              <div key={statusKey} className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-lg px-2 py-1 text-[11px]">
-                <span className="text-slate-600 font-medium">{statusKey}</span>
+              <div key={statusKey} title={statusKey} className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-lg px-2 py-1 text-[11px]">
+                <span className="text-slate-600 font-medium">
+                  {SERVICE_STATUS_LABELS[statusKey.toUpperCase()] || statusKey}
+                </span>
                 <span className="font-mono font-bold text-slate-900">{Number(countVal || 0)}</span>
               </div>
             ))}

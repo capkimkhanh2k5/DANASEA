@@ -1,7 +1,34 @@
 import { useState, useEffect, useCallback, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2, Wand2 } from 'lucide-react';
+import { 
+  Loader2, 
+  Wand2,
+  ArrowLeft,
+  Save,
+  Eye,
+  Send,
+  FileText,
+  Image as ImageIcon,
+  Tag,
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
+  Plus,
+  Upload,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+  X,
+  Hourglass
+} from 'lucide-react';
+import { 
+  AtlasPageHeader, 
+  AtlasSegmentedTabs, 
+  AtlasBadge, 
+  AtlasButton,
+  type AtlasTabItem 
+} from '../../../components/vendor/atlas/AtlasDesignSystem';
 import { vendorService } from '../../../services/vendorService';
 import { categoryService } from '../../../services/categoryService';
 import { vendorAiService } from '../../../services/vendorAiService';
@@ -63,7 +90,6 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
   const [activeTab, setActiveTab] = useState<FormTab>('CONTENT_SAFETY');
   const [isLoading, setIsLoading] = useState<boolean>(Boolean(serviceId));
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  
 
   // Categories
   const [categories, setCategories] = useState<CategoryDto[]>([]);
@@ -248,7 +274,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
       return null;
     }
     if (waiverRequired && !waiverContent.trim() && !waiverContentEn.trim()) {
-      toast.warning('Khi yêu cầu miễn trừ trách nhiệm, vui lòng nhập nội dung cam kết an toàn (Waiver).');
+      toast.warning('Khi yêu cầu miễn trừ trách nhiệm, vui lòng nhập nội dung cam kết an toàn.');
       return null;
     }
     if (weatherSensitive && (minWindKmh == null || maxWaveM == null)) {
@@ -431,7 +457,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
       return;
     }
     if (optType === 'PRIVATE' && (!optMaxPax || optMaxPax <= 0)) {
-      toast.warning('Gói riêng tư (PRIVATE) bắt buộc phải cấu hình số khách tối đa (maxPaxPerPackage > 0).');
+      toast.warning('Gói bao trọn chuyến bắt buộc phải cấu hình số khách tối đa.');
       return;
     }
 
@@ -483,913 +509,840 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
     }
   };
 
-  return (
-    <div className="w-full bg-surface min-h-screen">
-      <div className="flex flex-col w-full">
-        {/* Top Utility Header (Atlas Business Suite Standard) */}
-        <div className="w-full bg-white/95 backdrop-blur-sm border-b border-slate-200/80 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 shadow-xs sticky top-0 z-20">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight font-display">
-                {nameVi || 'Chưa đặt tên dịch vụ'}
-              </h1>
-              {serviceStatus === 'PUBLISHED' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Đang mở bán
-                </span>
-              )}
-              {serviceStatus === 'PENDING_REVIEW' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/70">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                  Chờ duyệt
-                </span>
-              )}
-              {serviceStatus === 'APPROVED' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200/70">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-                  Đã duyệt
-                </span>
-              )}
-              {serviceStatus === 'REJECTED' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/70">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                  Bị từ chối
-                </span>
-              )}
-              {serviceStatus === 'DRAFT' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                  Bản nháp
-                </span>
-              )}
-              {serviceStatus === 'PAUSED' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                  Tạm ngưng
-                </span>
-              )}
-            </div>
-          </div>
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'PUBLISHED':
+        return <AtlasBadge label="Đang mở bán" variant="success" />;
+      case 'PENDING_REVIEW':
+        return <AtlasBadge label="Chờ duyệt" variant="warning" />;
+      case 'APPROVED':
+        return <AtlasBadge label="Đã duyệt" variant="info" />;
+      case 'REJECTED':
+        return <AtlasBadge label="Bị từ chối" variant="danger" />;
+      case 'PAUSED':
+        return <AtlasBadge label="Tạm ngưng" variant="warning" />;
+      case 'DRAFT':
+      default:
+        return <AtlasBadge label="Bản nháp" variant="neutral" />;
+    }
+  };
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
-            <button 
+  const formTabs: AtlasTabItem<FormTab>[] = [
+    { id: 'CONTENT_SAFETY', label: '1. Nội dung & An toàn' },
+    { id: 'IMAGES', label: '2. Ảnh dịch vụ', count: images.length },
+    { id: 'OPTIONS', label: '3. Lựa chọn bán', count: options.length },
+    { id: 'SAFETY_DOCS', label: '4. Chứng từ an toàn', count: safetyDocs.length },
+  ];
+
+  return (
+    <div className="w-full max-w-[1400px] mx-auto px-6 py-5 space-y-6">
+      {/* 1. Page Header (Atlas Standard) */}
+      <AtlasPageHeader
+        title={serviceId ? (nameVi || 'Chỉnh sửa dịch vụ') : 'Tạo dịch vụ mới'}
+        actions={
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <AtlasButton
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/vendor/services')}
+              icon={<ArrowLeft className="w-4 h-4" />}
+            >
+              Quay lại
+            </AtlasButton>
+
+            {serviceId && renderStatusBadge(serviceStatus)}
+
+            <AtlasButton
+              variant="outline"
+              size="sm"
               onClick={() => handleSaveService(false)}
               disabled={isSaving}
-              className="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-xs cursor-pointer" 
-              type="button"
+              icon={isSaving ? <Loader2 className="w-4 h-4 animate-spin text-slate-500" /> : <Save className="w-4 h-4 text-slate-600" />}
             >
-              <span className="material-symbols-outlined text-[16px]">save</span>
-              <span>{isSaving ? 'Đang lưu...' : 'Lưu nháp'}</span>
-            </button>
+              {isSaving ? 'Đang lưu...' : 'Lưu nháp'}
+            </AtlasButton>
 
-            <button 
+            <AtlasButton
+              variant="outline"
+              size="sm"
               onClick={() => setPreviewOpen(true)}
-              className="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer" 
-              type="button"
+              icon={<Eye className="w-4 h-4 text-slate-600" />}
             >
-              <span className="material-symbols-outlined text-[16px]">visibility</span>
-              <span>Xem trước</span>
-            </button>
+              Xem trước
+            </AtlasButton>
 
             {serviceStatus === 'PENDING_REVIEW' ? (
-              <div className="px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-amber-600 animate-pulse">hourglass_top</span>
+              <div className="px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-1.5">
+                <Hourglass className="w-4 h-4 text-amber-600 animate-pulse" />
                 <span>Đang chờ duyệt</span>
               </div>
             ) : serviceStatus === 'PUBLISHED' ? (
-              <button 
+              <AtlasButton
+                variant="primary"
+                size="sm"
                 onClick={() => handleSaveService(false)}
                 disabled={isSaving}
-                className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer" 
-                type="button"
+                icon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               >
-                <span className="material-symbols-outlined text-[16px]">save</span>
-                <span>{isSaving ? 'Đang lưu...' : 'Lưu cập nhật'}</span>
-              </button>
+                {isSaving ? 'Đang lưu...' : 'Lưu cập nhật'}
+              </AtlasButton>
             ) : (
-              <button 
+              <AtlasButton
+                variant="primary"
+                size="sm"
                 onClick={() => handleSaveService(true)}
                 disabled={isSaving}
-                className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer" 
-                type="button"
+                icon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               >
-                <span className="material-symbols-outlined text-[16px]">send</span>
-                <span>Gửi duyệt</span>
-              </button>
+                Gửi duyệt
+              </AtlasButton>
             )}
           </div>
-        </div>
+        }
+      />
 
-        {/* Rejection Alert if REJECTED */}
-        {serviceStatus === 'REJECTED' && rejectionReason && (
-          <div className="mx-6 mt-4 p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-3">
-            <span className="material-symbols-outlined text-rose-600 mt-0.5">report_problem</span>
-            <div>
-              <h4 className="font-bold text-xs text-rose-800">Dịch vụ bị Quản trị viên từ chối duyệt</h4>
-              <p className="text-xs text-rose-700 mt-0.5">Lý do: <span className="font-semibold">{rejectionReason}</span></p>
-              <p className="text-[11px] text-rose-600 mt-1">Vui lòng cập nhật thông tin/chứng từ hợp lệ theo yêu cầu và bấm &quot;Gửi duyệt&quot; lại.</p>
-            </div>
-          </div>
-        )}
-
-        {/* 4 Mandatory Tabs Navigation (Atlas Segmented Control) */}
-        <div className="px-6 pt-4">
-          <div className="bg-slate-100 p-1 rounded-xl inline-flex border border-slate-200/70 text-xs">
-            <button
-              onClick={() => setActiveTab('CONTENT_SAFETY')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'CONTENT_SAFETY'
-                  ? 'bg-white text-slate-900 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 font-medium'
-              }`}
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[15px]">description</span>
-              <span>1. Nội dung &amp; An toàn</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('IMAGES')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'IMAGES'
-                  ? 'bg-white text-slate-900 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 font-medium'
-              }`}
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[15px]">photo_library</span>
-              <span>2. Ảnh dịch vụ</span>
-              <span className="px-1.5 py-0.2 rounded font-mono tabular-nums text-[10px] bg-slate-200/70 text-slate-700">
-                {images.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('OPTIONS')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'OPTIONS'
-                  ? 'bg-white text-slate-900 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 font-medium'
-              }`}
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[15px]">sell</span>
-              <span>3. Lựa chọn bán (Options)</span>
-              <span className="px-1.5 py-0.2 rounded font-mono tabular-nums text-[10px] bg-slate-200/70 text-slate-700">
-                {options.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('SAFETY_DOCS')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'SAFETY_DOCS'
-                  ? 'bg-white text-slate-900 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 font-medium'
-              }`}
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[15px]">verified_user</span>
-              <span>4. Chứng từ an toàn</span>
-              <span className="px-1.5 py-0.2 rounded font-mono tabular-nums text-[10px] bg-slate-200/70 text-slate-700">
-                {safetyDocs.length}
-              </span>
-            </button>
+      {/* Rejection Alert if REJECTED */}
+      {serviceStatus === 'REJECTED' && rejectionReason && (
+        <div className="p-4.5 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-bold text-sm text-rose-900">Dịch vụ bị Quản trị viên từ chối duyệt</h4>
+            <p className="text-xs text-rose-700 mt-1">Lý do: <span className="font-semibold text-rose-800">{rejectionReason}</span></p>
+            <p className="text-xs text-rose-600 mt-1">Vui lòng cập nhật thông tin/chứng từ hợp lệ theo yêu cầu và bấm &quot;Gửi duyệt&quot; lại.</p>
           </div>
         </div>
+      )}
 
-        {/* Tab Content Panes */}
-        <div className="p-6">
-          {isLoading ? (
-            <div className="w-full bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
-              <span className="material-symbols-outlined text-3xl animate-spin">sync</span>
-              <p className="mt-2 text-xs">Đang nạp dữ liệu dịch vụ...</p>
-            </div>
-          ) : (
-            <>
-              {/* TAB 1: CONTENT & SAFETY */}
-              {activeTab === 'CONTENT_SAFETY' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  {/* Left Column: Form Fields */}
-                  <div className="lg:col-span-8 space-y-6">
-                    {/* Basic Info */}
-                    <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                        <h2 className="text-sm font-bold text-black">
-                          Thông tin cơ bản
-                        </h2>
-                        <button
-                          type="button"
-                          onClick={handleAiOptimizeListing}
-                          disabled={isOptimizingAi || !nameVi.trim()}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors disabled:opacity-40 cursor-pointer shadow-xs"
-                          title="AI viết và tối ưu hóa tiêu đề, mô tả chuẩn SEO du lịch biển & song ngữ"
-                        >
-                          {isOptimizingAi ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-300" />
-                              <span>Đang tối ưu...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Wand2 className="w-3.5 h-3.5 text-sky-400" />
-                              <span>Tối ưu nội dung tour</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
+      {/* 2. Atlas Segmented Tabs Navigation */}
+      <div className="flex items-center justify-between gap-4">
+        <AtlasSegmentedTabs<FormTab>
+          tabs={formTabs}
+          activeTab={activeTab}
+          onChange={(tabId) => setActiveTab(tabId)}
+        />
+      </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Tên dịch vụ (Tiếng Việt) <span className="text-rose-500">*</span>
-                          </label>
-                          <input 
-                            type="text"
-                            value={nameVi}
-                            onChange={(e) => setNameVi(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                            placeholder="VD: Chèo SUP đón bình minh biển Mỹ Khê"
-                          />
-                        </div>
-
-                        <div className="md:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Tên dịch vụ (Tiếng Anh - Tự động điền)
-                          </label>
-                          <input 
-                            type="text"
-                            value={nameEn}
-                            onChange={(e) => setNameEn(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                            placeholder="VD: Sunrise Stand-up Paddleboarding at My Khe Beach"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Danh mục thể thao biển <span className="text-rose-500">*</span>
-                          </label>
-                          <select 
-                            value={categoryId}
-                            onChange={(e) => setCategoryId(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none bg-white cursor-pointer"
-                          >
-                            <option value="">-- Chọn danh mục --</option>
-                            {categories.map(cat => (
-                              <option key={cat.id} value={cat.id}>{cat.name}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Đơn giá niêm yết chuẩn (VNĐ) <span className="text-rose-500">*</span>
-                          </label>
-                          <input 
-                            type="number"
-                            min={1000}
-                            step={1000}
-                            value={price}
-                            onChange={(e) => setPrice(Number(e.target.value))}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono font-bold text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Thời lượng mỗi ca (phút) <span className="text-rose-500">*</span>
-                          </label>
-                          <input 
-                            type="number"
-                            min={10}
-                            value={durationMinutes}
-                            onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Sức chứa tham khảo mỗi ca (khách) <span className="text-rose-500">*</span>
-                          </label>
-                          <input 
-                            type="number"
-                            min={1}
-                            value={capacityPerSlot}
-                            onChange={(e) => setCapacityPerSlot(Number(e.target.value))}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                            placeholder="Số khách dự kiến"
-                          />
-                          <p className="mt-1 text-[11px] text-slate-500 leading-tight">
-                            Số khách dự kiến mỗi ca do đối tác khai báo, chỉ mang tính tham khảo và không giới hạn số lượng đặt chỗ thực tế.
-                          </p>
-                        </div>
-
-                        <div className="md:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Mô tả chi tiết dịch vụ (Tiếng Việt)
-                          </label>
-                          <textarea 
-                            rows={3}
-                            value={descriptionVi}
-                            onChange={(e) => setDescriptionVi(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                            placeholder="Mô tả lộ trình, trang thiết bị cung cấp, kinh nghiệm cần có..."
-                          />
-                        </div>
-
-                        <div className="md:col-span-2">
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Mô tả chi tiết dịch vụ (Tiếng Anh - Tùy chọn)
-                          </label>
-                          <textarea 
-                            rows={3}
-                            value={descriptionEn}
-                            onChange={(e) => setDescriptionEn(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                            placeholder="Detailed itinerary, equipment, requirements in English (hoặc bấm nút AI Dịch phía trên)..."
-                          />
-                        </div>
-                      </div>
+      {/* 3. Tab Content Panes */}
+      <div>
+        {isLoading ? (
+          <div className="w-full bg-white rounded-2xl border border-slate-200/80 p-12 text-center text-slate-500 shadow-xs">
+            <Loader2 className="w-8 h-8 animate-spin text-sky-600 mx-auto" />
+            <p className="mt-3 text-sm font-medium text-slate-600">Đang nạp dữ liệu dịch vụ...</p>
+          </div>
+        ) : (
+          <>
+            {/* TAB 1: CONTENT & SAFETY */}
+            {activeTab === 'CONTENT_SAFETY' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Left Column: Form Fields (8 cols) */}
+                <div className="lg:col-span-8 space-y-6">
+                  {/* Basic Info */}
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-5 shadow-xs">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <h2 className="text-base font-bold text-slate-900 font-display">
+                        Thông tin cơ bản
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={handleAiOptimizeListing}
+                        disabled={isOptimizingAi || !nameVi.trim()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-40"
+                        title="AI viết và tối ưu hóa tiêu đề, mô tả chuẩn SEO du lịch biển & song ngữ"
+                      >
+                        {isOptimizingAi ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-300" />
+                            <span>Đang tối ưu...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="w-3.5 h-3.5 text-sky-400" />
+                            <span>Tối ưu nội dung tour</span>
+                          </>
+                        )}
+                      </button>
                     </div>
 
-                    {/* Location Info */}
-                    <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
-                      <h2 className="text-sm font-bold text-black border-b border-slate-100 pb-2">
-                        Vị trí &amp; Địa điểm tập trung
-                      </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Tên bến / Điểm xuất phát
-                          </label>
-                          <input 
-                            type="text"
-                            value={locationName}
-                            onChange={(e) => setLocationName(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Địa chỉ chi tiết
-                          </label>
-                          <input 
-                            type="text"
-                            value={address}
-                            onChange={(e) => setAddress(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Vĩ độ (Latitude)
-                          </label>
-                          <input 
-                            type="number"
-                            step="0.0001"
-                            value={latitude ?? ''}
-                            onChange={(e) => setLatitude(e.target.value ? Number(e.target.value) : null)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Kinh độ (Longitude)
-                          </label>
-                          <input 
-                            type="number"
-                            step="0.0001"
-                            value={longitude ?? ''}
-                            onChange={(e) => setLongitude(e.target.value ? Number(e.target.value) : null)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Maritime Safety & Waiver Policy */}
-                    <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
-                      <h2 className="text-sm font-bold text-black border-b border-slate-100 pb-2">
-                        Chính sách an toàn biển &amp; Miễn trừ trách nhiệm (Waiver)
-                      </h2>
-
-                      {/* Waiver Toggle & Content */}
-                      <div className="space-y-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input 
-                            type="checkbox"
-                            checked={waiverRequired}
-                            onChange={(e) => setWaiverRequired(e.target.checked)}
-                            className="rounded border-slate-300 text-primary focus:ring-primary"
-                          />
-                          <span className="text-xs font-bold text-black">
-                            Bắt buộc du khách ký cam kết an toàn điện tử (Waiver) trước khi thanh toán
-                          </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Tên dịch vụ <span className="text-rose-500">*</span>
                         </label>
+                        <input 
+                          type="text"
+                          value={nameVi}
+                          onChange={(e) => setNameVi(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all placeholder:text-slate-400 bg-white"
+                          placeholder="VD: Chèo SUP đón bình minh biển Mỹ Khê"
+                        />
+                      </div>
 
-                        {waiverRequired && (
-                          <div className="space-y-2 pl-6">
-                            <label className="block text-xs font-semibold text-slate-700">
-                              Nội dung điều khoản miễn trừ trách nhiệm <span className="text-rose-500">*</span>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Tên tiếng Anh (Tùy chọn)
+                        </label>
+                        <input 
+                          type="text"
+                          value={nameEn}
+                          onChange={(e) => setNameEn(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all placeholder:text-slate-400 bg-white"
+                          placeholder="VD: Sunrise Stand-up Paddleboarding at My Khe Beach"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Danh mục thể thao biển <span className="text-rose-500">*</span>
+                        </label>
+                        <select 
+                          value={categoryId}
+                          onChange={(e) => setCategoryId(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all bg-white cursor-pointer"
+                        >
+                          <option value="">-- Chọn danh mục --</option>
+                          {categories.map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Đơn giá niêm yết (VNĐ) <span className="text-rose-500">*</span>
+                        </label>
+                        <input 
+                          type="number"
+                          min={1000}
+                          step={1000}
+                          value={price}
+                          onChange={(e) => setPrice(Number(e.target.value))}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 tabular-nums focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Thời lượng ca (phút) <span className="text-rose-500">*</span>
+                        </label>
+                        <input 
+                          type="number"
+                          min={10}
+                          value={durationMinutes}
+                          onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Sức chứa mỗi ca (khách) <span className="text-rose-500">*</span>
+                        </label>
+                        <input 
+                          type="number"
+                          min={1}
+                          value={capacityPerSlot}
+                          onChange={(e) => setCapacityPerSlot(Number(e.target.value))}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all bg-white"
+                          placeholder="Số khách dự kiến"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Mô tả dịch vụ
+                        </label>
+                        <textarea 
+                          rows={3}
+                          value={descriptionVi}
+                          onChange={(e) => setDescriptionVi(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all placeholder:text-slate-400 bg-white"
+                          placeholder="Mô tả lộ trình, trang thiết bị cung cấp, kinh nghiệm cần có..."
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Mô tả tiếng Anh (Tùy chọn)
+                        </label>
+                        <textarea 
+                          rows={3}
+                          value={descriptionEn}
+                          onChange={(e) => setDescriptionEn(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all placeholder:text-slate-400 bg-white"
+                          placeholder="Detailed itinerary, equipment, requirements in English..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Location Info */}
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-5 shadow-xs">
+                    <h2 className="text-base font-bold text-slate-900 font-display border-b border-slate-100 pb-3">
+                      Vị trí &amp; Điểm xuất phát
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Tên bến / Điểm xuất phát
+                        </label>
+                        <input 
+                          type="text"
+                          value={locationName}
+                          onChange={(e) => setLocationName(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Địa chỉ chi tiết
+                        </label>
+                        <input 
+                          type="text"
+                          value={address}
+                          onChange={(e) => setAddress(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Vĩ độ
+                        </label>
+                        <input 
+                          type="number"
+                          step="0.0001"
+                          value={latitude ?? ''}
+                          onChange={(e) => setLatitude(e.target.value ? Number(e.target.value) : null)}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm font-mono text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Kinh độ
+                        </label>
+                        <input 
+                          type="number"
+                          step="0.0001"
+                          value={longitude ?? ''}
+                          onChange={(e) => setLongitude(e.target.value ? Number(e.target.value) : null)}
+                          className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm font-mono text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Maritime Safety & Waiver Policy */}
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-5 shadow-xs">
+                    <h2 className="text-base font-bold text-slate-900 font-display border-b border-slate-100 pb-3">
+                      Chính sách an toàn &amp; Miễn trừ trách nhiệm
+                    </h2>
+
+                    {/* Waiver Toggle & Content */}
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input 
+                          type="checkbox"
+                          checked={waiverRequired}
+                          onChange={(e) => setWaiverRequired(e.target.checked)}
+                          className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                        />
+                        <span className="text-xs sm:text-sm font-bold text-slate-900">
+                          Bắt buộc du khách ký cam kết an toàn điện tử trước khi thanh toán
+                        </span>
+                      </label>
+
+                      {waiverRequired && (
+                        <div className="space-y-2 pl-6 pt-1">
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Nội dung điều khoản miễn trừ trách nhiệm <span className="text-rose-500">*</span>
+                          </label>
+                          <textarea 
+                            rows={3}
+                            value={waiverContent}
+                            onChange={(e) => setWaiverContent(e.target.value)}
+                            className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all placeholder:text-slate-400 bg-white"
+                            placeholder="Nhập các điều khoản bắt buộc khách phải chấp nhận..."
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Weather Sensitivity */}
+                    <div className="space-y-3 pt-4 border-t border-slate-100">
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <input 
+                          type="checkbox"
+                          checked={weatherSensitive}
+                          onChange={(e) => setWeatherSensitive(e.target.checked)}
+                          className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                        />
+                        <span className="text-xs sm:text-sm font-bold text-slate-900">
+                          Dịch vụ phụ thuộc điều kiện thời tiết biển
+                        </span>
+                      </label>
+
+                      {weatherSensitive && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6 pt-1">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                              Giới hạn gió tối đa (km/h) <span className="text-rose-500">*</span>
                             </label>
-                            <textarea 
-                              rows={3}
-                              value={waiverContent}
-                              onChange={(e) => setWaiverContent(e.target.value)}
-                              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                              placeholder="Nhập các điều khoản bắt buộc khách phải chấp nhận..."
+                            <input 
+                              type="number"
+                              min={1}
+                              value={minWindKmh ?? ''}
+                              onChange={(e) => setMinWindKmh(e.target.value ? Number(e.target.value) : null)}
+                              className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all bg-white"
                             />
                           </div>
-                        )}
-                      </div>
 
-                      {/* Weather Sensitivity */}
-                      <div className="space-y-3 pt-3 border-t border-slate-100">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input 
-                            type="checkbox"
-                            checked={weatherSensitive}
-                            onChange={(e) => setWeatherSensitive(e.target.checked)}
-                            className="rounded border-slate-300 text-primary focus:ring-primary"
-                          />
-                          <span className="text-xs font-bold text-black">
-                            Dịch vụ nhạy cảm với điều kiện thời tiết biển (Cần cấu hình ngưỡng an toàn)
-                          </span>
-                        </label>
-
-                        {weatherSensitive && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                Giới hạn gió tối đa (km/h) <span className="text-rose-500">*</span>
-                              </label>
-                              <input 
-                                type="number"
-                                min={1}
-                                value={minWindKmh ?? ''}
-                                onChange={(e) => setMinWindKmh(e.target.value ? Number(e.target.value) : null)}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                Độ cao sóng tối đa (mét) <span className="text-rose-500">*</span>
-                              </label>
-                              <input 
-                                type="number"
-                                step="0.1"
-                                min={0.1}
-                                value={maxWaveM ?? ''}
-                                onChange={(e) => setMaxWaveM(e.target.value ? Number(e.target.value) : null)}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                              />
-                            </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                              Độ cao sóng tối đa (mét) <span className="text-rose-500">*</span>
+                            </label>
+                            <input 
+                              type="number"
+                              step="0.1"
+                              min={0.1}
+                              value={maxWaveM ?? ''}
+                              onChange={(e) => setMaxWaveM(e.target.value ? Number(e.target.value) : null)}
+                              className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all bg-white"
+                            />
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Right Column: Quick Status & Next Tabs Guidance */}
-                  <div className="lg:col-span-4 space-y-4">
-                    <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-3">
-                      <h3 className="font-bold text-xs text-black">Tiến độ thiết lập dịch vụ</h3>
-                      <div className="space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-600">1. Thông tin cơ bản &amp; an toàn:</span>
-                          <span className="text-emerald-600 font-bold flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">check_circle</span> Xong
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-600">2. Hình ảnh minh họa:</span>
-                          <span className={`font-bold flex items-center gap-1 ${images.length > 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                            {images.length > 0 ? `${images.length} ảnh` : 'Chưa có ảnh'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-600">3. Gói / Lựa chọn bán:</span>
-                          <span className="text-slate-700 font-bold">{options.length} gói</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-600">4. Chứng chỉ an toàn:</span>
-                          <span className="text-slate-700 font-bold">{safetyDocs.length} tài liệu</span>
-                        </div>
+                {/* Right Column: Quick Status & Next Tabs Guidance (4 cols) */}
+                <div className="lg:col-span-4 space-y-4 sticky top-6">
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+                    <h3 className="font-bold text-sm text-slate-900 font-display">Tiến độ thiết lập dịch vụ</h3>
+                    <div className="space-y-3 text-xs">
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-slate-600">1. Thông tin cơ bản &amp; an toàn:</span>
+                        <span className="text-emerald-600 font-bold flex items-center gap-1 font-mono">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Xong
+                        </span>
                       </div>
-
-                      <div className="pt-2 border-t border-slate-100">
-                        <p className="text-[11px] text-slate-500">
-                          Mẹo: Nhấn nút &quot;Lưu nháp&quot; để tạo mã dịch vụ trước khi sang các tab tải ảnh và tạo gói bán.
-                        </p>
+                      <div className="flex items-center justify-between py-1 border-t border-slate-100">
+                        <span className="text-slate-600">2. Hình ảnh minh họa:</span>
+                        <span className={`font-bold flex items-center gap-1 font-mono ${images.length > 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {images.length > 0 ? `${images.length} ảnh` : 'Chưa có ảnh'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-1 border-t border-slate-100">
+                        <span className="text-slate-600">3. Gói / Lựa chọn bán:</span>
+                        <span className="text-slate-700 font-bold font-mono">{options.length} gói</span>
+                      </div>
+                      <div className="flex items-center justify-between py-1 border-t border-slate-100">
+                        <span className="text-slate-600">4. Chứng chỉ an toàn:</span>
+                        <span className="text-slate-700 font-bold font-mono">{safetyDocs.length} tài liệu</span>
                       </div>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* TAB 2: IMAGES */}
-              {activeTab === 'IMAGES' && (
-                <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <div>
-                      <h2 className="text-sm font-bold text-black">Thư viện ảnh dịch vụ (Tối đa 10 ảnh)</h2>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Ảnh chất lượng cao giúp tăng tỉ lệ khách đặt tour biển. Dịch vụ bắt buộc có ít nhất 1 ảnh để gửi duyệt.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary/90 transition-colors cursor-pointer shadow-xs">
-                        <span className="material-symbols-outlined text-[16px]">upload</span>
-                        <span>{isUploadingImage ? 'Đang tải lên...' : 'Tải ảnh mới'}</span>
-                        <input 
-                          type="file" 
-                          accept="image/jpeg,image/png,image/webp" 
-                          onChange={handleImageFileChange}
-                          disabled={isUploadingImage || images.length >= 10}
-                          className="hidden" 
-                        />
-                      </label>
-                    </div>
+            {/* TAB 2: IMAGES */}
+            {activeTab === 'IMAGES' && (
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-6 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 font-display">Thư viện ảnh dịch vụ</h2>
                   </div>
 
-                  {images.length === 0 ? (
-                    <div className="py-12 text-center text-slate-500">
-                      <span className="material-symbols-outlined text-4xl text-slate-400">add_photo_alternate</span>
-                      <p className="mt-2 text-xs font-semibold text-slate-700">Chưa có ảnh nào được tải lên</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Vui lòng tải lên ít nhất 1 ảnh đại diện để hoàn thiện dịch vụ.</p>
+                  <div>
+                    <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-black transition-colors cursor-pointer shadow-xs disabled:opacity-50">
+                      {isUploadingImage ? <Loader2 className="w-4 h-4 animate-spin text-slate-300" /> : <Upload className="w-4 h-4" />}
+                      <span>{isUploadingImage ? 'Đang tải lên...' : 'Tải ảnh mới'}</span>
+                      <input 
+                        type="file" 
+                        accept="image/jpeg,image/png,image/webp" 
+                        onChange={handleImageFileChange}
+                        disabled={isUploadingImage || images.length >= 10}
+                        className="hidden" 
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {images.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                      <ImageIcon className="w-6 h-6" />
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {images.map((img, idx) => (
-                        <div key={img.id} className="group relative rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex flex-col">
-                          <div className="aspect-4/3 w-full overflow-hidden bg-slate-100 relative">
-                            <img src={img.url} alt="Service" className="w-full h-full object-cover" />
-                            {idx === 0 && (
-                              <span className="absolute top-2 left-2 px-2 py-0.5 bg-primary text-on-primary text-[10px] font-bold rounded-md shadow-xs">
-                                Ảnh đại diện
+                    <p className="text-sm font-semibold text-slate-800">Chưa có ảnh nào được tải lên</p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Vui lòng tải lên ít nhất 1 ảnh đại diện để hoàn thiện dịch vụ.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {images.map((img, idx) => (
+                      <div key={img.id} className="group relative rounded-2xl border border-slate-200/80 overflow-hidden bg-slate-50 flex flex-col shadow-2xs">
+                        <div className="aspect-4/3 w-full overflow-hidden bg-slate-100 relative">
+                          <img src={img.url} alt="Service" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                          {idx === 0 && (
+                            <span className="absolute top-2.5 left-2.5 px-2.5 py-1 bg-slate-900/90 text-white text-[11px] font-bold rounded-lg shadow-xs backdrop-blur-xs">
+                              Ảnh đại diện
+                            </span>
+                          )}
+                        </div>
+                        <div className="p-3 flex items-center justify-between bg-white text-xs text-slate-700 border-t border-slate-100">
+                          <span className="text-xs font-semibold font-mono text-slate-600">Thứ tự: {idx + 1}</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleMoveImage(idx, 'UP')}
+                              disabled={idx === 0}
+                              className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
+                              title="Đưa lên"
+                              type="button"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleMoveImage(idx, 'DOWN')}
+                              disabled={idx === images.length - 1}
+                              className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
+                              title="Hạ xuống"
+                              type="button"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteImage(img.id)}
+                              className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer transition-colors"
+                              title="Xóa ảnh"
+                              type="button"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: OPTIONS */}
+            {activeTab === 'OPTIONS' && (
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-6 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 font-display">Các gói dịch vụ &amp; Lựa chọn bán</h2>
+                  </div>
+
+                  <AtlasButton
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setIsAddOptionModalOpen(true)}
+                    icon={<Plus className="w-4 h-4" />}
+                  >
+                    Thêm lựa chọn bán
+                  </AtlasButton>
+                </div>
+
+                {options.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                      <Tag className="w-6 h-6" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800">Chưa có lựa chọn bổ sung</p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      Dịch vụ sẽ tự động áp dụng đơn giá niêm yết chuẩn ({price.toLocaleString('vi-VN')} đ) ở Tab 1.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-200/80 overflow-hidden shadow-2xs">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50/80 text-slate-700 font-semibold border-b border-slate-200/80">
+                          <th className="py-3 px-4 uppercase tracking-wider text-[11px]">Tên gói / Lựa chọn</th>
+                          <th className="py-3 px-4 uppercase tracking-wider text-[11px]">Hình thức</th>
+                          <th className="py-3 px-4 uppercase tracking-wider text-[11px]">Đơn vị tính</th>
+                          <th className="py-3 px-4 uppercase tracking-wider text-[11px] text-right">Đơn giá</th>
+                          <th className="py-3 px-4 uppercase tracking-wider text-[11px] text-center">Tối đa khách</th>
+                          <th className="py-3 px-4 uppercase tracking-wider text-[11px]">Quyền lợi</th>
+                          <th className="py-3 px-4 uppercase tracking-wider text-[11px] text-center">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {options.map(opt => (
+                          <tr key={opt.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3 px-4 font-bold text-slate-900">{opt.name}</td>
+                            <td className="py-3 px-4">
+                              <span className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold ${
+                                opt.optionType === 'PRIVATE' ? 'bg-purple-50 text-purple-700 border border-purple-200/80' : 'bg-sky-50 text-sky-700 border border-sky-200/80'
+                              }`}>
+                                {opt.optionType === 'PRIVATE' ? 'Bao trọn gói' : 'Ghép đoàn'}
                               </span>
-                            )}
-                          </div>
-                          <div className="p-2 flex items-center justify-between bg-white text-xs text-slate-700">
-                            <span className="text-[11px] font-semibold">Thứ tự: {idx + 1}</span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleMoveImage(idx, 'UP')}
-                                disabled={idx === 0}
-                                className="p-1 rounded hover:bg-slate-100 disabled:opacity-30"
-                                title="Đưa lên"
-                                type="button"
-                              >
-                                <span className="material-symbols-outlined text-[16px]">arrow_upward</span>
-                              </button>
-                              <button
-                                onClick={() => handleMoveImage(idx, 'DOWN')}
-                                disabled={idx === images.length - 1}
-                                className="p-1 rounded hover:bg-slate-100 disabled:opacity-30"
-                                title="Hạ xuống"
-                                type="button"
-                              >
-                                <span className="material-symbols-outlined text-[16px]">arrow_downward</span>
-                              </button>
-                              <button
-                                onClick={() => handleDeleteImage(img.id)}
-                                className="p-1 rounded text-rose-600 hover:bg-rose-50"
-                                title="Xóa ảnh"
-                                type="button"
-                              >
-                                <span className="material-symbols-outlined text-[16px]">delete</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TAB 3: OPTIONS */}
-              {activeTab === 'OPTIONS' && (
-                <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <div>
-                      <h2 className="text-sm font-bold text-black">Các gói &amp; Lựa chọn bán (Pricing Options)</h2>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Tùy chọn ghép đoàn (SHARED tính theo người) hoặc bao trọn cano/thuyền (PRIVATE tính theo gói).
-                      </p>
-                    </div>
-
-                    <button 
-                      onClick={() => setIsAddOptionModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary/90 transition-colors shadow-xs"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">add</span>
-                      <span>Thêm lựa chọn bán</span>
-                    </button>
-                  </div>
-
-                  {options.length === 0 ? (
-                    <div className="py-12 text-center text-slate-500">
-                      <span className="material-symbols-outlined text-4xl text-slate-400">sell</span>
-                      <p className="mt-2 text-xs font-semibold text-slate-700">Chưa có lựa chọn bổ sung</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Dịch vụ sẽ tự động áp dụng đơn giá niêm yết chuẩn ở Tab 1.</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
-                            <th className="py-2.5 px-3">Tên gói / Lựa chọn</th>
-                            <th className="py-2.5 px-3">Hình thức</th>
-                            <th className="py-2.5 px-3">Đơn vị tính</th>
-                            <th className="py-2.5 px-3 text-right">Đơn giá</th>
-                            <th className="py-2.5 px-3 text-center">Tối đa khách/gói</th>
-                            <th className="py-2.5 px-3">Quyền lợi</th>
-                            <th className="py-2.5 px-3 text-center">Trạng thái</th>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600">
+                              {opt.pricingUnit === 'PER_PACKAGE' ? 'Theo gói trọn gói' : 'Theo đầu người'}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 tabular-nums">
+                              {opt.price.toLocaleString('vi-VN')} đ
+                            </td>
+                            <td className="py-3 px-4 text-center font-mono text-slate-700">
+                              {opt.maxPaxPerPackage ? `${opt.maxPaxPerPackage} khách` : '—'}
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 max-w-xs truncate" title={opt.benefits || ''}>
+                              {opt.benefits || '—'}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <AtlasBadge
+                                label={opt.status === 'ACTIVE' ? 'Đang mở bán' : 'Ngưng bán'}
+                                variant={opt.status === 'ACTIVE' ? 'success' : 'neutral'}
+                              />
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {options.map(opt => (
-                            <tr key={opt.id} className="hover:bg-slate-50">
-                              <td className="py-2.5 px-3 font-bold text-black">{opt.name}</td>
-                              <td className="py-2.5 px-3">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                                  opt.optionType === 'PRIVATE' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
-                                }`}>
-                                  {opt.optionType === 'PRIVATE' ? 'Bao trọn gói (Private)' : 'Ghép đoàn (Shared)'}
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-3">
-                                {opt.pricingUnit === 'PER_PACKAGE' ? 'Theo gói trọn gói' : 'Theo đầu người'}
-                              </td>
-                              <td className="py-2.5 px-3 text-right font-mono font-bold text-black">
-                                {opt.price.toLocaleString('vi-VN')} đ
-                              </td>
-                              <td className="py-2.5 px-3 text-center">
-                                {opt.maxPaxPerPackage ? `${opt.maxPaxPerPackage} khách` : '-'}
-                              </td>
-                              <td className="py-2.5 px-3 text-slate-600 max-w-xs truncate" title={opt.benefits || ''}>
-                                {opt.benefits || '-'}
-                              </td>
-                              <td className="py-2.5 px-3 text-center">
-                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  {opt.status === 'ACTIVE' ? 'Đang mở bán' : 'Ngưng bán'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
 
-              {/* TAB 4: SAFETY DOCUMENTS */}
-              {activeTab === 'SAFETY_DOCS' && (
-                <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-5 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <div>
-                      <h2 className="text-sm font-bold text-black">Chứng chỉ &amp; Giấy phép an toàn dịch vụ</h2>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Tải lên chứng nhận kiểm định cano, phao cứu sinh, bằng thuyền trưởng hoặc chứng chỉ lặn an toàn.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary/90 transition-colors cursor-pointer shadow-xs">
-                        <span className="material-symbols-outlined text-[16px]">upload_file</span>
-                        <span>{isUploadingDoc ? 'Đang tải...' : 'Tải chứng chỉ (PDF/Ảnh)'}</span>
-                        <input 
-                          type="file" 
-                          accept="application/pdf,image/jpeg,image/png" 
-                          onChange={handleSafetyDocChange}
-                          disabled={isUploadingDoc}
-                          className="hidden" 
-                        />
-                      </label>
-                    </div>
+            {/* TAB 4: SAFETY DOCUMENTS */}
+            {activeTab === 'SAFETY_DOCS' && (
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-6 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 font-display">Chứng chỉ &amp; Giấy phép an toàn</h2>
                   </div>
 
-                  {safetyDocs.length === 0 ? (
-                    <div className="py-12 text-center text-slate-500">
-                      <span className="material-symbols-outlined text-4xl text-slate-400">verified_user</span>
-                      <p className="mt-2 text-xs font-semibold text-slate-700">Chưa có chứng chỉ an toàn nào</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Đính kèm chứng chỉ kiểm định an toàn để hồ sơ dịch vụ được duyệt nhanh chóng.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {safetyDocs.map(doc => (
-                        <div key={doc.id} className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between gap-3 text-xs">
-                          <div className="flex items-center gap-3">
-                            <span className="material-symbols-outlined text-2xl text-slate-500">description</span>
-                            <div>
-                              <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="font-bold text-primary hover:underline">
-                                Xem chứng từ đã tải lên
-                              </a>
-                              <p className="text-[11px] text-slate-500">Ngày nộp: {new Date(doc.createdAt).toLocaleDateString('vi-VN')}</p>
-                            </div>
-                          </div>
+                  <div>
+                    <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-black transition-colors cursor-pointer shadow-xs disabled:opacity-50">
+                      {isUploadingDoc ? <Loader2 className="w-4 h-4 animate-spin text-slate-300" /> : <Upload className="w-4 h-4" />}
+                      <span>{isUploadingDoc ? 'Đang tải...' : 'Tải chứng chỉ (PDF/Ảnh)'}</span>
+                      <input 
+                        type="file" 
+                        accept="application/pdf,image/jpeg,image/png" 
+                        onChange={handleSafetyDocChange}
+                        disabled={isUploadingDoc}
+                        className="hidden" 
+                      />
+                    </label>
+                  </div>
+                </div>
 
-                          <div className="flex items-center gap-2">
-                            {doc.status === 'APPROVED' && (
-                              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300">
-                                Đã duyệt
-                              </span>
-                            )}
-                            {doc.status === 'PENDING' && (
-                              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-300">
-                                Chờ kiểm tra
-                              </span>
-                            )}
-                            {doc.status === 'REJECTED' && (
-                              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-800 border border-rose-300">
-                                Bị từ chối
-                              </span>
-                            )}
+                {safetyDocs.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                      <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800">Chưa có chứng chỉ an toàn nào</p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      Đính kèm chứng chỉ kiểm định an toàn để hồ sơ dịch vụ được duyệt nhanh chóng.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {safetyDocs.map(doc => (
+                      <div key={doc.id} className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/70 flex items-center justify-between gap-4 text-xs hover:border-slate-300 transition-colors">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center shrink-0 text-slate-500">
+                            <FileText className="w-5 h-5 text-sky-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="font-bold text-slate-900 hover:text-sky-600 transition-colors block truncate">
+                              Xem chứng từ đã tải lên
+                            </a>
+                            <p className="text-[11px] text-slate-500 font-mono mt-0.5">Ngày nộp: {new Date(doc.createdAt).toLocaleDateString('vi-VN')}</p>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
 
-        {/* Modal: Add Option */}
-        {isAddOptionModalOpen && createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-            <div className="bg-white rounded-xl shadow-md border border-slate-200/90 w-full max-w-md p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-bold text-sm text-black">Thêm lựa chọn bán / Gói dịch vụ</h3>
-                <button onClick={() => setIsAddOptionModalOpen(false)} className="text-slate-400 hover:text-black">
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
+                        <div className="shrink-0">
+                          {doc.status === 'APPROVED' && <AtlasBadge label="Đã duyệt" variant="success" />}
+                          {doc.status === 'PENDING' && <AtlasBadge label="Chờ kiểm tra" variant="warning" />}
+                          {doc.status === 'REJECTED' && <AtlasBadge label="Bị từ chối" variant="danger" />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Modal: Add Option */}
+      {isAddOptionModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 w-full max-w-md p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-base text-slate-900 font-display">Thêm gói dịch vụ</h3>
+              <button 
+                type="button"
+                onClick={() => setIsAddOptionModalOpen(false)} 
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Tên gói dịch vụ: <span className="text-rose-500">*</span></label>
+                <input 
+                  type="text"
+                  value={optName}
+                  onChange={(e) => setOptName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none transition-all placeholder:text-slate-400 bg-white"
+                  placeholder="VD: Bao trọn cano riêng kèm flycam"
+                />
               </div>
 
-              <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Tên gói / Lựa chọn:</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Hình thức:</label>
+                  <select
+                    value={optType}
+                    onChange={(e) => {
+                      const newType = e.target.value as OptionType;
+                      setOptType(newType);
+                      if (newType === 'PRIVATE') {
+                        setOptPricingUnit('PER_PACKAGE');
+                        if (!optMaxPax) setOptMaxPax(6);
+                      } else {
+                        setOptPricingUnit('PER_PERSON');
+                        setOptMaxPax(null);
+                      }
+                    }}
+                    className="w-full px-3 py-2.5 border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none bg-white cursor-pointer"
+                  >
+                    <option value="SHARED">Ghép đoàn</option>
+                    <option value="PRIVATE">Bao trọn gói</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Đơn vị tính:</label>
                   <input 
                     type="text"
-                    value={optName}
-                    onChange={(e) => setOptName(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                    placeholder="VD: Bao trọn cano riêng kèm flycam"
+                    disabled
+                    value={optPricingUnit === 'PER_PACKAGE' ? 'Theo gói trọn' : 'Theo người'}
+                    className="w-full px-3 py-2.5 border border-slate-200/80 bg-slate-50 rounded-xl text-xs text-slate-600 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Đơn giá (VNĐ): <span className="text-rose-500">*</span></label>
+                  <input 
+                    type="number"
+                    min={1000}
+                    step={1000}
+                    value={optPrice}
+                    onChange={(e) => setOptPrice(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl font-mono font-bold text-sm text-slate-900 tabular-nums focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none bg-white"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {optType === 'PRIVATE' && (
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Hình thức:</label>
-                    <select
-                      value={optType}
-                      onChange={(e) => {
-                        const newType = e.target.value as OptionType;
-                        setOptType(newType);
-                        if (newType === 'PRIVATE') {
-                          setOptPricingUnit('PER_PACKAGE');
-                          if (!optMaxPax) setOptMaxPax(6);
-                        } else {
-                          setOptPricingUnit('PER_PERSON');
-                          setOptMaxPax(null);
-                        }
-                      }}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none bg-white cursor-pointer"
-                    >
-                      <option value="SHARED">Ghép đoàn (SHARED)</option>
-                      <option value="PRIVATE">Bao trọn gói (PRIVATE)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Đơn vị tính:</label>
-                    <input 
-                      type="text"
-                      disabled
-                      value={optPricingUnit === 'PER_PACKAGE' ? 'Theo gói (PER_PACKAGE)' : 'Theo người (PER_PERSON)'}
-                      className="w-full px-2.5 py-1.5 border border-slate-200 bg-slate-100 rounded-lg text-slate-600 font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Đơn giá (VNĐ):</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">Tối đa khách / gói: <span className="text-rose-500">*</span></label>
                     <input 
                       type="number"
-                      min={1000}
-                      step={1000}
-                      value={optPrice}
-                      onChange={(e) => setOptPrice(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-mono font-bold text-black focus:ring-1 focus:ring-primary focus:outline-none"
+                      min={1}
+                      value={optMaxPax ?? ''}
+                      onChange={(e) => setOptMaxPax(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-sm text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none bg-white"
                     />
                   </div>
-
-                  {optType === 'PRIVATE' && (
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">Tối đa khách / gói:</label>
-                      <input 
-                        type="number"
-                        min={1}
-                        value={optMaxPax ?? ''}
-                        onChange={(e) => setOptMaxPax(e.target.value ? Number(e.target.value) : null)}
-                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Quyền lợi bổ sung:</label>
-                  <textarea 
-                    rows={2}
-                    value={optBenefits}
-                    onChange={(e) => setOptBenefits(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none"
-                    placeholder="VD: Bao gồm nước suối, khăn lạnh, chụp ảnh miễn phí..."
-                  />
-                </div>
+                )}
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  onClick={() => setIsAddOptionModalOpen(false)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  type="button"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={handleCreateOption}
-                  className="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-colors"
-                  type="button"
-                >
-                  Lưu lựa chọn
-                </button>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Quyền lợi bổ sung:</label>
+                <textarea 
+                  rows={2}
+                  value={optBenefits}
+                  onChange={(e) => setOptBenefits(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-200/90 rounded-xl text-xs text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none bg-white placeholder:text-slate-400"
+                  placeholder="VD: Bao gồm nước suối, khăn lạnh, chụp ảnh miễn phí..."
+                />
               </div>
             </div>
-          </div>,
-          document.body
-        )}
 
-        {/* Modal: Preview */}
-        {previewOpen && createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-            <div className="bg-white rounded-xl shadow-md border border-slate-200/90 w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-bold text-sm text-black">Bản xem trước dịch vụ</h3>
-                <button onClick={() => setPreviewOpen(false)} className="text-slate-400 hover:text-black">
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <AtlasButton
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddOptionModalOpen(false)}
+              >
+                Hủy
+              </AtlasButton>
+              <AtlasButton
+                variant="primary"
+                size="sm"
+                onClick={handleCreateOption}
+              >
+                Lưu lựa chọn
+              </AtlasButton>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal: Preview */}
+      {previewOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 w-full max-w-lg p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-base text-slate-900 font-display">Bản xem trước dịch vụ</h3>
+              <button 
+                type="button"
+                onClick={() => setPreviewOpen(false)} 
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs text-slate-700">
+              <div className="aspect-16/9 rounded-xl overflow-hidden bg-slate-100 border border-slate-200/80 shadow-2xs">
+                <img 
+                  src={images[0]?.url || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80'} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover" 
+                />
               </div>
-
-              <div className="space-y-3 text-xs text-slate-700">
-                <div className="aspect-16/9 rounded-lg overflow-hidden bg-slate-100">
-                  <img 
-                    src={images[0]?.url || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80'} 
-                    alt="Preview" 
-                    className="w-full h-full object-cover" 
-                  />
-                </div>
-                <h4 className="font-bold text-base text-black">{nameVi || 'Tên dịch vụ'}</h4>
-                <p className="text-slate-600">{descriptionVi || 'Chưa có mô tả chi tiết.'}</p>
-                <div className="grid grid-cols-2 gap-2 p-2 bg-slate-50 rounded-lg">
-                  <div>Đơn vị niêm yết: <span className="font-mono font-bold text-black">{price.toLocaleString('vi-VN')} đ</span></div>
-                  <div>Thời lượng: <span className="font-semibold text-black">{durationMinutes} phút</span></div>
-                  <div>Sức chứa tham khảo: <span className="font-semibold text-black">{capacityPerSlot} khách/ca</span></div>
-                  <div>Địa điểm: <span className="font-semibold text-black">{locationName}</span></div>
-                </div>
+              <div>
+                <h4 className="font-bold text-lg text-slate-900 font-display">{nameVi || 'Tên dịch vụ'}</h4>
+                {nameEn && <p className="text-xs text-slate-500 font-medium mt-0.5">{nameEn}</p>}
               </div>
-
-              <div className="flex justify-end pt-2 border-t border-slate-100">
-                <button
-                  onClick={() => setPreviewOpen(false)}
-                  className="px-4 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-bold"
-                  type="button"
-                >
-                  Đóng
-                </button>
+              <p className="text-slate-600 text-xs leading-relaxed">{descriptionVi || 'Chưa có mô tả chi tiết.'}</p>
+              <div className="grid grid-cols-2 gap-2.5 p-3.5 bg-slate-50 rounded-xl border border-slate-200/70 text-xs">
+                <div>Đơn vị niêm yết: <span className="font-mono font-bold text-slate-900">{price.toLocaleString('vi-VN')} đ</span></div>
+                <div>Thời lượng: <span className="font-semibold text-slate-900 font-mono">{durationMinutes} phút</span></div>
+                <div>Sức chứa tham khảo: <span className="font-semibold text-slate-900 font-mono">{capacityPerSlot} khách/ca</span></div>
+                <div>Địa điểm: <span className="font-semibold text-slate-900">{locationName}</span></div>
               </div>
             </div>
-          </div>,
-          document.body
-        )}
 
-        
-      </div>
+            <div className="flex justify-end pt-3 border-t border-slate-100">
+              <AtlasButton
+                variant="primary"
+                size="sm"
+                onClick={() => setPreviewOpen(false)}
+              >
+                Đóng
+              </AtlasButton>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

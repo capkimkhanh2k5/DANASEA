@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Bot,
+  Sparkles,
   Plus,
   Send,
   Pin,
@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import { AdminButton } from '../../../components/admin/AdminWorkspace';
-import { formatDisplayCode } from '../../../utils/displayCode';
+import { formatDisplayCode, formatTextWithDisplayCodes } from '../../../utils/displayCode';
 import { adminAiService, getAdminAiError } from '../../../services/adminAiService';
 import type {
   CopilotConversation,
@@ -405,7 +405,7 @@ export const AdminCopilot: React.FC = () => {
                       <>
                         <div className="admin-copilot__session-title" title={c.title}>
                           {c.pinned && <Pin size={11} className="admin-copilot__pin-icon" />}
-                          <span>{c.title || 'Đoạn chat mới'}</span>
+                          <span>{formatTextWithDisplayCodes(c.title) || 'Đoạn chat mới'}</span>
                         </div>
                         <div className="admin-copilot__session-time">
                           {new Date(c.updatedAt).toLocaleDateString('vi-VN', {
@@ -468,10 +468,10 @@ export const AdminCopilot: React.FC = () => {
         <header className="admin-copilot__topbar">
           <div className="admin-copilot__topbar-title">
             <div className="admin-copilot__topbar-icon">
-              <Bot size={15} />
+              <Sparkles size={15} />
             </div>
             <span>
-              {conversations.find((c) => c.id === currentConversationId)?.title || 'Admin DaNaBot'}
+              {formatTextWithDisplayCodes(conversations.find((c) => c.id === currentConversationId)?.title || 'Admin DaNaBot')}
             </span>
           </div>
 
@@ -547,7 +547,7 @@ export const AdminCopilot: React.FC = () => {
                       : 'admin-copilot__msg-avatar--assistant'
                   }`}
                 >
-                  {m.role === 'user' ? 'A' : <Bot size={15} />}
+                  {m.role === 'user' ? 'A' : <Sparkles size={15} />}
                 </div>
 
                 <div className="admin-copilot__msg-body">
@@ -557,7 +557,7 @@ export const AdminCopilot: React.FC = () => {
                     }`}
                   >
                     {m.role === 'user' ? (
-                      m.content
+                      formatTextWithDisplayCodes(m.content)
                     ) : (
                       <MarkdownText content={m.content} />
                     )}
@@ -610,7 +610,7 @@ export const AdminCopilot: React.FC = () => {
           {sending && (
             <div className="admin-copilot__msg admin-copilot__msg--assistant">
               <div className="admin-copilot__msg-avatar admin-copilot__msg-avatar--assistant">
-                <Bot size={15} />
+                <Sparkles size={15} />
               </div>
               <div className="admin-copilot__msg-body">
                 <div className="admin-copilot__msg-content admin-copilot__loading-content">
