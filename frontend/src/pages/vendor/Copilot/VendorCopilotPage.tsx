@@ -4,11 +4,11 @@ import {
   Plus, 
   Pin, 
   Trash2, 
-  MoreVertical,
-  Paperclip
+  MoreVertical
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from '../../../components/vendor/copilot/CopilotArtifactCard';
+import { ContextPreviewCard } from '../../../components/vendor/copilot/ContextPreviewCard';
 import { MarkdownText } from '../../../components/common/MarkdownText';
 import { VendorCopilotActionDeck } from '../../../components/vendor/copilot/VendorCopilotActionDeck';
 import { formatTextWithDisplayCodes } from '../../../utils/displayCode';
@@ -183,11 +183,10 @@ export function VendorCopilotPage() {
                   key={m.id}
                   className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                 >
-                  <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[80%]`}>
+                  <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[85%]`}>
                     {isUser && m.context && (
-                      <div className="mb-1.5 self-end inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200/80 text-sky-800 text-[11px] font-medium shadow-2xs">
-                        <Paperclip className="w-3 h-3 text-sky-600 shrink-0" />
-                        <span className="truncate max-w-[280px]">{m.context.label}</span>
+                      <div className="mb-2 self-end w-full flex justify-end">
+                        <ContextPreviewCard context={m.context} />
                       </div>
                     )}
 

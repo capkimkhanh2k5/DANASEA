@@ -497,10 +497,13 @@ export const VendorContextPinModal: React.FC<Props> = ({
     onSelectContext({
       type: target.type,
       id: target.id,
-      label: `[${currentCategory.label}] ${target.title}`,
+      label: target.title,
       meta: {
+        categoryLabel: currentCategory.label,
         title: target.title,
         subtitle: target.subtitle,
+        badge: target.badge,
+        detailSpecs: target.detailSpecs,
       },
     });
     onClose();
@@ -513,7 +516,11 @@ export const VendorContextPinModal: React.FC<Props> = ({
     onSelectContext({
       type: selectedType,
       id: cleanId,
-      label: `[${currentCategory.label}] #${formatDisplayCode(cleanId, selectedType === 'ORDER' ? 'ORD' : selectedType === 'DISPUTE' ? 'DISP' : 'CTX')}`,
+      label: `#${formatDisplayCode(cleanId, selectedType === 'ORDER' ? 'ORD' : selectedType === 'DISPUTE' ? 'DISP' : 'CTX')}`,
+      meta: {
+        categoryLabel: currentCategory.label,
+        title: `#${formatDisplayCode(cleanId, selectedType === 'ORDER' ? 'ORD' : selectedType === 'DISPUTE' ? 'DISP' : 'CTX')}`,
+      },
     });
     onClose();
   };

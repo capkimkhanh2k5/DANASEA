@@ -8,11 +8,11 @@ import {
   Pin, 
   Trash2, 
   MoreVertical,
-  Plus,
-  Paperclip
+  Plus
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from './CopilotArtifactCard';
+import { ContextPreviewCard } from './ContextPreviewCard';
 import { MarkdownText } from '../../common/MarkdownText';
 import { VendorCopilotActionDeck } from './VendorCopilotActionDeck';
 import { formatTextWithDisplayCodes } from '../../../utils/displayCode';
@@ -252,11 +252,10 @@ export const VendorCopilotDrawer: React.FC = () => {
                 className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} animate-in fade-in duration-100`}
               >
                 {isUser ? (
-                  <div className="flex flex-col items-end max-w-[85%]">
+                  <div className="flex flex-col items-end max-w-[90%]">
                     {m.context && (
-                      <div className="mb-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 border border-sky-200/80 text-sky-800 text-[10px] font-medium shadow-2xs">
-                        <Paperclip className="w-2.5 h-2.5 text-sky-600 shrink-0" />
-                        <span className="truncate max-w-[200px]">{m.context.label}</span>
+                      <div className="mb-1.5 self-end w-full flex justify-end">
+                        <ContextPreviewCard context={m.context} />
                       </div>
                     )}
                     <div className="w-full bg-sky-700 text-white rounded-xl rounded-tr-xs px-3.5 py-2.5 text-xs font-normal leading-relaxed shadow-xs">
