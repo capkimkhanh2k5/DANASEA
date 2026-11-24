@@ -129,11 +129,6 @@ export const FloatingCustomerDeck: React.FC<FloatingCustomerDeckProps> = ({
           >
             {/* Mascot Avatar SVG */}
             <DanaseaAiMascot size={58} className="drop-shadow-lg" />
-
-            {/* BETA Pill Tag nổi góc trên bên phải */}
-            <span className="absolute -top-1 -right-0.5 px-1.5 py-0.2 rounded-full bg-sky-50 text-sky-800 font-extrabold text-[9px] tracking-wider border border-sky-200/90 shadow-2xs pointer-events-none">
-              BETA
-            </span>
           </button>
         </div>
       </aside>
