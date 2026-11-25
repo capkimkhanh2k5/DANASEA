@@ -4,7 +4,9 @@ import com.danasea.backend.modules.report.domain.models.DashboardMetrics;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AdminDashboardResponse {
 
@@ -16,6 +18,7 @@ public class AdminDashboardResponse {
     private double completionRate;
     private double cancellationRate;
     private List<ReportAlertDto> alerts = new ArrayList<>();
+    private Map<String, Long> vendorBadgeDistribution = new LinkedHashMap<>();
 
     public AdminDashboardResponse() {
         this.status = "ADMIN_ACCESS_GRANTED";
@@ -29,6 +32,26 @@ public class AdminDashboardResponse {
             double completionRate,
             double cancellationRate,
             List<ReportAlertDto> alerts) {
+        this(
+                totalRevenue,
+                netPayout,
+                newOrders,
+                completedOrders,
+                completionRate,
+                cancellationRate,
+                alerts,
+                new LinkedHashMap<>());
+    }
+
+    public AdminDashboardResponse(
+            BigDecimal totalRevenue,
+            BigDecimal netPayout,
+            long newOrders,
+            long completedOrders,
+            double completionRate,
+            double cancellationRate,
+            List<ReportAlertDto> alerts,
+            Map<String, Long> vendorBadgeDistribution) {
         this.status = "ADMIN_ACCESS_GRANTED";
         this.totalRevenue = totalRevenue != null ? totalRevenue : BigDecimal.ZERO;
         this.netPayout = netPayout != null ? netPayout : BigDecimal.ZERO;
@@ -37,12 +60,16 @@ public class AdminDashboardResponse {
         this.completionRate = completionRate;
         this.cancellationRate = cancellationRate;
         this.alerts = alerts != null ? alerts : new ArrayList<>();
+        this.vendorBadgeDistribution =
+                vendorBadgeDistribution != null
+                        ? new LinkedHashMap<>(vendorBadgeDistribution)
+                        : new LinkedHashMap<>();
     }
 
     public static AdminDashboardResponse from(DashboardMetrics metrics) {
         if (metrics == null) {
             return new AdminDashboardResponse(
-                    BigDecimal.ZERO, BigDecimal.ZERO, 0L, 0L, 0.0, 0.0, List.of());
+                    BigDecimal.ZERO, BigDecimal.ZERO, 0L, 0L, 0.0, 0.0, List.of(), Map.of());
         }
         List<ReportAlertDto> alertDtos =
                 metrics.getAlerts() != null
@@ -55,7 +82,8 @@ public class AdminDashboardResponse {
                 metrics.getCompletedOrders(),
                 metrics.getCompletionRate(),
                 metrics.getCancellationRate(),
-                alertDtos);
+                alertDtos,
+                metrics.getVendorBadgeDistribution());
     }
 
     public String getStatus() {
@@ -120,5 +148,16 @@ public class AdminDashboardResponse {
 
     public void setAlerts(List<ReportAlertDto> alerts) {
         this.alerts = alerts;
+    }
+
+    public Map<String, Long> getVendorBadgeDistribution() {
+        return vendorBadgeDistribution;
+    }
+
+    public void setVendorBadgeDistribution(Map<String, Long> vendorBadgeDistribution) {
+        this.vendorBadgeDistribution =
+                vendorBadgeDistribution != null
+                        ? new LinkedHashMap<>(vendorBadgeDistribution)
+                        : new LinkedHashMap<>();
     }
 }

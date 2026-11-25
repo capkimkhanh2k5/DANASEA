@@ -12,6 +12,8 @@ import { RevenueChart } from './RevenueChart';
 import { useAdminDashboard } from './useAdminDashboard';
 import { WorkloadDonut } from './WorkloadDonut';
 import { ExecutiveDigestBanner } from './ExecutiveDigestBanner';
+import { TopVendorsCard } from './TopVendorsCard';
+import { BadgeQualityCard } from './BadgeQualityCard';
 
 export function AdminDashboard() {
   const [searchParams] = useSearchParams();
@@ -38,7 +40,7 @@ export function AdminDashboard() {
     dashboard.reload();
   };
 
-  const _rangeLabel = `${shortDate(range.from)} – ${shortDate(range.to)}/${range.to.slice(0, 4)}`;
+  const rangeLabel = `${shortDate(range.from)} – ${shortDate(range.to)}/${range.to.slice(0, 4)}`;
   const bookingUnavailable = loading || !data?.bookings;
   const revenueUnavailable = loading || !data?.revenue;
 
@@ -124,6 +126,22 @@ export function AdminDashboard() {
               counts={counts}
               loading={loading}
               demo={demo}
+            />
+          </div>
+
+          {/* =========================================================================
+              HÀNG 3: Top 5 đối tác doanh thu + Phân bổ huy hiệu & Cảnh báo rớt hạng
+              ========================================================================= */}
+          <div className="admin-dashboard-row-2">
+            <TopVendorsCard
+              vendors={data?.topVendors}
+              loading={loading}
+              rangeLabel={rangeLabel}
+            />
+            <BadgeQualityCard
+              distribution={data?.vendorBadgeDistribution}
+              atRiskAlerts={data?.badgeRiskAlerts}
+              loading={loading}
             />
           </div>
         </>

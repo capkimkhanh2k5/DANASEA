@@ -238,6 +238,7 @@ class SettlementUseCaseTest {
 
             Vendor qualifiedVendor = new Vendor();
             qualifiedVendor.setId(vendorId);
+            qualifiedVendor.setBadgeTier(com.danasea.backend.modules.vendor.domain.models.BadgeTier.TOP_RATED);
             qualifiedVendor.setRatingAvg(new BigDecimal("4.90"));
             qualifiedVendor.setRatingCount(10);
 
@@ -263,6 +264,47 @@ class SettlementUseCaseTest {
             assertThat(response.safetyRebateQualified()).isTrue();
             assertThat(response.safetyRebateAmount()).isEqualByComparingTo("50000.00");
             assertThat(response.netPayableAmount()).isEqualByComparingTo("2300000.00");
+        }
+
+        @Test
+        @DisplayName("Safety & SLA Rebate: Không đủ điều kiện nếu chưa đạt huy hiệu TOP_RATED")
+        void testGenerateSettlementWithSafetyRebateRejectedWhenNotTopRated() {
+            UUID subOrderId = UUID.randomUUID();
+            SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
+            subOrder.setId(subOrderId);
+            subOrder.setVendorId(vendorId);
+            subOrder.setSubtotalAmount(new BigDecimal("2500000.00"));
+            subOrder.setCommissionRate(new BigDecimal("0.1000"));
+            subOrder.setStatus(SubOrderStatus.COMPLETED);
+            subOrder.setCreatedAt(periodStart.atTime(12, 0).atOffset(OffsetDateTime.now().getOffset()));
+
+            Vendor verifiedVendor = new Vendor();
+            verifiedVendor.setId(vendorId);
+            verifiedVendor.setBadgeTier(com.danasea.backend.modules.vendor.domain.models.BadgeTier.VERIFIED);
+            verifiedVendor.setRatingAvg(new BigDecimal("4.90"));
+            verifiedVendor.setRatingCount(10);
+
+            when(settlementRepository.findByVendorIdAndPeriodStartAndPeriodEnd(vendorId, periodStart, periodEnd))
+                    .thenReturn(Optional.empty());
+            when(subOrderRepository.findByVendorIdAndStatusIn(eq(vendorId), any()))
+                    .thenReturn(List.of(subOrder));
+            when(refundRepository.findBySubOrderIdIn(any()))
+                    .thenReturn(Collections.emptyList());
+            when(disputeRepository.findBySubOrderIdInAndStatusIn(any(), any()))
+                    .thenReturn(Collections.emptyList());
+            when(vendorInternalApi.findById(vendorId))
+                    .thenReturn(Optional.of(verifiedVendor));
+
+            when(settlementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(lineItemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            GenerateSettlementRequest request = new GenerateSettlementRequest(vendorId, periodStart, periodEnd);
+            SettlementResponse response = generateSettlementUseCase.execute(request);
+
+            assertThat(response.safetyRebateQualified()).isFalse();
+            assertThat(response.safetyRebateAmount()).isEqualByComparingTo("0.00");
+            assertThat(response.safetyRebateNote()).contains("TOP_RATED");
+            assertThat(response.netPayableAmount()).isEqualByComparingTo("2250000.00");
         }
 
         @Test

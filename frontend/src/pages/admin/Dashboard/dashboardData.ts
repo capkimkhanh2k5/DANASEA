@@ -1,4 +1,15 @@
-import { numeric, type BookingMetric, type DashboardData, type DateRange, type RecentOrder, type RevenueMetric, type TopServingVendorItem, type TopVendorItem } from './dashboardModel.ts';
+import {
+  numeric,
+  type BadgeRiskAlert,
+  type BookingMetric,
+  type DashboardData,
+  type DateRange,
+  type RecentOrder,
+  type RevenueMetric,
+  type TopServingVendorItem,
+  type TopVendorItem,
+  type VendorBadgeDistribution,
+} from './dashboardModel.ts';
 
 export type DashboardGet = (path: string, config: {
   params: Record<string, string | number>;
@@ -86,9 +97,14 @@ function parseTopVendors(value: unknown): TopVendorItem[] {
   const items = list(record(value).items);
   const parsed: TopVendorItem[] = items.map(item => {
     const row = record(item);
+    const rawBadge = typeof row.badgeTier === 'string' ? row.badgeTier.toUpperCase() : '';
+    const badgeTier = rawBadge === 'TOP_RATED' || rawBadge === 'VERIFIED' || rawBadge === 'NONE'
+      ? rawBadge
+      : undefined;
     return {
       vendorId: String(row.vendorId ?? ''),
       vendorName: String(row.businessName || 'Đối tác'),
+      badgeTier,
       revenue: numeric(row.revenue),
       completedOrders: orderCount(row.completedOrders),
       sharePercent: 0,
@@ -100,6 +116,42 @@ function parseTopVendors(value: unknown): TopVendorItem[] {
     ...v,
     sharePercent: totalRevenue > 0 ? Math.round((v.revenue / totalRevenue) * 1000) / 10 : 0,
   }));
+}
+
+function parseAdminDashboardOverview(value: unknown): {
+  vendorBadgeDistribution: VendorBadgeDistribution | null;
+  badgeRiskAlerts: BadgeRiskAlert[];
+} {
+  const payload = record(value);
+  let vendorBadgeDistribution: VendorBadgeDistribution | null = null;
+  if (payload.vendorBadgeDistribution && typeof payload.vendorBadgeDistribution === 'object' && !Array.isArray(payload.vendorBadgeDistribution)) {
+    const raw = payload.vendorBadgeDistribution as Record<string, unknown>;
+    const toNonNegativeInt = (v: unknown) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : 0;
+    };
+    vendorBadgeDistribution = {
+      TOP_RATED: toNonNegativeInt(raw.TOP_RATED),
+      VERIFIED: toNonNegativeInt(raw.VERIFIED),
+      NONE: toNonNegativeInt(raw.NONE),
+    };
+  }
+
+  const rawAlerts = Array.isArray(payload.alerts) ? payload.alerts : [];
+  const badgeRiskAlerts: BadgeRiskAlert[] = rawAlerts
+    .filter(item => item && typeof item === 'object' && !Array.isArray(item))
+    .map(item => item as Record<string, unknown>)
+    .filter(row => String(row.issueType ?? '').toUpperCase() === 'BADGE_AT_RISK')
+    .map(row => ({
+      vendorId: String(row.vendorId ?? ''),
+      businessName: String(row.businessName || 'Đối tác'),
+      issueType: 'BADGE_AT_RISK',
+      severity: String(row.severity || 'WARNING'),
+      message: String(row.message || 'Đối tác TOP_RATED có nguy cơ rớt hạng.'),
+      metricValue: Number.isFinite(Number(row.metricValue)) ? Number(row.metricValue) : 0,
+    }));
+
+  return { vendorBadgeDistribution, badgeRiskAlerts };
 }
 
 export async function loadAdminDashboard(get: DashboardGet, range: DateRange, signal: AbortSignal): Promise<DashboardData> {
@@ -125,7 +177,7 @@ export async function loadAdminDashboard(get: DashboardGet, range: DateRange, si
   const [
     bookings, revenue, vendors, services, refunds,
     disputesOpen, disputesReview, settlementDraft, settlementPending, payoutRequested,
-    recentOrders, topVendors, roleApplications
+    recentOrders, topVendors, roleApplications, adminOverview
   ] = await Promise.all([
     read('/admin/reports/bookings', { ...range, groupBy: 'day' }, data => parseBookings(data, range), 'báo cáo đặt chỗ'),
     read('/admin/reports/revenue', { ...range, groupBy: 'day' }, data => parseRevenue(data, range), 'báo cáo tiền thu'),
@@ -143,6 +195,7 @@ export async function loadAdminDashboard(get: DashboardGet, range: DateRange, si
       topServingVendors: parseTopServingVendors(data),
     }), 'báo cáo đối tác'),
     read('/admin/partner-applications', { ...page, status: 'PENDING' }, count, 'đơn xét duyệt vai trò'),
+    readOptional('/admin/dashboard', { from: range.from, to: range.to }, parseAdminDashboardOverview),
   ]);
   // Khi API payout hoặc settlement trả về null (lỗi mạng hoặc 404), dữ liệu chưa đầy đủ:
   // tuyệt đối không kết luận 0 payout chờ duyệt mà để settlements = null (unknown).
@@ -155,6 +208,8 @@ export async function loadAdminDashboard(get: DashboardGet, range: DateRange, si
     hotServices: null,
     topVendors: topVendors?.topVendors ?? null,
     topServingVendors: topVendors?.topServingVendors ?? null,
+    vendorBadgeDistribution: adminOverview?.vendorBadgeDistribution ?? null,
+    badgeRiskAlerts: adminOverview?.badgeRiskAlerts ?? [],
     operations: {
       vendors, services, refunds,
       disputes: disputesOpen === null || disputesReview === null ? null : disputesOpen + disputesReview,

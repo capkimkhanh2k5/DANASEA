@@ -25,10 +25,15 @@ import {
   AtlasBadge, 
   AtlasButton 
 } from '../../../components/vendor/atlas/AtlasDesignSystem';
+import { getBadgeTierLabel, normalizeBadgeTier } from '../../../utils/badgeTier';
 
 export function Profile() {
   const { user: authUser, accessToken } = useAuthStore();
-  const [profile, setProfile] = useState<(VendorProfileData & { rejection_reason?: string }) | null>(null);
+  const [profile, setProfile] = useState<(VendorProfileData & {
+    rejection_reason?: string;
+    rating_avg?: number;
+    rating_count?: number;
+  }) | null>(null);
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfileResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'account' | 'bank' | 'docs'>('info');
@@ -67,9 +72,13 @@ export function Profile() {
       const realDocs = await vendorProfileService.getDocuments().catch(() => []);
       
       const vStatus = realProfile.verificationStatus || realProfile.status || 'PENDING';
-      const bTier = realProfile.badgeTier || 'NONE';
+      const bTier = normalizeBadgeTier(realProfile.badgeTier);
 
-      const mapped: VendorProfileData & { rejection_reason?: string } = {
+      const mapped: VendorProfileData & {
+        rejection_reason?: string;
+        rating_avg?: number;
+        rating_count?: number;
+      } = {
         id: realProfile.id,
         name: realProfile.businessName || realProfile.brandName || 'Doanh nghiệp đối tác',
         phone: realProfile.contactPhone || '0905123458',
@@ -77,6 +86,8 @@ export function Profile() {
         address: realProfile.address || realProfile.businessAddress || 'Đà Nẵng',
         verification_status: vStatus === 'APPROVED' ? 'APPROVED' : vStatus === 'REJECTED' ? 'REJECTED' : 'PENDING',
         badge_tier: bTier,
+        rating_avg: realProfile.ratingAvg ?? realProfile.ratingAverage ?? 0,
+        rating_count: realProfile.ratingCount ?? realProfile.totalReviews ?? 0,
         bank_name: realProfile.bankName || '',
         bank_account_number: realProfile.bankAccountNumber || '',
         bank_account_holder: realProfile.bankAccountHolder || '',
@@ -275,6 +286,35 @@ export function Profile() {
       <AtlasPageHeader
         title="Hồ sơ & Pháp lý Doanh nghiệp"
       />
+
+      {/* Vendor Reputation & Badge Summary */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Huy hiệu uy tín đối tác
+            </span>
+            <AtlasBadge
+              label={getBadgeTierLabel(profile.badge_tier)}
+              variant={
+                normalizeBadgeTier(profile.badge_tier) === 'TOP_RATED'
+                  ? 'warning'
+                  : normalizeBadgeTier(profile.badge_tier) === 'VERIFIED'
+                    ? 'success'
+                    : 'neutral'
+              }
+            />
+            {typeof profile.rating_count === 'number' && profile.rating_count > 0 && (
+              <span className="text-xs font-medium text-slate-600 font-mono tabular-nums">
+                {(profile.rating_avg ?? 0).toFixed(1)} / 5.0 ({profile.rating_count} đánh giá)
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Hệ thống tự động cập nhật từ đánh giá hiển thị: <strong className="text-slate-700">Đã xác minh</strong> (≥ 1 đánh giá &amp; ≥ 3.5★), <strong className="text-slate-700">Đối tác hàng đầu</strong> (≥ 5 đánh giá &amp; ≥ 4.5★ — ưu tiên tìm kiếm, ưu tiên hàng chờ chi trả và mở khóa Quỹ thưởng An toàn +2% khi đạt ≥ 4.8★ cùng 0 lỗi vận hành).
+          </p>
+        </div>
+      </div>
 
       {/* Rejection Alert & Resubmit CTA */}
       {profile.verification_status === 'REJECTED' && (

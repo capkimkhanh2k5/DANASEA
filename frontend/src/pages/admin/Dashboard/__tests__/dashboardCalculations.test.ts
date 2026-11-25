@@ -203,5 +203,49 @@ describe('Admin Dashboard Operations — Settlements & Payout Requests Aggregati
     assert.equal(data.operations.disputes, 1);
     assert.equal(data.operations.settlements, 0);
   });
+
+  test('parses vendorBadgeDistribution and BADGE_AT_RISK alerts from /admin/dashboard', async () => {
+    const { loadAdminDashboard } = await import('../dashboardData.ts');
+    const mockGet = async (path: string) => {
+      if (path === '/admin/dashboard') {
+        return {
+          data: {
+            vendorBadgeDistribution: { TOP_RATED: 4, VERIFIED: 3, NONE: 2 },
+            alerts: [
+              {
+                vendorId: 'v-risk-1',
+                businessName: 'Danang Sea Club',
+                issueType: 'BADGE_AT_RISK',
+                severity: 'WARNING',
+                message: "Đối tác TOP_RATED 'Danang Sea Club' có nguy cơ rớt hạng (điểm TB: 4.55/5.0)",
+                metricValue: 4.55,
+              },
+              {
+                vendorId: 'v-other',
+                businessName: 'Other Co',
+                issueType: 'OVERLOADED',
+                severity: 'CRITICAL',
+                message: 'Quá tải slot',
+                metricValue: 96,
+              },
+            ],
+          },
+        };
+      }
+      if (path === '/admin/reports/bookings' || path === '/admin/reports/revenue' || path === '/admin/reports/vendors') {
+        return { data: { items: [] } };
+      }
+      if (path === '/admin/services') {
+        return { data: [] };
+      }
+      return { data: { content: [], totalElements: 0 } };
+    };
+
+    const data = await loadAdminDashboard(mockGet as Parameters<typeof loadAdminDashboard>[0], { from: '2026-11-08', to: '2026-11-14' }, new AbortController().signal);
+    assert.deepEqual(data.vendorBadgeDistribution, { TOP_RATED: 4, VERIFIED: 3, NONE: 2 });
+    assert.equal(data.badgeRiskAlerts?.length, 1);
+    assert.equal(data.badgeRiskAlerts?.[0].vendorId, 'v-risk-1');
+    assert.equal(data.badgeRiskAlerts?.[0].issueType, 'BADGE_AT_RISK');
+  });
 });
 

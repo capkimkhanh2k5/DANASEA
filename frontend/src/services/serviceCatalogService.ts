@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import type { BadgeTier } from '../types';
 import type { ServicePageResponse, ServiceDetailDto, StructuredSlotDto } from '../types/service';
 import { flowLogger } from '../utils/flowLogger';
 
@@ -7,7 +8,8 @@ export interface ServiceQueryParams {
   size?: number;
   categoryId?: string;
   keyword?: string;
-  sortBy?: 'price_asc' | 'price_desc' | 'rating_desc' | 'views_desc';
+  badgeTier?: BadgeTier;
+  sortBy?: 'recommended' | 'newest' | 'price_asc' | 'price_desc' | 'rating_desc' | 'views_desc';
   minPrice?: number;
   maxPrice?: number;
 }
@@ -39,6 +41,7 @@ export const serviceCatalogService = {
       size: params.size ?? 12,
       ...(params.categoryId ? { categoryId: params.categoryId } : {}),
       ...(params.keyword ? { keyword: params.keyword } : {}),
+      ...(params.badgeTier ? { badgeTier: params.badgeTier } : {}),
       ...(params.sortBy ? { sortBy: params.sortBy } : {}),
       ...(params.minPrice !== undefined ? { minPrice: params.minPrice } : {}),
       ...(params.maxPrice !== undefined ? { maxPrice: params.maxPrice } : {}),

@@ -141,12 +141,12 @@ Nhằm đảm bảo dữ liệu thống kê không bị sai lệch trong môi tr
    - `rating_avg = ROUND(AVG(rating), 1)` (nếu `rating_count == 0` thì `rating_avg = 0.0`).
 
 3. **Cây quyết định suy luận Huy hiệu uy tín (`BadgeTier`):**
-   - **`TOP_RATED`**: Đạt được khi nhà cung cấp có điểm trung bình xuất sắc và đủ số lượng đánh giá tối thiểu:
-     $$\text{ratingAvg} \ge 4.0 \quad \text{VÀ} \quad \text{ratingCount} \ge 5$$
-   - **`VERIFIED`**: Đã bắt đầu nhận được đánh giá từ khách hàng thực tế nhưng chưa đạt ngưỡng Top Rated:
-     $$\text{ratingCount} \ge 1 \quad (\text{chưa đạt TOP\_RATED})$$
-   - **`NONE`**: Khi Vendor chưa có bất kỳ đánh giá hợp lệ nào:
-     $$\text{ratingCount} = 0$$
+   - **`TOP_RATED` (Đối tác hàng đầu)**: Đạt được khi nhà cung cấp có điểm trung bình xuất sắc và đủ số lượng đánh giá tối thiểu (ưu tiên hiển thị tìm kiếm, nhận diện ưu tiên hàng chờ chi trả và là điều kiện mở khóa Quỹ thưởng An toàn +2% khi đạt ≥ 4.8★ & 0 lỗi vận hành):
+     $$\text{ratingAvg} \ge 4.5 \quad \text{VÀ} \quad \text{ratingCount} \ge 5$$
+   - **`VERIFIED` (Đã xác minh)**: Đã nhận được đánh giá thực tế đạt chất lượng tối thiểu nhưng chưa đạt ngưỡng Top Rated:
+     $$\text{ratingCount} \ge 1 \quad \text{VÀ} \quad \text{ratingAvg} \ge 3.5 \quad (\text{chưa đạt TOP\_RATED})$$
+   - **`NONE` (Chưa xếp hạng)**: Khi Vendor chưa có đánh giá hợp lệ nào hoặc điểm trung bình thấp hơn 3.5:
+     $$\text{ratingCount} = 0 \quad \text{HOẶC} \quad \text{ratingAvg} < 3.5$$
 
 ---
 

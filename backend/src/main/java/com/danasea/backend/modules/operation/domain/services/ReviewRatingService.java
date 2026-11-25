@@ -21,6 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReviewRatingService {
 
+    public static final int VERIFIED_MIN_REVIEWS = 1;
+    public static final BigDecimal VERIFIED_MIN_RATING = new BigDecimal("3.50");
+    public static final int TOP_RATED_MIN_REVIEWS = 5;
+    public static final BigDecimal TOP_RATED_MIN_RATING = new BigDecimal("4.50");
+
     private final JpaReviewRepository reviewRepository;
     private final JpaServiceRepository serviceRepository;
     private final JpaVendorRepository vendorRepository;
@@ -76,19 +81,23 @@ public class ReviewRatingService {
                 ? BigDecimal.valueOf(avg).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
-        BadgeTier badgeTier;
-        if (count >= 5 && ratingAvg.compareTo(new BigDecimal("4.0")) >= 0) {
-            badgeTier = BadgeTier.TOP_RATED;
-        } else if (count >= 1) {
-            badgeTier = BadgeTier.VERIFIED;
-        } else {
-            badgeTier = BadgeTier.NONE;
-        }
+        BadgeTier badgeTier = deriveBadgeTier(count, ratingAvg);
 
         vendorEntity.setRatingAvg(ratingAvg);
         vendorEntity.setRatingCount((int) count);
         vendorEntity.setBadgeTier(badgeTier);
         vendorRepository.save(vendorEntity);
         log.info("Recalculated Vendor [{}] - ratingAvg: {}, ratingCount: {}, badgeTier: {}", vendorId, ratingAvg, count, badgeTier);
+    }
+
+    public static BadgeTier deriveBadgeTier(long visibleReviewCount, BigDecimal avgRating) {
+        BigDecimal rating = avgRating != null ? avgRating : BigDecimal.ZERO;
+        if (visibleReviewCount >= TOP_RATED_MIN_REVIEWS && rating.compareTo(TOP_RATED_MIN_RATING) >= 0) {
+            return BadgeTier.TOP_RATED;
+        }
+        if (visibleReviewCount >= VERIFIED_MIN_REVIEWS && rating.compareTo(VERIFIED_MIN_RATING) >= 0) {
+            return BadgeTier.VERIFIED;
+        }
+        return BadgeTier.NONE;
     }
 }

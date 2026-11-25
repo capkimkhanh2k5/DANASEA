@@ -22,6 +22,7 @@ import { adminPayoutService } from '../../../services/adminPayoutService';
 import type { PayoutRequestItem } from '../../../services/vendorPayoutService';
 import type { SettlementDetailResponse, SettlementResponse } from '../../../types/adminSettlement';
 import type { AdminVendorResponse } from '../../../types/adminVendor';
+import { getBadgeTierLabel, normalizeBadgeTier } from '../../../utils/badgeTier';
 import {
   AdminBadge,
   AdminState,
@@ -124,6 +125,7 @@ export function AdminPayouts() {
               rejectionReason: p.rejectionReason,
               adminNote: p.adminNote,
               note: p.note || p.vendorNote,
+              vendorBadgeTier: normalizeBadgeTier(p.vendorBadgeTier ?? v?.badgeTier),
             };
           });
         } else {
@@ -145,6 +147,7 @@ export function AdminPayouts() {
               totalOrdersCount: 0,
               createdAt: s.createdAt,
               updatedAt: s.updatedAt,
+              vendorBadgeTier: normalizeBadgeTier(v?.badgeTier),
             };
           });
         }
@@ -571,7 +574,12 @@ export function AdminPayouts() {
                       </AdminBadge>
                     </div>
 
-                    <div className="admin-payouts__item-vendor">{p.vendorName}</div>
+                    <div className="admin-payouts__item-vendor" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span>{p.vendorName}</span>
+                      {p.vendorBadgeTier === 'TOP_RATED' && (
+                        <AdminBadge tone="amber">Ưu tiên · {getBadgeTierLabel('TOP_RATED')}</AdminBadge>
+                      )}
+                    </div>
 
                     <div className="admin-payouts__item-meta">
                       <span>{p.periodText}</span>
@@ -607,8 +615,11 @@ export function AdminPayouts() {
                 <span className="admin-payouts__detail-id-tag" title={selectedPayout.id}>
                   LỆNH CHI #{formatDisplayCode(selectedPayout.id, 'PAY')}
                 </span>
-                <h2 id="payout-detail-heading" className="admin-payouts__detail-vendor-name">
-                  {selectedPayout.vendorName}
+                <h2 id="payout-detail-heading" className="admin-payouts__detail-vendor-name" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span>{selectedPayout.vendorName}</span>
+                  {selectedPayout.vendorBadgeTier === 'TOP_RATED' && (
+                    <AdminBadge tone="amber">Ưu tiên · {getBadgeTierLabel('TOP_RATED')}</AdminBadge>
+                  )}
                 </h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--admin-muted, #737373)' }}>
                   <Calendar size={14} />

@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import type { BadgeTier } from '../types';
 
 export interface EligibleSettlementPayout {
   settlementId: string;
@@ -26,6 +27,7 @@ export interface PayoutRequestItem {
   adminNote?: string | null;
   note?: string | null;
   vendorNote?: string | null;
+  vendorBadgeTier?: BadgeTier | null;
   createdAt: string;
   updatedAt: string;
 }

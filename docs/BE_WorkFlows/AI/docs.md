@@ -363,7 +363,7 @@ Sơ đồ nguồn: `codeFlows/Decision_Flowchart/CliProxy_ModelFallback_DF.mmd`.
 **Luồng xử lý:**
 1. **Phân tích Review Coaching 4 trụ cột:**
    - Hệ thống quét lịch sử đánh giá của đối tác trong 30-180 ngày, bóc tách dữ liệu theo 4 khía cạnh trọng yếu: Hướng dẫn viên (`GUIDE`), An toàn & Thiết bị (`SAFETY`), Đúng giờ (`PUNCTUALITY`), Giá trị xứng đáng (`VALUE`).
-   - Trích xuất điểm mạnh và điểm yếu kèm bằng chứng thực tế từ bình luận của khách, xếp hạng huy hiệu (`BadgeTier`: STANDARD → SILVER → GOLD → ELITE) và lộ trình thăng hạng.
+   - Trích xuất điểm mạnh và điểm yếu kèm bằng chứng thực tế từ bình luận của khách, xếp hạng huy hiệu (`BadgeTier`: `NONE` → `VERIFIED` → `TOP_RATED`) và lộ trình thăng hạng.
    - Lưu trữ bản phân tích vào bảng `ai_vendor_insights` (Flyway V55).
 2. **Soạn nháp phản hồi đánh giá thông minh (Smart Reply Draft):**
    - Hỗ trợ 3 tông giọng (`PROFESSIONAL`, `FRIENDLY`, `EMPATHETIC`), kiểm duyệt an toàn tự động, tích hợp voucher giữ chân khách hàng.

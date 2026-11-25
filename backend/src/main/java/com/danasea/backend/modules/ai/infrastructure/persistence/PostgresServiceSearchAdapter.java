@@ -33,35 +33,41 @@ public class PostgresServiceSearchAdapter implements ServiceSearchPort {
             String keyword, String category, BigDecimal minPrice, BigDecimal maxPrice,
             SupportedLanguage language) {
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT id, CASE WHEN ? = 'en' THEN COALESCE(NULLIF(name_en, ''), name) ELSE name END, price, avg_rating ");
-        sql.append("FROM services ");
-        sql.append("WHERE status = 'PUBLISHED' ");
+        sql.append("SELECT s.id, CASE WHEN ? = 'en' THEN COALESCE(NULLIF(s.name_en, ''), s.name) ELSE s.name END, ");
+        sql.append("s.price, s.avg_rating, COALESCE(v.badge_tier, 'NONE') ");
+        sql.append("FROM services s ");
+        sql.append("LEFT JOIN vendors v ON v.id = s.vendor_id ");
+        sql.append("WHERE s.status = 'PUBLISHED' ");
 
         List<Object> params = new ArrayList<>();
         params.add((language == null ? SupportedLanguage.VI : language).code());
 
         if (keyword != null && !keyword.trim().isEmpty()) {
-            sql.append("AND search_vector @@ plainto_tsquery('simple', ?) ");
+            sql.append("AND s.search_vector @@ plainto_tsquery('simple', ?) ");
             params.add(keyword.trim());
         }
 
         if (minPrice != null) {
-            sql.append("AND price >= ? ");
+            sql.append("AND s.price >= ? ");
             params.add(minPrice);
         }
 
         if (maxPrice != null) {
-            sql.append("AND price <= ? ");
+            sql.append("AND s.price <= ? ");
             params.add(maxPrice);
         }
 
         if (category != null && !category.trim().isEmpty()) {
-            sql.append("AND category_id IN (SELECT id FROM categories WHERE name ILIKE ? OR name_en ILIKE ?) ");
+            sql.append("AND s.category_id IN (SELECT id FROM categories WHERE name ILIKE ? OR name_en ILIKE ?) ");
             params.add("%" + category.trim() + "%");
             params.add("%" + category.trim() + "%");
         }
 
-        sql.append("ORDER BY avg_rating DESC NULLS LAST LIMIT ").append(DEFAULT_SEARCH_LIMIT);
+        sql.append("ORDER BY (")
+                .append("((COALESCE(s.avg_rating, 0) * COALESCE(s.rating_count, 0)) + (3.8 * 3)) / (COALESCE(s.rating_count, 0) + 3.0) ")
+                .append("+ CASE COALESCE(v.badge_tier, 'NONE') WHEN 'TOP_RATED' THEN 0.35 WHEN 'VERIFIED' THEN 0.10 ELSE 0.0 END")
+                .append(") DESC, COALESCE(s.rating_count, 0) DESC, s.created_at DESC LIMIT ")
+                .append(DEFAULT_SEARCH_LIMIT);
 
         Query query = entityManager.createNativeQuery(sql.toString());
         for (int i = 0; i < params.size(); i++) {
@@ -78,6 +84,7 @@ public class PostgresServiceSearchAdapter implements ServiceSearchPort {
                     .price((BigDecimal) row[2])
                     .avgRating((BigDecimal) row[3])
                     .matchType(MATCH_TYPE_EXACT)
+                    .vendorBadgeTier(row.length > 4 && row[4] != null ? row[4].toString() : "NONE")
                     .build());
         }
 

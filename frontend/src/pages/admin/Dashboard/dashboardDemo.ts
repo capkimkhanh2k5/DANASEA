@@ -93,11 +93,13 @@ function computeTopVendors(range: DateRange): TopVendorItem[] {
     const d = (s.createdAt || '').slice(0, 10);
     return d >= range.from && d <= range.to && ['CONFIRMED', 'COMPLETED', 'PAID'].includes(s.status);
   });
-  const map = new Map<string, { vendorId: string; vendorName: string; revenue: number; completedOrders: number }>();
+  const map = new Map<string, { vendorId: string; vendorName: string; badgeTier?: 'NONE' | 'VERIFIED' | 'TOP_RATED'; revenue: number; completedOrders: number }>();
   for (const s of inRange) {
+    const mockVendor = MOCK_ADMIN_VENDORS.find(v => v.id === s.vendorId);
     const existing = map.get(s.vendorId) || {
       vendorId: s.vendorId,
       vendorName: getVendorName(s.vendorId),
+      badgeTier: mockVendor?.badgeTier,
       revenue: 0,
       completedOrders: 0,
     };
@@ -149,6 +151,12 @@ export function createDashboardDemo(range: DateRange): DashboardData {
     createdAt: o.createdAt || '',
   }));
 
+  const vendorBadgeDistribution = {
+    TOP_RATED: MOCK_ADMIN_VENDORS.filter(v => v.badgeTier === 'TOP_RATED').length,
+    VERIFIED: MOCK_ADMIN_VENDORS.filter(v => v.badgeTier === 'VERIFIED').length,
+    NONE: MOCK_ADMIN_VENDORS.filter(v => v.badgeTier === 'NONE').length,
+  };
+
   return {
     bookings,
     revenue,
@@ -163,6 +171,17 @@ export function createDashboardDemo(range: DateRange): DashboardData {
     hotServices: computeHotServices(range),
     topVendors: computeTopVendors(range),
     topServingVendors: computeTopServingVendors(range),
+    vendorBadgeDistribution,
+    badgeRiskAlerts: [
+      {
+        vendorId: '128672c5-94e7-5560-896c-158794913b8c',
+        businessName: 'Công ty Cổ phần D BLUE',
+        issueType: 'BADGE_AT_RISK',
+        severity: 'WARNING',
+        message: "Đối tác TOP_RATED 'Công ty Cổ phần D BLUE' có nguy cơ rớt hạng (điểm TB: 4.60/5.0)",
+        metricValue: 4.6,
+      },
+    ],
     recentOrders,
     errors: [],
   };

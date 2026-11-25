@@ -78,6 +78,7 @@ public class CatalogController {
             @RequestParam(required = false) Integer guests,
             @RequestParam(required = false) Integer participantCount,
             @RequestParam(required = false) UUID vendorId,
+            @RequestParam(required = false) com.danasea.backend.modules.vendor.domain.models.BadgeTier badgeTier,
             @RequestParam(required = false) BigDecimal minRating,
             @RequestParam(required = false) String sortBy,
             @RequestParam(defaultValue = "0") int page,
@@ -108,6 +109,7 @@ public class CatalogController {
                 .timeSlot(timeSlot)
                 .guests(guests)
                 .vendorId(vendorId)
+                .badgeTier(badgeTier)
                 .minRating(minRating)
                 .sortBy(sortBy)
                 .page(page)
@@ -121,6 +123,8 @@ public class CatalogController {
         List<ServiceSummaryResponse> responses = results.stream().map(r -> ServiceSummaryResponse.builder()
                 .flashSales(offers.stream().filter(o -> o.serviceId().equals(r.getId())).toList())
                 .id(r.getId())
+                .vendorId(r.getVendorId())
+                .vendorBadgeTier(r.getVendorBadgeTier())
                 .name(r.getName())
                 .slug(r.getSlug())
                 .shortDescription(r.getShortDescription())

@@ -1,11 +1,12 @@
 import type { MOCK_ADMIN_PAYOUTS } from '../../../data/adminMockData';
-import type { PayoutRequestStatus } from '../../../types';
+import type { BadgeTier, PayoutRequestStatus } from '../../../types';
 
 export type PayoutExtended = (typeof MOCK_ADMIN_PAYOUTS)[0] & {
   bankReference?: string | null;
   rejectionReason?: string | null;
   adminNote?: string | null;
   note?: string | null;
+  vendorBadgeTier?: BadgeTier;
 };
 export type PayoutStatusFilter = 'all' | 'REQUESTED' | 'APPROVED' | 'PAID' | 'REJECTED';
 
