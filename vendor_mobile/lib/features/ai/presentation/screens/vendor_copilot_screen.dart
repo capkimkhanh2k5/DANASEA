@@ -170,6 +170,11 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
     return formatDisplayCode(raw, prefix: prefix);
   }
 
+  String _cleanDisplayContent(String raw) {
+    final cleaned = raw.replaceFirst(RegExp(r'^\[(?:Về\s+)?[^\]]+\]\s*'), '');
+    return cleaned.isNotEmpty ? cleaned : raw;
+  }
+
   final List<String> _quickPrompts = [
     'Doanh thu hôm nay của gian hàng là bao nhiêu?',
     'Tháng này gian hàng có doanh thu và thực thu dự kiến bao nhiêu?',
@@ -228,27 +233,17 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
 
     final contextType = _pinnedContextType ?? widget.contextType;
     final contextId = _pinnedContextId ?? widget.contextId;
-
-    String contextPrefix = '';
-    if (_pinnedContextTitle != null && _pinnedContextTitle!.trim().isNotEmpty) {
-      final title = _pinnedContextTitle!.trim();
-      contextPrefix = title.startsWith('[') ? title : '[$title]';
-    } else if (contextType != null && contextId != null) {
-      final label = contextType == 'ORDER' ? 'Đơn hàng' : 'Dịch vụ';
-      final codePrefix = contextType == 'ORDER' ? 'ORD' : 'SRV';
-      contextPrefix = '[$label: #${_formatShortCode(contextId, prefix: codePrefix)}]';
-    }
-
-    final messageWithContext = (contextPrefix.isNotEmpty && !clean.startsWith('['))
-        ? '$contextPrefix $clean'
-        : clean;
+    final contextLabel = _pinnedContextTitle?.trim();
 
     _textController.clear();
     final userMsg = CopilotMessageModel(
       id: 'usr-${DateTime.now().millisecondsSinceEpoch}',
       role: 'user',
-      content: messageWithContext,
+      content: clean,
       createdAt: DateTime.now(),
+      contextType: contextType,
+      contextId: contextId,
+      contextLabel: contextLabel,
     );
 
     setState(() {
@@ -260,9 +255,10 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
     try {
       final aiResp = await _aiRepo.chatWithCopilot(
         conversationId: _conversationId,
-        message: messageWithContext,
+        message: clean,
         contextType: contextType,
         contextId: contextId,
+        contextLabel: contextLabel,
       );
 
       if (mounted) {
@@ -1056,6 +1052,85 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
               ),
             ),
 
+            // Attached Context Preview Card for User Message (Dựng lại từ contextType, contextId, contextLabel)
+            if (isUser &&
+                (msg.contextType != null ||
+                    msg.contextId != null ||
+                    msg.contextLabel != null ||
+                    msg.content.startsWith('['))) ...[
+              () {
+                String? label = msg.contextLabel?.trim();
+                String? type = msg.contextType?.trim();
+                String? id = msg.contextId?.trim();
+
+                // If not in fields, extract from legacy prefix [Về ...] or [Dịch vụ: ...]
+                if (label == null || label.isEmpty) {
+                  final match = RegExp(r'^\[(?:Về\s+)?([^\]]+?)\]').firstMatch(msg.content);
+                  if (match != null) {
+                    label = match.group(1);
+                  }
+                }
+
+                // Fallback: nếu contextLabel null thì hiển thị contextType
+                final displayTitle = (label != null && label.isNotEmpty)
+                    ? label
+                    : (type != null && type.isNotEmpty
+                        ? (type == 'SERVICE' ? 'Dịch vụ' : type == 'ORDER' ? 'Đơn hàng' : type)
+                        : 'Ngữ cảnh đính kèm');
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.82,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE6F4F1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF006874).withValues(alpha: 0.25),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        type == 'ORDER' ? Icons.receipt_long_rounded : Icons.surfing_rounded,
+                        size: 13,
+                        color: const Color(0xFF006874),
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          displayTitle,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF004D56),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (id != null && id.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '#${_formatShortCode(id, prefix: type == 'ORDER' ? 'SUB' : 'SRV')}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF006874),
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }(),
+            ],
+
             // Bubble
             Container(
               margin: const EdgeInsets.only(bottom: 6),
@@ -1091,7 +1166,7 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
                 children: [
                   if (isUser)
                     SelectableText(
-                      msg.content,
+                      _cleanDisplayContent(msg.content),
                       style: AppTypography.bodyMd(
                         color: Colors.white,
                       ),

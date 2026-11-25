@@ -2727,6 +2727,7 @@ class VendorAiRepository implements IVendorAiRepository {
     required String message,
     String? contextType,
     String? contextId,
+    String? contextLabel,
   }) async {
     final res = await _session.request(
       '/api/vendor/ai/copilot/chat',
@@ -2737,6 +2738,7 @@ class VendorAiRepository implements IVendorAiRepository {
         'message': message,
         if (contextType != null) 'contextType': contextType,
         if (contextId != null) 'contextId': contextId,
+        if (contextLabel != null) 'contextLabel': contextLabel,
       },
     );
     final response = CopilotMessageModel.fromJson(res);

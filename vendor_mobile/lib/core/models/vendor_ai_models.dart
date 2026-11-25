@@ -12,6 +12,9 @@ class CopilotMessageModel {
   final bool isVerified;
   final List<String> details;
   final List<Map<String, dynamic>> artifacts;
+  final String? contextType;
+  final String? contextId;
+  final String? contextLabel;
 
   const CopilotMessageModel({
     required this.id,
@@ -22,6 +25,9 @@ class CopilotMessageModel {
     this.isVerified = false,
     this.details = const [],
     this.artifacts = const [],
+    this.contextType,
+    this.contextId,
+    this.contextLabel,
   });
 
   bool get isUser => role.toLowerCase() == 'user';
@@ -55,6 +61,9 @@ class CopilotMessageModel {
           : DateTime.now(),
       isVerified: json['generatedTextVerified'] == true,
       artifacts: rawArtifacts,
+      contextType: json['contextType']?.toString(),
+      contextId: json['contextId']?.toString(),
+      contextLabel: json['contextLabel']?.toString(),
       details: [
         for (final artifact in rawArtifacts)
           ..._artifactDetails(artifact),

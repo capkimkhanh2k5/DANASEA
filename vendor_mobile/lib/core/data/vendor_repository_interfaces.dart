@@ -285,6 +285,7 @@ abstract class IVendorAiRepository {
     required String message,
     String? contextType,
     String? contextId,
+    String? contextLabel,
   });
   Future<List<Map<String, dynamic>>> listConversations();
   Future<List<CopilotMessageModel>> getConversationHistory(String conversationId);
