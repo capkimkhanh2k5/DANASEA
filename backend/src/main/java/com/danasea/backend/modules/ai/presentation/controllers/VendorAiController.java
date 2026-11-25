@@ -150,6 +150,13 @@ public class VendorAiController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/copilot/refunds")
+    public List<VendorAiDataPort.VendorRefundDetail> listVendorRefunds(
+            @RequestParam(defaultValue = "50") int limit
+    ) {
+        return vendorDataPort.listRefunds(resolveVendorId(), limit);
+    }
+
     // ==================== HELPERS ====================
 
     private UUID resolveUserId() {

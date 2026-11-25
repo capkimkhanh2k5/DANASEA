@@ -356,6 +356,35 @@ public class JpaVendorAiDataAdapter implements VendorAiDataPort {
 
     @Override
     @Transactional(readOnly = true)
+    public List<VendorRefundDetail> listRefunds(UUID vendorId, int limit) {
+        if (jdbc == null || vendorId == null) return List.of();
+        int bounded = Math.max(1, Math.min(limit, 100));
+        return jdbc.query("""
+                SELECT r.id, r.sub_order_id, s.name AS service_title,
+                       r.amount, r.refund_percentage, r.reason, r.status, r.provider,
+                       r.created_at, r.processed_at
+                FROM refunds r
+                JOIN sub_orders so ON so.id = r.sub_order_id
+                LEFT JOIN services s ON s.id = so.service_id
+                WHERE so.vendor_id = ?
+                ORDER BY r.created_at DESC
+                LIMIT ?
+                """, (rs, i) -> new VendorRefundDetail(
+                rs.getObject("id", UUID.class),
+                rs.getObject("sub_order_id", UUID.class),
+                rs.getString("service_title"),
+                rs.getBigDecimal("amount"),
+                rs.getBigDecimal("refund_percentage"),
+                rs.getString("reason"),
+                rs.getString("status"),
+                rs.getString("provider"),
+                rs.getObject("created_at", OffsetDateTime.class),
+                rs.getObject("processed_at", OffsetDateTime.class)
+        ), vendorId, bounded);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<VendorEquipmentDetail> getEquipmentDetail(UUID vendorId, UUID equipmentId) {
         if (jdbc == null || vendorId == null || equipmentId == null) return Optional.empty();
         var equipment = jdbc.query("""

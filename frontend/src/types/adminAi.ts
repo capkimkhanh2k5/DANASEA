@@ -139,6 +139,9 @@ export interface CopilotMessage {
   toolsUsed?: string | null;
   verified: boolean;
   createdAt: string;
+  contextType?: string | null;
+  contextId?: string | null;
+  contextLabel?: string | null;
 }
 
 export interface CopilotChatRequestDto {
@@ -146,6 +149,7 @@ export interface CopilotChatRequestDto {
   message: string;
   contextType?: string | null;
   contextId?: string | null;
+  contextLabel?: string | null;
 }
 
 export interface CopilotChatResponse {

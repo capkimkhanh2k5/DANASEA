@@ -66,6 +66,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 class VendorCopilotServiceIntentTest {
 
     private VendorAiDataPort vendorAiData;
+    private AdminAiDataPort adminAiData;
     private AiExtendedInsightStorePort insightStore;
     private LlmClientPort llmClient;
     private RoleCopilotUseCase copilot;
@@ -78,7 +79,7 @@ class VendorCopilotServiceIntentTest {
     @BeforeEach
     void setUp() {
         vendorAiData = mock(VendorAiDataPort.class);
-        var adminAiData = mock(AdminAiDataPort.class);
+        adminAiData = mock(AdminAiDataPort.class);
         insightStore = mock(AiExtendedInsightStorePort.class);
         var decisionModel = mock(DecisionModelPort.class);
         llmClient = mock(LlmClientPort.class);
@@ -330,5 +331,54 @@ class VendorCopilotServiceIntentTest {
         assertThat(promptCaptor.getValue())
                 .contains("ORDER " + otherVendorOrderId + " is NOT found in this vendor's shop")
                 .doesNotContain("SPOOFED_SECRET_LABEL");
+    }
+
+    @Test
+    @DisplayName("Admin Copilot nạp dữ liệu thật cho ORDER, VENDOR, SERVICE khi đính kèm ngữ cảnh")
+    void adminCopilotGroundsPinnedOrderVendorService() {
+        var llmAnswer = new LlmResponse();
+        llmAnswer.setResponseStatus("ANSWERED");
+        llmAnswer.setContent("Dữ liệu sàn đã xác minh.");
+        when(llmClient.generateText(any(), any(), anyString())).thenReturn(llmAnswer);
+        when(insightStore.listCopilotMessages(any())).thenReturn(List.of());
+
+        UUID adminId = UUID.randomUUID();
+        UUID adminConvId = UUID.randomUUID();
+        var adminConv = new CopilotConversation(adminConvId, adminId, "ADMIN", null, "vi", null,
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(adminConvId)).thenReturn(Optional.of(adminConv));
+
+        UUID subOrderId = UUID.randomUUID();
+        UUID masterOrderId = UUID.randomUUID();
+        UUID targetVendorId = UUID.randomUUID();
+        UUID targetServiceId = UUID.randomUUID();
+
+        when(adminAiData.getOrderDetail(subOrderId)).thenReturn(Optional.of(new AdminAiDataPort.AdminOrderDetail(
+                subOrderId, masterOrderId, targetVendorId, "Danabeach", targetServiceId, "Mô tô nước – Danabeach",
+                "Nguyễn Văn A", LocalDate.of(2026, 10, 25), LocalTime.of(9, 0), LocalTime.of(10, 0),
+                1, BigDecimal.valueOf(650_000), BigDecimal.valueOf(65_000), BigDecimal.valueOf(585_000),
+                "COMPLETED", "PAID", null, OffsetDateTime.now(), OffsetDateTime.now()
+        )));
+        when(adminAiData.getVendorDetail(targetVendorId)).thenReturn(Optional.of(new AdminAiDataPort.AdminVendorDetail(
+                targetVendorId, "Danabeach", "APPROVED", "GOLD", BigDecimal.valueOf(4.8), 20, 4L
+        )));
+        when(adminAiData.getServiceDetail(targetServiceId)).thenReturn(Optional.of(new AdminAiDataPort.AdminServiceDetail(
+                targetServiceId, targetVendorId, "Danabeach", "Mô tô nước – Danabeach", "Jetski",
+                "PUBLISHED", BigDecimal.valueOf(650_000), 15, 2, BigDecimal.valueOf(4.8), 10
+        )));
+
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId,
+                "Nói sơ về đơn hàng này", "ORDER", subOrderId, "Đơn hàng #0002", SupportedLanguage.VI);
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId,
+                "Trạng thái hiện tại là gì?", "VENDOR", targetVendorId, "Danabeach", SupportedLanguage.VI);
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId,
+                "Nói sơ về dịch vụ này", "SERVICE", targetServiceId, "Mô tô nước", SupportedLanguage.VI);
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(llmClient, org.mockito.Mockito.times(3)).generateText(any(), any(), promptCaptor.capture());
+        var prompts = promptCaptor.getAllValues();
+        assertThat(prompts.get(0)).contains("ORDER (verified platform record)").contains("finalAmountVnd=650000");
+        assertThat(prompts.get(1)).contains("VENDOR (verified platform record)").contains("businessName=Danabeach");
+        assertThat(prompts.get(2)).contains("SERVICE (verified platform record)").contains("basePriceVnd=650000");
     }
 }

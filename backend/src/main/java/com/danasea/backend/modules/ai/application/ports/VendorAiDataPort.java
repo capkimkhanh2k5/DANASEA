@@ -202,6 +202,10 @@ public interface VendorAiDataPort {
         return Optional.empty();
     }
 
+    default List<VendorRefundDetail> listRefunds(UUID vendorId, int limit) {
+        return List.of();
+    }
+
     default Optional<VendorEquipmentDetail> getEquipmentDetail(UUID vendorId, UUID equipmentId) {
         return Optional.empty();
     }

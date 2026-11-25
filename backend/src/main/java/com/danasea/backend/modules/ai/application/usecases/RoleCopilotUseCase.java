@@ -470,7 +470,12 @@ public class RoleCopilotUseCase {
                         ? "Which order or risk assessment case should I inspect? Attach the order/case or provide its ID so I can show verified observed facts, Velocity 3/5/3 signals, and limitations."
                         : "Bạn muốn xem căn cứ cảnh báo rủi ro của đơn hàng hoặc hồ sơ nào? Hãy đính kèm đơn/hồ sơ hoặc cung cấp mã ID để tôi hiển thị dữ liệu thực tế (observed), tín hiệu Velocity 3/5/3 và giới hạn đánh giá.";
             }
-            if (orderId != null) args.put("orderId", orderId.toString());
+            if (orderId != null) {
+                UUID resolvedMasterOrderId = adminAiData.getOrderDetail(orderId)
+                        .map(AdminAiDataPort.AdminOrderDetail::masterOrderId)
+                        .orElse(orderId);
+                args.put("orderId", resolvedMasterOrderId.toString());
+            }
             if (caseId != null) args.put("caseId", caseId.toString());
             args.put("createNewAssessment", CopilotRequest.matches(CREATE_RISK_CASE, normalized));
         }
@@ -1024,8 +1029,22 @@ public class RoleCopilotUseCase {
     private String describeAttachment(boolean admin, UUID vendorId, String attachmentType, UUID attachmentId,
                                       String attachmentLabel) {
         if (attachmentType == null || attachmentId == null) return null;
+        String type = attachmentType.trim().toUpperCase(Locale.ROOT);
+        if (admin) {
+            try {
+                return switch (type) {
+                    case "ORDER" -> describeAdminOrder(attachmentId);
+                    case "DISPUTE" -> describeAdminDispute(attachmentId);
+                    case "VENDOR" -> describeAdminVendor(attachmentId);
+                    case "SERVICE" -> describeAdminService(attachmentId);
+                    default -> type + " id=" + attachmentId
+                            + (attachmentLabel == null || attachmentLabel.isBlank() ? "" : "; label=" + sanitizeFactText(attachmentLabel, 120));
+                };
+            } catch (RuntimeException exception) {
+                log.info("Admin attached {} lookup failed ({})", type, exception.getClass().getSimpleName());
+            }
+        }
         if (!admin && vendorId != null) {
-            String type = attachmentType.trim().toUpperCase(Locale.ROOT);
             try {
                 return switch (type) {
                     case "SERVICE" -> describeVendorService(vendorId, attachmentId);
@@ -1043,8 +1062,88 @@ public class RoleCopilotUseCase {
                 log.info("Attached {} lookup failed ({})", type, exception.getClass().getSimpleName());
             }
         }
-        return attachmentType.toUpperCase(Locale.ROOT) + " id=" + attachmentId
+        return type + " id=" + attachmentId
                 + (attachmentLabel == null || attachmentLabel.isBlank() ? "" : "; label=" + sanitizeFactText(attachmentLabel, 120));
+    }
+
+    private String describeAdminOrder(UUID orderId) {
+        var detail = adminAiData.getOrderDetail(orderId);
+        if (detail.isEmpty()) return notFoundInPlatform("ORDER", orderId);
+        var d = detail.get();
+        var sb = new StringBuilder("subOrderId=").append(d.subOrderId());
+        appendFact(sb, "masterOrderId", d.masterOrderId());
+        appendFact(sb, "vendor", sanitizeFactText(d.vendorBusinessName(), 150));
+        appendFact(sb, "service", sanitizeFactText(d.serviceTitle(), 200));
+        appendFact(sb, "customer", sanitizeFactText(d.customerName(), 120));
+        appendFact(sb, "status", d.status());
+        appendFact(sb, "paymentStatus", d.paymentStatus());
+        if (d.slotDate() != null) {
+            sb.append("; slot=").append(d.slotDate());
+            if (d.slotStartTime() != null) sb.append(" ").append(d.slotStartTime());
+            if (d.slotEndTime() != null) sb.append("-").append(d.slotEndTime());
+        }
+        appendFact(sb, "quantity", d.quantity());
+        appendFact(sb, "finalAmountVnd", d.finalAmount());
+        appendFact(sb, "commissionVnd", d.commissionAmount());
+        appendFact(sb, "vendorPayoutVnd", d.vendorPayoutAmount());
+        appendFact(sb, "checkedInAt", d.checkedInAt());
+        appendFact(sb, "cancellationReason", d.cancellationReason());
+        appendFact(sb, "createdAt", d.createdAt());
+        return "ORDER (verified platform record): " + sb;
+    }
+
+    private String describeAdminDispute(UUID disputeId) {
+        var detail = adminAiData.getDisputeFullEvidence(disputeId);
+        if (detail.isEmpty()) return notFoundInPlatform("DISPUTE", disputeId);
+        var d = detail.get();
+        var sb = new StringBuilder("disputeId=").append(d.disputeId());
+        appendFact(sb, "subOrderId", d.subOrderId());
+        appendFact(sb, "vendor", sanitizeFactText(d.vendorBusinessName(), 150));
+        appendFact(sb, "service", sanitizeFactText(d.serviceTitle(), 200));
+        appendFact(sb, "customer", sanitizeFactText(d.customerName(), 120));
+        appendFact(sb, "status", d.status());
+        appendFact(sb, "reason", d.disputeReason());
+        appendFact(sb, "description", sanitizeFactText(d.description(), 300));
+        appendFact(sb, "subtotalVnd", d.subtotalAmount());
+        appendFact(sb, "checkinUsed", d.checkinUsed());
+        appendFact(sb, "vendorResponse", sanitizeFactText(d.vendorResponse(), 300));
+        appendFact(sb, "createdAt", d.disputeCreatedAt());
+        return "DISPUTE (verified platform record): " + sb;
+    }
+
+    private String describeAdminVendor(UUID vendorId) {
+        var detail = adminAiData.getVendorDetail(vendorId);
+        if (detail.isEmpty()) return notFoundInPlatform("VENDOR", vendorId);
+        var d = detail.get();
+        var sb = new StringBuilder("vendorId=").append(d.id());
+        appendFact(sb, "businessName", sanitizeFactText(d.businessName(), 150));
+        appendFact(sb, "status", d.status());
+        appendFact(sb, "badgeTier", d.badgeTier());
+        appendFact(sb, "ratingAvg", d.ratingAvg());
+        appendFact(sb, "ratingCount", d.ratingCount());
+        sb.append("; publishedServicesCount=").append(d.publishedServicesCount());
+        return "VENDOR (verified platform record): " + sb;
+    }
+
+    private String describeAdminService(UUID serviceId) {
+        var detail = adminAiData.getServiceDetail(serviceId);
+        if (detail.isEmpty()) return notFoundInPlatform("SERVICE", serviceId);
+        var d = detail.get();
+        var sb = new StringBuilder("serviceId=").append(d.id());
+        appendFact(sb, "vendor", sanitizeFactText(d.vendorBusinessName(), 150));
+        appendFact(sb, "title", sanitizeFactText(d.title(), 200));
+        appendFact(sb, "category", sanitizeFactText(d.categoryName(), 120));
+        appendFact(sb, "status", d.status());
+        appendFact(sb, "basePriceVnd", d.basePrice());
+        appendFact(sb, "durationMinutes", d.durationMinutes());
+        appendFact(sb, "capacityPerSlot", d.capacityPerSlot());
+        appendFact(sb, "averageRating", d.averageRating());
+        appendFact(sb, "reviewCount", d.reviewCount());
+        return "SERVICE (verified platform record): " + sb;
+    }
+
+    private static String notFoundInPlatform(String type, UUID id) {
+        return type + " " + id + " is NOT found in the platform database; say so clearly and do not invent or guess its details.";
     }
 
     private String describeVendorService(UUID vendorId, UUID serviceId) {

@@ -40,10 +40,26 @@ function generateLocalId(prefix: string): string {
   return `${prefix}-${localMessageSequence}`;
 }
 
+const ADMIN_CONTEXT_META: Record<string, { label: string; prefix: string }> = {
+  DISPUTE: { label: 'Hồ sơ khiếu nại', prefix: 'DISP' },
+  ORDER: { label: 'Đơn hàng', prefix: 'ORD' },
+  VENDOR: { label: 'Đối tác', prefix: 'VND' },
+  SERVICE: { label: 'Dịch vụ', prefix: 'SRV' },
+};
+
+function formatAdminContextLabel(type: string, id: string, customLabel?: string | null): string {
+  if (customLabel && customLabel.trim()) return customLabel.trim();
+  const meta = ADMIN_CONTEXT_META[type.toUpperCase()] || { label: type, prefix: 'CTX' };
+  return `${meta.label} #${formatDisplayCode(id, meta.prefix)}`;
+}
+
 interface LocalMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  contextType?: string | null;
+  contextId?: string | null;
+  contextLabel?: string | null;
   artifacts?: CopilotArtifact[];
   toolsUsed?: string[];
   verified?: boolean;
@@ -54,6 +70,7 @@ interface LocalMessage {
     message: string;
     contextType?: string | null;
     contextId?: string | null;
+    contextLabel?: string | null;
   };
 }
 
@@ -78,6 +95,7 @@ export const AdminCopilot: React.FC = () => {
   // Context attachment state
   const [contextType, setContextType] = useState<CopilotContextType | null>(null);
   const [contextId, setContextId] = useState<string | null>(null);
+  const [contextLabel, setContextLabel] = useState<string | null>(null);
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [manualAttachType, setManualAttachType] = useState<CopilotContextType>('DISPUTE');
   const [manualAttachId, setManualAttachId] = useState('');
@@ -89,9 +107,11 @@ export const AdminCopilot: React.FC = () => {
   useEffect(() => {
     const qType = searchParams.get('contextType') as CopilotContextType | null;
     const qId = searchParams.get('contextId');
+    const qLabel = searchParams.get('contextLabel');
     if (qType && qId) {
       setContextType(qType);
       setContextId(qId);
+      setContextLabel(formatAdminContextLabel(qType, qId, qLabel));
     }
   }, [searchParams]);
 
@@ -135,6 +155,9 @@ export const AdminCopilot: React.FC = () => {
           id: m.id,
           role: (m.role || '').toLowerCase() === 'assistant' ? 'assistant' : 'user',
           content: m.content,
+          contextType: m.contextType ?? null,
+          contextId: m.contextId ?? null,
+          contextLabel: m.contextLabel ?? null,
           artifacts: parseArtifactsJson(m.artifactsJson),
           toolsUsed: m.toolsUsed ? m.toolsUsed.split(',').map((t: string) => t.trim()).filter(Boolean) : undefined,
           verified: m.verified,
@@ -175,6 +198,7 @@ export const AdminCopilot: React.FC = () => {
     setSearchParams({});
     setContextType(null);
     setContextId(null);
+    setContextLabel(null);
     textareaRef.current?.focus();
   };
 
@@ -247,10 +271,17 @@ export const AdminCopilot: React.FC = () => {
     const text = (textToSend || inputText).trim();
     if (!text || sending) return;
 
+    const effectiveLabel = contextType && contextId
+      ? formatAdminContextLabel(contextType, contextId, contextLabel)
+      : undefined;
+
     const userMsg: LocalMessage = {
       id: generateLocalId('usr'),
       role: 'user',
       content: text,
+      contextType: contextType || null,
+      contextId: contextId || null,
+      contextLabel: effectiveLabel || null,
       createdAt: new Date().toISOString(),
     };
 
@@ -263,6 +294,7 @@ export const AdminCopilot: React.FC = () => {
       message: text,
       contextType: contextType || undefined,
       contextId: contextId || undefined,
+      contextLabel: effectiveLabel,
     };
 
     try {
@@ -309,9 +341,11 @@ export const AdminCopilot: React.FC = () => {
 
   // Handle manual context attachment
   const handleApplyAttachment = () => {
-    if (manualAttachId.trim()) {
+    const trimmedId = manualAttachId.trim();
+    if (trimmedId) {
       setContextType(manualAttachType);
-      setContextId(manualAttachId.trim());
+      setContextId(trimmedId);
+      setContextLabel(formatAdminContextLabel(manualAttachType, trimmedId));
       setShowAttachModal(false);
       setManualAttachId('');
     }
@@ -320,6 +354,7 @@ export const AdminCopilot: React.FC = () => {
   const handleRemoveAttachment = () => {
     setContextType(null);
     setContextId(null);
+    setContextLabel(null);
   };
 
   return (
@@ -480,7 +515,7 @@ export const AdminCopilot: React.FC = () => {
               <div className="admin-copilot__context-badge">
                 <Paperclip size={12} />
                 <span>
-                  {contextType === 'DISPUTE' ? 'Khiếu nại' : 'Đơn hàng'}: #{formatDisplayCode(contextId, contextType === 'DISPUTE' ? 'DISP' : 'ORD')}
+                  {formatAdminContextLabel(contextType, contextId, contextLabel)}
                 </span>
                 <button
                   type="button"
@@ -551,6 +586,13 @@ export const AdminCopilot: React.FC = () => {
                 </div>
 
                 <div className="admin-copilot__msg-body">
+                  {m.role === 'user' && m.contextType && m.contextId && (
+                    <div className="admin-copilot__msg-context">
+                      <Paperclip size={11} />
+                      <span>{formatAdminContextLabel(m.contextType, m.contextId, m.contextLabel)}</span>
+                    </div>
+                  )}
+
                   <div
                     className={`admin-copilot__msg-content ${
                       m.isError ? 'admin-copilot__msg-content--error' : ''
@@ -632,7 +674,7 @@ export const AdminCopilot: React.FC = () => {
               <div className="admin-copilot__attachment-chip">
                 <Paperclip size={12} />
                 <span>
-                  Đính kèm: {contextType === 'DISPUTE' ? 'Hồ sơ khiếu nại' : 'Đơn hàng'} #{formatDisplayCode(contextId, contextType === 'DISPUTE' ? 'DISP' : 'ORD')}
+                  Đính kèm: {formatAdminContextLabel(contextType, contextId, contextLabel)}
                 </span>
                 <button
                   type="button"
@@ -749,6 +791,8 @@ export const AdminCopilot: React.FC = () => {
             >
               <option value="DISPUTE">Hồ sơ khiếu nại (Dispute)</option>
               <option value="ORDER">Đơn hàng (Order)</option>
+              <option value="VENDOR">Đối tác (Vendor)</option>
+              <option value="SERVICE">Dịch vụ (Service)</option>
             </select>
           </div>
 

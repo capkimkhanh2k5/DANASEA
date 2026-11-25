@@ -111,4 +111,15 @@ export const vendorAiService = {
     });
     return res.data;
   },
+
+  /**
+   * GET /api/vendor/ai/copilot/refunds
+   * Lấy danh sách yêu cầu hoàn tiền thuộc gian hàng vendor để đính kèm ngữ cảnh Copilot
+   */
+  async getCopilotRefunds(limit = 50): Promise<import('../types/vendorAi').VendorCopilotRefundDto[]> {
+    const res = await apiClient.get<import('../types/vendorAi').VendorCopilotRefundDto[]>('/vendor/ai/copilot/refunds', {
+      params: { limit },
+    });
+    return res.data || [];
+  },
 };
