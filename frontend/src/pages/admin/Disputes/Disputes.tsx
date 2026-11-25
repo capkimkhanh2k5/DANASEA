@@ -426,8 +426,21 @@ export function Disputes() {
                       }}
                     >
                       <div className="admin-disputes__item-top">
-                        <span className="admin-disputes__item-id" title={d.id}>
+                        <span className="admin-disputes__item-id" title={d.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           #{formatDisplayCode(d.id, 'DISP')}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const code = formatDisplayCode(d.id, 'DISP');
+                              navigator.clipboard.writeText(code);
+                              setNotice(`Đã sao chép mã khiếu nại: ${code}`);
+                            }}
+                            title="Sao chép mã khiếu nại"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 1, color: 'inherit' }}
+                          >
+                            <Copy size={11} />
+                          </button>
                         </span>
                         <AdminBadge
                           tone={
@@ -483,10 +496,11 @@ export function Disputes() {
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard.writeText(selectedDispute.id);
-                          setNotice(`Đã sao chép UUID hồ sơ: ${selectedDispute.id}`);
+                          const code = formatDisplayCode(selectedDispute.id, 'DISP');
+                          navigator.clipboard.writeText(code);
+                          setNotice(`Đã sao chép mã khiếu nại: ${code}`);
                         }}
-                        title="Sao chép UUID khiếu nại"
+                        title="Sao chép mã khiếu nại"
                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 1, color: 'inherit' }}
                       >
                         <Copy size={11} />
@@ -501,10 +515,11 @@ export function Disputes() {
                         type="button"
                         onClick={() => {
                           const oid = selectedDispute.orderId || '';
-                          navigator.clipboard.writeText(oid);
-                          setNotice(`Đã sao chép UUID đơn chính: ${oid}`);
+                          const code = formatDisplayCode(oid, 'ORD');
+                          navigator.clipboard.writeText(code);
+                          setNotice(`Đã sao chép mã đơn chính: ${code}`);
                         }}
-                        title="Sao chép UUID đơn chính"
+                        title="Sao chép mã đơn chính"
                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 1, color: 'var(--admin-muted, #595959)' }}
                       >
                         <Copy size={11} />
@@ -519,10 +534,11 @@ export function Disputes() {
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText(selectedDispute.subOrderId);
-                            setNotice(`Đã sao chép UUID đơn con: ${selectedDispute.subOrderId}`);
+                            const code = formatDisplayCode(selectedDispute.subOrderId, 'SUB');
+                            navigator.clipboard.writeText(code);
+                            setNotice(`Đã sao chép mã đơn con: ${code}`);
                           }}
-                          title="Sao chép UUID đơn con"
+                          title="Sao chép mã đơn con"
                           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 1, color: 'var(--admin-muted, #595959)' }}
                         >
                           <Copy size={11} />

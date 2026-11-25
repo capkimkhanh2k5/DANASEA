@@ -117,6 +117,9 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         authEpoch += 1;
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          window.sessionStorage.removeItem('danabot_pinned_session');
+        }
         if (import.meta.env?.DEV) {
           console.log('[useAuthStore] logout() invoked. Clearing state.');
         }
