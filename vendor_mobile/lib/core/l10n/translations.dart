@@ -1538,6 +1538,7 @@ const englishTranslations = <String, String>{
   "Đối tác biển đã xác thực": "Verified marine partner",
   "Đối tác gửi yêu cầu nhận tiền trực tiếp đến ban tài chính DANASEA. Hệ thống không tự động phê duyệt tức thì nhằm rà soát tính hợp lệ của tour đã hoàn tất. Thời gian xử lý được cập nhật theo tiến độ yêu cầu thanh toán.":
       "Partners submit payout requests directly to DANASEA Finance. Requests are not approved instantly so completed tours can be verified. Processing times follow the request's progress.",
+  "Chưa xếp hạng": "Unranked",
   "Đối tác hàng đầu": "Top partner",
   "Đối tác mới": "New partner",
   "Đối tác xác thực": "Verified partner",

@@ -748,6 +748,71 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                   ),
                   const SizedBox(height: 14),
 
+                  // Safety Rebate Box (+2%)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: currentSettlement.safetyRebateQualified
+                          ? const Color(0xFFECFDF5)
+                          : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: currentSettlement.safetyRebateQualified
+                            ? const Color(0xFFA7F3D0)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          currentSettlement.safetyRebateQualified
+                              ? Icons.verified_rounded
+                              : Icons.info_outline_rounded,
+                          size: 16,
+                          color: currentSettlement.safetyRebateQualified
+                              ? const Color(0xFF059669)
+                              : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                currentSettlement.safetyRebateQualified
+                                    ? 'Đạt thưởng An toàn Biển (+2%): +'
+                                    : 'Quỹ thưởng An toàn Biển (+2%)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: currentSettlement.safetyRebateQualified
+                                      ? const Color(0xFF065F46)
+                                      : const Color(0xFF334155),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                currentSettlement.safetyRebateNote != null && currentSettlement.safetyRebateNote!.isNotEmpty
+                                    ? currentSettlement.safetyRebateNote!
+                                    : (currentSettlement.safetyRebateQualified
+                                        ? 'Đạt đủ điều kiện: Đối tác hàng đầu (TOP_RATED) & không vi phạm an toàn.'
+                                        : 'Yêu cầu: Đạt huy hiệu Đối tác hàng đầu (TOP_RATED), rating ≥ 4.80 và 0 lỗi an toàn.'),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: currentSettlement.safetyRebateQualified
+                                      ? const Color(0xFF047857)
+                                      : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   // Distribution Gauge
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,

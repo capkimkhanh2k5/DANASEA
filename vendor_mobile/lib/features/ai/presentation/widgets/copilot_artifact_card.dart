@@ -1,3 +1,4 @@
+import '../../../../core/models/vendor_models.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 
@@ -44,7 +45,7 @@ class CopilotArtifactCard extends StatelessWidget {
     final num cancellationRate = (data['cancellationRate'] as num?) ?? 0;
     final double ratingAvg = (data['ratingAvg'] as num?)?.toDouble() ?? 0.0;
     final int ratingCount = (data['ratingCount'] as num?)?.toInt() ?? 0;
-    final String badgeTier = data['badgeTier']?.toString() ?? 'STANDARD';
+    final VendorBadgeTier badgeTier = VendorBadgeTier.fromApi(data['badgeTier']?.toString());
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
@@ -89,7 +90,7 @@ class CopilotArtifactCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  'Hạng: $badgeTier',
+                  'Hạng: ${badgeTier.labelVi}',
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,

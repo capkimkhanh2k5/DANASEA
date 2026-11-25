@@ -1,3 +1,4 @@
+import '../../../../core/models/danasea_models.dart';
 /// Data models representing elements on the DanaSea Home Screen.
 /// Structured to allow seamless replacement with real API/backend models later.
 class ExperienceItem {
@@ -11,6 +12,7 @@ class ExperienceItem {
   final String imageUrl;
   final bool isVerified;
   final bool isFavorite;
+  final VendorBadgeTier vendorBadge;
 
   const ExperienceItem({
     required this.id,
@@ -23,6 +25,7 @@ class ExperienceItem {
     required this.imageUrl,
     this.isVerified = true,
     this.isFavorite = false,
+    this.vendorBadge = VendorBadgeTier.none,
   });
 
   ExperienceItem copyWith({
@@ -36,6 +39,7 @@ class ExperienceItem {
     String? imageUrl,
     bool? isVerified,
     bool? isFavorite,
+    VendorBadgeTier? vendorBadge,
   }) {
     return ExperienceItem(
       id: id ?? this.id,
@@ -48,6 +52,7 @@ class ExperienceItem {
       imageUrl: imageUrl ?? this.imageUrl,
       isVerified: isVerified ?? this.isVerified,
       isFavorite: isFavorite ?? this.isFavorite,
+      vendorBadge: vendorBadge ?? this.vendorBadge,
     );
   }
 }

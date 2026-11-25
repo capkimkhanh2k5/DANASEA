@@ -35,6 +35,8 @@ class _SearchScreenState extends State<SearchScreen> {
   String? _selectedCategory;
   String? _selectedTimeOfDay;
   int? _maxPrice;
+  bool _onlyTopRatedVendors = false;
+  String _sortBy = 'recommended';
 
   List<CategoryModel> _categories = [];
   List<ServiceModel> _items = [];
@@ -317,6 +319,8 @@ class _SearchScreenState extends State<SearchScreen> {
         categoryId: resolvedCategoryId,
         maxPrice: _maxPrice,
         page: 0,
+        sortBy: _sortBy == 'recommended' ? null : _sortBy,
+        badgeTier: _onlyTopRatedVendors ? 'TOP_RATED' : null,
       );
       if (!mounted || generation != _generation) return;
       setState(() {
@@ -346,6 +350,8 @@ class _SearchScreenState extends State<SearchScreen> {
     if (_selectedCategory != null) count++;
     if (_selectedTimeOfDay != null) count++;
     if (_maxPrice != null) count++;
+    if (_onlyTopRatedVendors) count++;
+    if (_sortBy != 'recommended') count++;
     return count;
   }
 
@@ -626,6 +632,100 @@ class _SearchScreenState extends State<SearchScreen> {
                               );
                             }).toList(),
                           ),
+
+                          // HUY HIỆU ĐỐI TÁC
+                          const SizedBox(height: 20),
+                          LocalizedText(
+                            'Huy hiệu đối tác',
+                            style: AppTypography.headlineSm(
+                              color: AppColors.onSurface,
+                            ).copyWith(fontSize: 14, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 8),
+                          ChoiceChip(
+                            avatar: const Icon(
+                              Icons.workspace_premium,
+                              size: 16,
+                              color: Color(0xFFD97706),
+                            ),
+                            label: const LocalizedText('Đối tác hàng đầu'),
+                            selected: _onlyTopRatedVendors,
+                            selectedColor: const Color(0xFFD97706),
+                            backgroundColor: AppColors.surfaceContainerHigh,
+                            onSelected: (val) {
+                              setModalState(() {
+                                _onlyTopRatedVendors = val;
+                              });
+                              setState(() {});
+                              _search();
+                            },
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            labelStyle: TextStyle(
+                              color: _onlyTopRatedVendors
+                                  ? Colors.white
+                                  : AppColors.onSurface,
+                              fontWeight: _onlyTopRatedVendors
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+
+                          // SẮP XẾP
+                          const SizedBox(height: 20),
+                          LocalizedText(
+                            'Sắp xếp theo',
+                            style: AppTypography.headlineSm(
+                              color: AppColors.onSurface,
+                            ).copyWith(fontSize: 14, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              {'label': 'Đề xuất', 'val': 'recommended'},
+                              {'label': 'Mới nhất', 'val': 'newest'},
+                              {'label': 'Đánh giá cao', 'val': 'rating_desc'},
+                              {'label': 'Giá tăng dần', 'val': 'price_asc'},
+                              {'label': 'Giá giảm dần', 'val': 'price_desc'},
+                            ].map((opt) {
+                              final isSel = _sortBy == opt['val'];
+                              return ChoiceChip(
+                                label: LocalizedText(opt['label'] as String),
+                                selected: isSel,
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    setModalState(() {
+                                      _sortBy = opt['val'] as String;
+                                    });
+                                    setState(() {});
+                                    _search();
+                                  }
+                                },
+                                backgroundColor: const Color(0xFFF0F9FA),
+                                selectedColor: AppColors.secondary,
+                                side: BorderSide(
+                                  color: isSel
+                                      ? AppColors.secondary
+                                      : const Color(0xFFB4E3E8),
+                                  width: 1,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                labelStyle: TextStyle(
+                                  color: isSel
+                                      ? Colors.white
+                                      : AppColors.onSurface,
+                                  fontWeight: isSel
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ],
                       ),
                     ),
@@ -785,6 +885,25 @@ class _SearchScreenState extends State<SearchScreen> {
                       setState(() => _maxPrice = null);
                       _search();
                     }),
+                  if (_onlyTopRatedVendors)
+                    _buildActiveChip('Đối tác hàng đầu', () {
+                      setState(() => _onlyTopRatedVendors = false);
+                      _search();
+                    }),
+                  if (_sortBy != 'recommended')
+                    _buildActiveChip(
+                      switch (_sortBy) {
+                        'newest' => 'Mới nhất',
+                        'rating_desc' => 'Đánh giá cao',
+                        'price_asc' => 'Giá tăng dần',
+                        'price_desc' => 'Giá giảm dần',
+                        _ => _sortBy,
+                      },
+                      () {
+                        setState(() => _sortBy = 'recommended');
+                        _search();
+                      },
+                    ),
                   TextButton(
                     onPressed: () {
                       setState(() {
@@ -792,6 +911,8 @@ class _SearchScreenState extends State<SearchScreen> {
                         _selectedCategory = null;
                         _selectedTimeOfDay = null;
                         _maxPrice = null;
+                        _onlyTopRatedVendors = false;
+                        _sortBy = 'recommended';
                       });
                       _search();
                     },
@@ -1176,41 +1297,48 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
                   ),
-                  // Vendor Badge
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondary.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.verified,
-                            size: 12,
-                            color: AppColors.onSecondary,
-                          ),
-                          const SizedBox(width: 4),
-                          LocalizedText(
-                            srv.vendorName.isNotEmpty
-                                ? srv.vendorName
-                                : 'DanaSea Partner',
-                            style: AppTypography.labelSm(
-                              color: AppColors.onSecondary,
-                              fontWeight: FontWeight.w700,
+                  // Vendor Badge: hide when none, emerald for verified, amber for topRated
+                  if (srv.vendorBadge != VendorBadgeTier.none)
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: srv.vendorBadge == VendorBadgeTier.topRated
+                              ? const Color(0xFFD97706)
+                              : AppColors.secondary.withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              srv.vendorBadge == VendorBadgeTier.topRated
+                                  ? Icons.workspace_premium
+                                  : Icons.verified,
+                              size: 12,
+                              color: Colors.white,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            LocalizedText(
+                              srv.vendorBadge == VendorBadgeTier.topRated
+                                  ? 'Đối tác hàng đầu'
+                                  : (srv.vendorName.isNotEmpty
+                                      ? srv.vendorName
+                                      : 'Đã xác minh'),
+                              style: AppTypography.labelSm(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
                   // Ocean condition badge (live weather + AI distance)
                   Positioned(
                     bottom: 10,

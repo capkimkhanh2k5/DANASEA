@@ -115,12 +115,23 @@ enum VendorBadgeTier {
   verified,
   topRated;
 
+  static VendorBadgeTier fromApi(String? value) {
+    switch (value?.trim().toUpperCase()) {
+      case 'VERIFIED':
+        return VendorBadgeTier.verified;
+      case 'TOP_RATED':
+        return VendorBadgeTier.topRated;
+      default:
+        return VendorBadgeTier.none;
+    }
+  }
+
   String get labelVi {
     switch (this) {
       case VendorBadgeTier.none:
-        return 'Đối tác mới';
+        return 'Chưa xếp hạng';
       case VendorBadgeTier.verified:
-        return 'Đối tác xác thực';
+        return 'Đã xác minh';
       case VendorBadgeTier.topRated:
         return 'Đối tác hàng đầu';
     }
@@ -163,7 +174,7 @@ class VendorModel {
     this.verifiedAt,
     this.ratingAvg = 5.0,
     this.ratingCount = 0,
-    this.badgeTier = VendorBadgeTier.verified,
+    this.badgeTier = VendorBadgeTier.none,
     required this.createdAt,
   });
 
@@ -1159,6 +1170,9 @@ class SettlementModel {
   final SettlementStatus status;
   final DateTime generatedAt;
   final int orderCount;
+  final bool safetyRebateQualified;
+  final double safetyRebateAmount;
+  final String? safetyRebateNote;
 
   const SettlementModel({
     required this.id,
@@ -1171,6 +1185,9 @@ class SettlementModel {
     required this.status,
     required this.generatedAt,
     this.orderCount = 0,
+    this.safetyRebateQualified = false,
+    this.safetyRebateAmount = 0.0,
+    this.safetyRebateNote,
   });
 }
 

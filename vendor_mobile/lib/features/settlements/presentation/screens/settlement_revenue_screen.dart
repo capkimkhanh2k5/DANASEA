@@ -1023,6 +1023,49 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
               ),
               const SizedBox(height: 8),
 
+              if (item.safetyRebateQualified || (item.safetyRebateNote != null && item.safetyRebateNote!.isNotEmpty)) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: item.safetyRebateQualified
+                        ? const Color(0xFFECFDF5)
+                        : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: item.safetyRebateQualified
+                          ? const Color(0xFFA7F3D0)
+                          : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        item.safetyRebateQualified ? Icons.verified_rounded : Icons.info_outline,
+                        size: 14,
+                        color: item.safetyRebateQualified ? const Color(0xFF059669) : const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          item.safetyRebateNote != null && item.safetyRebateNote!.isNotEmpty
+                              ? item.safetyRebateNote!
+                              : (item.safetyRebateQualified
+                                  ? 'Đã áp dụng thưởng An toàn Biển (+2%)'
+                                  : 'Cần đạt TOP_RATED để nhận thưởng An toàn (+2%)'),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: item.safetyRebateQualified ? const Color(0xFF065F46) : const Color(0xFF475569),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               // Payout destination note
               Row(
                 children: [

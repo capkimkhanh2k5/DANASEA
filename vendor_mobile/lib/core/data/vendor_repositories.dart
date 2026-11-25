@@ -130,6 +130,9 @@ class VendorProfileRepository implements IVendorProfileRepository {
               (json['verificationStatus']?.toString().toLowerCase()),
           orElse: () => VendorVerificationStatus.approved,
         ),
+        badgeTier: VendorBadgeTier.fromApi(json['badgeTier']?.toString()),
+        ratingAvg: (json['ratingAvg'] as num?)?.toDouble() ?? _db.currentVendor.ratingAvg,
+        ratingCount: (json['ratingCount'] as num?)?.toInt() ?? _db.currentVendor.ratingCount,
         createdAt: json['createdAt'] != null
             ? DateTime.tryParse(json['createdAt'].toString()) ??
                   _db.currentVendor.createdAt
@@ -1856,6 +1859,9 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
       status: status,
       generatedAt: createdAt,
       orderCount: (json['orderCount'] as num?)?.toInt() ?? 0,
+      safetyRebateQualified: json['safetyRebateQualified'] == true,
+      safetyRebateAmount: (json['safetyRebateAmount'] as num?)?.toDouble() ?? 0.0,
+      safetyRebateNote: json['safetyRebateNote']?.toString(),
     );
   }
 

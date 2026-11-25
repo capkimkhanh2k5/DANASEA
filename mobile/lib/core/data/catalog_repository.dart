@@ -59,6 +59,7 @@ class CatalogRepository {
     int page = 0,
     int size = 20,
     String? sortBy,
+    String? badgeTier,
   }) async {
     final query = <String, String>{
       'page': '$page',
@@ -68,6 +69,8 @@ class CatalogRepository {
       'categoryId': ?categoryId,
       if (maxPrice != null) 'maxPrice': '$maxPrice',
       if (sortBy != null && sortBy.trim().isNotEmpty) 'sortBy': sortBy.trim(),
+      if (badgeTier != null && badgeTier.trim().isNotEmpty)
+        'badgeTier': badgeTier.trim(),
     };
     final path = Uri(path: '/api/services', queryParameters: query).toString();
     final json = await session.request(path);
@@ -157,7 +160,7 @@ class CatalogRepository {
       name: json['name'] as String,
       vendorId: json['vendorId'] as String? ?? '',
       vendorName: json['businessName'] as String? ?? '',
-      vendorBadge: switch (json['badgeTier']) {
+      vendorBadge: switch (json['vendorBadgeTier'] ?? json['badgeTier']) {
         'VERIFIED' => VendorBadgeTier.verified,
         'TOP_RATED' => VendorBadgeTier.topRated,
         _ => VendorBadgeTier.none,
