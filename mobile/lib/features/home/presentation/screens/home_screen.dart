@@ -65,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     try {
       final results = await Future.wait([
-        _catalog.search(size: 7, sortBy: 'popularity'),
+        _catalog.search(size: 7, sortBy: 'recommended'),
         _catalog.flashSales(),
       ]);
       if (!mounted) return;
@@ -89,7 +89,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 imageUrl: s.imageUrls.isEmpty
                     ? 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&auto=format&fit=crop&q=80'
                     : s.imageUrls.first,
-                isVerified: true,
+                vendorBadge: s.vendorBadge,
+                isVerified: s.vendorBadge != VendorBadgeTier.none,
               ),
             )
             .toList();

@@ -130,6 +130,9 @@ class VendorProfileRepository implements IVendorProfileRepository {
               (json['verificationStatus']?.toString().toLowerCase()),
           orElse: () => VendorVerificationStatus.approved,
         ),
+        badgeTier: VendorBadgeTier.fromApi(json['badgeTier']?.toString()),
+        ratingAvg: (json['ratingAvg'] as num?)?.toDouble() ?? _db.currentVendor.ratingAvg,
+        ratingCount: (json['ratingCount'] as num?)?.toInt() ?? _db.currentVendor.ratingCount,
         createdAt: json['createdAt'] != null
             ? DateTime.tryParse(json['createdAt'].toString()) ??
                   _db.currentVendor.createdAt
@@ -1856,6 +1859,9 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
       status: status,
       generatedAt: createdAt,
       orderCount: (json['orderCount'] as num?)?.toInt() ?? 0,
+      safetyRebateQualified: json['safetyRebateQualified'] == true,
+      safetyRebateAmount: (json['safetyRebateAmount'] as num?)?.toDouble() ?? 0.0,
+      safetyRebateNote: json['safetyRebateNote']?.toString(),
     );
   }
 
@@ -2721,6 +2727,7 @@ class VendorAiRepository implements IVendorAiRepository {
     required String message,
     String? contextType,
     String? contextId,
+    String? contextLabel,
   }) async {
     final res = await _session.request(
       '/api/vendor/ai/copilot/chat',
@@ -2731,6 +2738,7 @@ class VendorAiRepository implements IVendorAiRepository {
         'message': message,
         if (contextType != null) 'contextType': contextType,
         if (contextId != null) 'contextId': contextId,
+        if (contextLabel != null) 'contextLabel': contextLabel,
       },
     );
     final response = CopilotMessageModel.fromJson(res);

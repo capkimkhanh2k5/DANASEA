@@ -1,3 +1,4 @@
+import '../../../../core/models/vendor_models.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 
@@ -28,6 +29,8 @@ class CopilotArtifactCard extends StatelessWidget {
       return _buildOptimizeListingCard(context, data);
     } else if (type == 'VENDOR_SERVICE_COUNT_CARD' || artifact['tool'] == 'vendor_service_count') {
       return _buildServiceCountCard(context, data);
+    } else if (type == 'VENDOR_SERVICE_DETAIL_CARD' || artifact['tool'] == 'vendor_service_detail') {
+      return _buildServiceDetailCard(context, data);
     } else if (type == 'COPILOT_CONTENT_ASSESSMENT_CARD' || artifact['tool'] == 'vendor_text_assessment') {
       return _buildContentAssessmentCard(context, data);
     }
@@ -42,7 +45,7 @@ class CopilotArtifactCard extends StatelessWidget {
     final num cancellationRate = (data['cancellationRate'] as num?) ?? 0;
     final double ratingAvg = (data['ratingAvg'] as num?)?.toDouble() ?? 0.0;
     final int ratingCount = (data['ratingCount'] as num?)?.toInt() ?? 0;
-    final String badgeTier = data['badgeTier']?.toString() ?? 'STANDARD';
+    final VendorBadgeTier badgeTier = VendorBadgeTier.fromApi(data['badgeTier']?.toString());
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
@@ -87,7 +90,7 @@ class CopilotArtifactCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  'Hạng: $badgeTier',
+                  'Hạng: ${badgeTier.labelVi}',
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -760,6 +763,210 @@ class CopilotArtifactCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 10.5, color: Color(0xFFBE123C), fontWeight: FontWeight.w500),
               ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceDetailCard(BuildContext context, Map<String, dynamic> data) {
+    final title = data['title']?.toString() ?? 'Dịch vụ';
+    final categoryName = data['categoryName']?.toString() ?? '';
+    final status = (data['status']?.toString() ?? 'PUBLISHED').toUpperCase();
+    final num? basePrice = data['basePrice'] as num?;
+    final int? durationMinutes = (data['durationMinutes'] as num?)?.toInt();
+    final int? capacityPerSlot = (data['capacityPerSlot'] as num?)?.toInt();
+    final rawOptions = data['options'] is List ? (data['options'] as List) : [];
+
+    final statusText = status == 'PUBLISHED'
+        ? 'Đang hoạt động'
+        : status == 'PENDING_REVIEW'
+            ? 'Chờ duyệt'
+            : status == 'DRAFT'
+                ? 'Bản nháp'
+                : status == 'PAUSED'
+                    ? 'Tạm dừng'
+                    : status;
+    final statusColor = status == 'PUBLISHED'
+        ? const Color(0xFF059669)
+        : status == 'PENDING_REVIEW'
+            ? const Color(0xFFD97706)
+            : const Color(0xFF64748B);
+    final statusBg = status == 'PUBLISHED'
+        ? const Color(0xFFECFDF5)
+        : status == 'PENDING_REVIEW'
+            ? const Color(0xFFFFFBEB)
+            : const Color(0xFFF1F5F9);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 2),
+                child: Icon(Icons.sell_outlined, size: 16, color: Color(0xFF0284C7)),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.navyAnchor,
+                      ),
+                    ),
+                    if (categoryName.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        categoryName,
+                        style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Overview row: base price & operational details
+          Row(
+            children: [
+              if (basePrice != null && basePrice > 0)
+                Expanded(
+                  child: _buildMetricTile(
+                    label: 'Giá niêm yết',
+                    value: _formatMoney(basePrice),
+                    valueColor: const Color(0xFF0369A1),
+                  ),
+                ),
+              if (basePrice != null && basePrice > 0 && (durationMinutes != null || capacityPerSlot != null))
+                const SizedBox(width: 8),
+              if (durationMinutes != null || capacityPerSlot != null)
+                Expanded(
+                  child: _buildMetricTile(
+                    label: 'Vận hành',
+                    value: [
+                      if (durationMinutes != null) '$durationMinutes phút',
+                      if (capacityPerSlot != null) '$capacityPerSlot khách/ca',
+                    ].join(' • '),
+                    valueColor: AppColors.navyAnchor,
+                  ),
+                ),
+            ],
+          ),
+
+          // Options list
+          if (rawOptions.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Text(
+              'Các gói giá đang áp dụng:',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF475569),
+              ),
+            ),
+            const SizedBox(height: 6),
+            ...rawOptions.map((optRaw) {
+              final opt = optRaw is Map ? Map<String, dynamic>.from(optRaw) : <String, dynamic>{};
+              final optName = opt['name']?.toString() ?? 'Gói';
+              final num optPrice = (opt['price'] as num?) ?? 0;
+              final unit = (opt['pricingUnit']?.toString() ?? 'PER_PERSON').toUpperCase();
+              final unitLabel = unit == 'PER_PERSON'
+                  ? 'người'
+                  : unit == 'PER_PACKAGE'
+                      ? 'gói'
+                      : unit == 'PER_GROUP'
+                          ? 'nhóm'
+                          : unit == 'PER_HOUR'
+                              ? 'giờ'
+                              : unit == 'PER_DAY'
+                                  ? 'ngày'
+                                  : unit;
+              final maxPax = (opt['maxPaxPerPackage'] as num?)?.toInt();
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFF1F5F9)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            optName,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.navyAnchor,
+                            ),
+                          ),
+                          if (maxPax != null && maxPax > 0)
+                            Text(
+                              'Tối đa $maxPax khách/gói',
+                              style: const TextStyle(fontSize: 9.5, color: Color(0xFF64748B)),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '${_formatMoney(optPrice)} / $unitLabel',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0284C7),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ],
       ),

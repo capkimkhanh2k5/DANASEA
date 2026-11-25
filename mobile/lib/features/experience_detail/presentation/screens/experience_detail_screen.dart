@@ -1274,6 +1274,81 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
                           ],
                         ),
 
+                        // VENDOR / ĐƠN VỊ TỔ CHỨC & BADGE
+                        if (service.vendorName.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          InkWell(
+                            onTap: widget.onOpenVendor,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.storefront_outlined,
+                                  size: 14,
+                                  color: AppColors.secondary,
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    service.vendorName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.bodySm(
+                                      color: AppColors.onSurface,
+                                      fontWeight: FontWeight.w600,
+                                    ).copyWith(fontSize: 12),
+                                  ),
+                                ),
+                                if (service.vendorBadge != VendorBadgeTier.none) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: service.vendorBadge == VendorBadgeTier.topRated
+                                          ? const Color(0xFFFEF3C7)
+                                          : const Color(0xFFD1FAE5),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: service.vendorBadge == VendorBadgeTier.topRated
+                                            ? const Color(0xFFF59E0B)
+                                            : const Color(0xFF10B981),
+                                        width: 0.8,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          service.vendorBadge == VendorBadgeTier.topRated
+                                              ? Icons.workspace_premium
+                                              : Icons.verified,
+                                          size: 11,
+                                          color: service.vendorBadge == VendorBadgeTier.topRated
+                                              ? const Color(0xFFD97706)
+                                              : const Color(0xFF059669),
+                                        ),
+                                        const SizedBox(width: 3),
+                                        LocalizedText(
+                                          service.vendorBadge == VendorBadgeTier.topRated
+                                              ? 'Đối tác hàng đầu'
+                                              : 'Đã xác minh',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            color: service.vendorBadge == VendorBadgeTier.topRated
+                                                ? const Color(0xFFB45309)
+                                                : const Color(0xFF047857),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+
                         // ROW 3: 4 KEY SPEC METRIC BOXES (CONNECTED WHITE BAR MATCHING REFERENCE)
                         const SizedBox(height: 16),
                         _buildConnectedMetricsBar(service),

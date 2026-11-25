@@ -1,3 +1,4 @@
+import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/symbolic_vendor_avatar.dart';
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -154,22 +155,62 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                               ),
                               const SizedBox(height: 4),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(color: AppColors.secondary.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: switch (_db.vendor.badgeTier) {
+                                    VendorBadgeTier.topRated => const Color(0xFFFFFBEB),
+                                    VendorBadgeTier.verified => const Color(0xFFECFDF5),
+                                    VendorBadgeTier.none => const Color(0xFFF1F5F9),
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: switch (_db.vendor.badgeTier) {
+                                      VendorBadgeTier.topRated => const Color(0xFFFDE68A),
+                                      VendorBadgeTier.verified => const Color(0xFFA7F3D0),
+                                      VendorBadgeTier.none => const Color(0xFFCBD5E1),
+                                    },
+                                    width: 0.8,
+                                  ),
+                                ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.verified, size: 12, color: AppColors.secondary),
-                                    const SizedBox(width: 3),
+                                    Icon(
+                                      switch (_db.vendor.badgeTier) {
+                                        VendorBadgeTier.topRated => Icons.workspace_premium,
+                                        VendorBadgeTier.verified => Icons.verified,
+                                        VendorBadgeTier.none => Icons.remove_circle_outline,
+                                      },
+                                      size: 13,
+                                      color: switch (_db.vendor.badgeTier) {
+                                        VendorBadgeTier.topRated => const Color(0xFFD97706),
+                                        VendorBadgeTier.verified => const Color(0xFF059669),
+                                        VendorBadgeTier.none => const Color(0xFF64748B),
+                                      },
+                                    ),
+                                    const SizedBox(width: 4),
                                     Flexible(
                                       child: LocalizedText(
                                         _db.vendor.badgeTier.labelVi,
-                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: switch (_db.vendor.badgeTier) {
+                                            VendorBadgeTier.topRated => const Color(0xFFB45309),
+                                            VendorBadgeTier.verified => const Color(0xFF047857),
+                                            VendorBadgeTier.none => const Color(0xFF475569),
+                                          },
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
                                 ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                '≥ 1 đánh giá & ≥ 3.5★: Đã xác minh • ≥ 5 đánh giá & ≥ 4.5★: Hàng đầu',
+                                style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
                               ),
                             ],
                           ),

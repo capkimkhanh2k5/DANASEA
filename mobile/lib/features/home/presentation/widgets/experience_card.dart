@@ -1,3 +1,4 @@
+import '../../../../core/models/danasea_models.dart';
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -68,30 +69,36 @@ class ExperienceCard extends StatelessWidget {
                       );
                     },
                   ),
-                  // Verified Badge (top-left)
-                  if (item.isVerified)
+                  // Badge (top-left): Hide when none, Verified (emerald), Top Rated (amber)
+                  if (item.vendorBadge != VendorBadgeTier.none)
                     Positioned(
                       top: 12,
                       left: 12,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.secondary.withValues(alpha: 0.90),
+                          color: item.vendorBadge == VendorBadgeTier.topRated
+                              ? const Color(0xFFD97706)
+                              : AppColors.secondary.withValues(alpha: 0.90),
                           borderRadius: AppShapes.radiusFull,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.verified,
+                            Icon(
+                              item.vendorBadge == VendorBadgeTier.topRated
+                                  ? Icons.workspace_premium
+                                  : Icons.verified,
                               size: 14,
-                              color: AppColors.onSecondary,
+                              color: Colors.white,
                             ),
                             const SizedBox(width: 4),
                             LocalizedText(
-                              'Nhà cung cấp đã xác minh',
+                              item.vendorBadge == VendorBadgeTier.topRated
+                                  ? 'Đối tác hàng đầu'
+                                  : 'Đã xác minh',
                               style: AppTypography.labelSm(
-                                color: AppColors.onSecondary,
+                                color: Colors.white,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),

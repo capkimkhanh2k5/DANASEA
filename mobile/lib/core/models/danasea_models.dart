@@ -37,7 +37,33 @@ class UserModel {
 // 2. VENDORS & CATEGORIES
 // ==========================================
 
-enum VendorBadgeTier { none, verified, topRated }
+enum VendorBadgeTier {
+  none,
+  verified,
+  topRated;
+
+  static VendorBadgeTier fromApi(String? value) {
+    switch (value?.trim().toUpperCase()) {
+      case 'VERIFIED':
+        return VendorBadgeTier.verified;
+      case 'TOP_RATED':
+        return VendorBadgeTier.topRated;
+      default:
+        return VendorBadgeTier.none;
+    }
+  }
+
+  String get labelVi {
+    switch (this) {
+      case VendorBadgeTier.none:
+        return 'Chưa xếp hạng';
+      case VendorBadgeTier.verified:
+        return 'Đã xác minh';
+      case VendorBadgeTier.topRated:
+        return 'Đối tác hàng đầu';
+    }
+  }
+}
 
 enum VendorVerificationStatus { pending, approved, rejected }
 
@@ -68,7 +94,7 @@ class VendorModel {
     this.verificationStatus = VendorVerificationStatus.approved,
     this.ratingAvg = 5.0,
     this.ratingCount = 0,
-    this.badgeTier = VendorBadgeTier.verified,
+    this.badgeTier = VendorBadgeTier.none,
     this.avatarUrl,
   });
 }
@@ -167,7 +193,7 @@ class ServiceModel {
     required this.id,
     required this.vendorId,
     required this.vendorName,
-    this.vendorBadge = VendorBadgeTier.verified,
+    this.vendorBadge = VendorBadgeTier.none,
     required this.categoryId,
     required this.categoryName,
     required this.name,

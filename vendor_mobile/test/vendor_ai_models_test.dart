@@ -81,5 +81,17 @@ void main() {
       CopilotMessageModel.fromJson({'message': 'Xin chào'}).details,
       isEmpty,
     );
+
+    final contextMsg = CopilotMessageModel.fromJson({
+      'role': 'USER',
+      'message': 'Dịch vụ này có những ca nào?',
+      'contextType': 'SERVICE',
+      'contextId': '088d874c-a61e-5b58-a7a9-497f32a56901',
+      'contextLabel': 'Mô tô nước – Danabeach',
+    });
+    expect(contextMsg.contextType, 'SERVICE');
+    expect(contextMsg.contextId, '088d874c-a61e-5b58-a7a9-497f32a56901');
+    expect(contextMsg.contextLabel, 'Mô tô nước – Danabeach');
+    expect(contextMsg.content, 'Dịch vụ này có những ca nào?');
   });
 }

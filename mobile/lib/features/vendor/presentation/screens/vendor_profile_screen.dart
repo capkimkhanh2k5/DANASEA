@@ -84,7 +84,7 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
                   vendor.badgeTier == 'TOP_RATED')
                 LocalizedText(
                   vendor.badgeTier == 'TOP_RATED'
-                      ? 'Được đánh giá cao'
+                      ? 'Đối tác hàng đầu'
                       : 'Đã xác minh',
                 ),
               Row(

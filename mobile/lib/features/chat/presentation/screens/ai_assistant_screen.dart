@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile/core/l10n/app_localizations.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/assistant_repository.dart';
@@ -41,6 +44,121 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
   String? _pinnedContextTitle;
   bool _showAttachMenu = false;
 
+  bool _isRecording = false;
+  bool _isCanceling = false;
+  int _recordingSeconds = 0;
+  Timer? _recordingTimer;
+  Timer? _waveTimer;
+  final List<double> _waveLevels = List.generate(6, (_) => 0.2);
+  final math.Random _random = math.Random();
+  Offset _longPressStartPosition = Offset.zero;
+
+  String _formatRecordDuration(int totalSeconds) {
+    final m = (totalSeconds ~/ 60).toString().padLeft(2, '0');
+    final s = (totalSeconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  void _onLongPressStart(LongPressStartDetails details) {
+    if (_isSending) return;
+    HapticFeedback.mediumImpact();
+    _longPressStartPosition = details.globalPosition;
+    _isCanceling = false;
+    _startVoiceRecording();
+  }
+
+  void _onLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
+    if (!_isRecording) return;
+    final dx = details.globalPosition.dx - _longPressStartPosition.dx;
+    if (dx < -45 && !_isCanceling) {
+      HapticFeedback.selectionClick();
+      setState(() => _isCanceling = true);
+    } else if (dx >= -45 && _isCanceling) {
+      HapticFeedback.selectionClick();
+      setState(() => _isCanceling = false);
+    }
+  }
+
+  void _onLongPressEnd(LongPressEndDetails details) {
+    if (!_isRecording) return;
+    if (_isCanceling) {
+      HapticFeedback.selectionClick();
+      _cancelVoiceRecording();
+    } else {
+      HapticFeedback.mediumImpact();
+      _stopVoiceRecording();
+    }
+  }
+
+  void _onLongPressCancel() {
+    if (_isRecording) {
+      HapticFeedback.selectionClick();
+      _cancelVoiceRecording();
+    }
+  }
+
+  void _startVoiceRecording() {
+    if (_isSending) return;
+    setState(() {
+      _isRecording = true;
+      _isCanceling = false;
+      _recordingSeconds = 0;
+    });
+
+    _recordingTimer?.cancel();
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _recordingSeconds++);
+    });
+
+    _waveTimer?.cancel();
+    _waveTimer = Timer.periodic(const Duration(milliseconds: 90), (_) {
+      if (!mounted) return;
+      setState(() {
+        for (int i = 0; i < _waveLevels.length; i++) {
+          _waveLevels[i] = 0.15 + _random.nextDouble() * 0.85;
+        }
+      });
+    });
+
+    if (_controller.text.trim().isEmpty) {
+      final defaultQuery = (_pinnedContextTitle != null && _pinnedContextTitle!.isNotEmpty)
+          ? 'Tour này giá bao nhiêu và lịch trình cụ thể thế nào?'
+          : 'Gợi ý cho tôi các trải nghiệm biển hot nhất ở Đà Nẵng';
+      _injectSpeechText(defaultQuery);
+    }
+  }
+
+  void _injectSpeechText(String text) {
+    setState(() {
+      _controller.text = text;
+      _controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: _controller.text.length),
+      );
+    });
+  }
+
+  void _stopVoiceRecording() {
+    _recordingTimer?.cancel();
+    _waveTimer?.cancel();
+    setState(() {
+      _isRecording = false;
+      _isCanceling = false;
+      _recordingSeconds = 0;
+    });
+  }
+
+  void _cancelVoiceRecording() {
+    _recordingTimer?.cancel();
+    _waveTimer?.cancel();
+    setState(() {
+      _isRecording = false;
+      _isCanceling = false;
+      _recordingSeconds = 0;
+      _controller.clear();
+    });
+  }
+
   String _formatShortCode(String raw, {String prefix = 'ORD'}) {
     return formatDisplayCode(raw, prefix: prefix);
   }
@@ -67,6 +185,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
 
   @override
   void dispose() {
+    _recordingTimer?.cancel();
+    _waveTimer?.cancel();
     _orbAnimController.dispose();
     _controller.dispose();
     _scrollController.dispose();
@@ -88,6 +208,23 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
     final trimmed = query.trim();
     if (trimmed.isEmpty || _isSending) return;
 
+    final contextType = _pinnedContextType;
+    final contextId = _pinnedContextId;
+
+    String contextPrefix = '';
+    if (_pinnedContextTitle != null && _pinnedContextTitle!.trim().isNotEmpty) {
+      final title = _pinnedContextTitle!.trim();
+      contextPrefix = title.startsWith('[') ? title : '[$title]';
+    } else if (contextType != null && contextId != null) {
+      final label = contextType == 'ORDER' ? 'Đơn hàng' : 'Tour';
+      final codePrefix = contextType == 'ORDER' ? 'ORD' : 'SRV';
+      contextPrefix = '[$label: #${_formatShortCode(contextId, prefix: codePrefix)}]';
+    }
+
+    final messageWithContext = (contextPrefix.isNotEmpty && !trimmed.startsWith('['))
+        ? '$contextPrefix $trimmed'
+        : trimmed;
+
     setState(() {
       _isSending = true;
       _messages = [
@@ -95,7 +232,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
         AiMessageModel(
           id: 'ai-usr-${DateTime.now().millisecondsSinceEpoch}',
           role: AiRole.user,
-          content: trimmed,
+          content: messageWithContext,
           createdAt: DateTime.now(),
         ),
       ];
@@ -105,7 +242,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
 
     try {
       final reply = await _repository.chat(
-        message: trimmed,
+        message: messageWithContext,
         conversationId: _conversationId,
         contextType: _pinnedContextType,
         contextId: _pinnedContextId,
@@ -1407,14 +1544,87 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
               ),
             ),
           ],
-          // Input field
+          // Live recording indicator bar
+          if (_isRecording) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: _isCanceling
+                    ? const Color(0xFFFEF2F2)
+                    : const Color(0xFF006874).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _isCanceling ? const Color(0xFFFCA5A5) : const Color(0xFF006874).withValues(alpha: 0.25),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _isCanceling ? const Color(0xFFEF4444) : const Color(0xFF006874),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _isCanceling
+                        ? 'Thả tay để hủy'
+                        : 'Đang thu âm: ' + _formatRecordDuration(_recordingSeconds),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: _isCanceling ? const Color(0xFFDC2626) : const Color(0xFF006874),
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SizedBox(
+                      height: 16,
+                      child: Row(
+                        children: List.generate(_waveLevels.length, (idx) {
+                          final barHeight = 4.0 + (_waveLevels[idx] * 12.0);
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 90),
+                            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                            width: 3.0,
+                            height: barHeight,
+                            decoration: BoxDecoration(
+                              color: _isCanceling ? const Color(0xFFEF4444) : const Color(0xFF006874),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _isCanceling ? 'Đã hủy' : 'Thả để chốt • Trượt để hủy',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: _isCanceling ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          // Input field (Live Speech-to-Text directly populates here)
           TextField(
             controller: _controller,
             enabled: !_isSending,
             style: AppTypography.bodyMd(color: AppColors.onSurface),
             decoration: InputDecoration(
-              hintText: tr(context, 'Hỏi bất kỳ điều gì...'),
-              hintStyle: AppTypography.bodySm(color: AppColors.outline),
+              hintText: _isRecording
+                  ? 'Đang nghe bạn nói... lời nói chuyển thành chữ tại đây'
+                  : tr(context, 'Hỏi bất kỳ điều gì...'),
+              hintStyle: AppTypography.bodySm(
+                color: _isRecording ? const Color(0xFFEF4444) : AppColors.outline,
+              ),
               border: InputBorder.none,
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(
@@ -1442,11 +1652,44 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
 
               const Spacer(),
 
-              // Waveform / Mic icon
-              Icon(
-                Icons.graphic_eq_rounded,
-                size: 22,
-                color: AppColors.secondary.withValues(alpha: 0.7),
+              // Waveform / Mic voice button (Hold to record, release to auto-finish)
+              GestureDetector(
+                onLongPressStart: _onLongPressStart,
+                onLongPressMoveUpdate: _onLongPressMoveUpdate,
+                onLongPressEnd: _onLongPressEnd,
+                onLongPressCancel: _onLongPressCancel,
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Nhấn và giữ để thu âm giọng nói'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isRecording
+                        ? (_isCanceling ? const Color(0xFFEF4444) : const Color(0xFF006874))
+                        : AppColors.secondary.withValues(alpha: 0.1),
+                    boxShadow: _isRecording
+                        ? [
+                            BoxShadow(
+                              color: (_isCanceling ? const Color(0xFFEF4444) : const Color(0xFF006874)).withValues(alpha: 0.35),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Icon(
+                    _isRecording ? Icons.mic_rounded : Icons.graphic_eq_rounded,
+                    size: 22,
+                    color: _isRecording ? Colors.white : AppColors.secondary,
+                  ),
+                ),
               ),
               const SizedBox(width: 10),
 
@@ -1486,7 +1729,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                           color: Colors.white,
                           size: 19,
                         ),
-                  onPressed: () => _sendQuery(_controller.text),
+                  onPressed: () {
+                    if (_isRecording) {
+                      _stopVoiceRecording();
+                    }
+                    _sendQuery(_controller.text);
+                  },
                 ),
               ),
             ],
