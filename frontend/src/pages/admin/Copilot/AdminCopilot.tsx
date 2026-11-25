@@ -388,7 +388,9 @@ export const AdminCopilot: React.FC = () => {
           contextType,
           contextId,
           pinnedSummary?.title
-            ? `${pinnedSummary.title} (#${pinnedSummary.displayCode})`
+            ? (pinnedSummary.displayCode && !pinnedSummary.title.includes(pinnedSummary.displayCode)
+                ? `${pinnedSummary.title} (#${pinnedSummary.displayCode})`
+                : pinnedSummary.title)
             : pinnedSummary?.displayCode
               ? `${(ADMIN_CONTEXT_META[contextType]?.label || contextType)} #${pinnedSummary.displayCode}`
               : null

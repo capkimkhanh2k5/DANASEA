@@ -56,19 +56,37 @@ export function matchesDisplayCodeOrId(input: string, targetId: string, prefix =
 
 const UUID_REGEX = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g;
 
+function inferPrefixFromContext(text: string, offset: number): string {
+  const before = text.slice(Math.max(0, offset - 48), offset).toLowerCase();
+  if (/(?:mã\s*ca|ca\s*này|ca\s*khởi\s*hành|\bslot\b)/i.test(before)) return 'SLOT';
+  if (/(?:đơn\s*phụ|đơn\s*con|sub[- ]?order)/i.test(before)) return 'SUB';
+  if (/(?:khiếu\s*nại|tranh\s*chấp|\bdispute\b)/i.test(before)) return 'DISP';
+  if (/(?:dịch\s*vụ|\bservice\b)/i.test(before)) return 'SRV';
+  if (/(?:đánh\s*giá|\breview\b)/i.test(before)) return 'REV';
+  if (/(?:hoàn\s*tiền|\brefund\b)/i.test(before)) return 'REF';
+  if (/(?:thiết\s*bị|\bequipment\b)/i.test(before)) return 'EQP';
+  if (/(?:rút\s*tiền|chi\s*trả|\bpayout\b)/i.test(before)) return 'PAY';
+  if (/(?:đối\s*tác|nhà\s*cung\s*cấp|\bvendor\b)/i.test(before)) return 'VND';
+  return 'ORD';
+}
+
 /**
  * Formats any raw 36-char UUIDs found in free text (like chat titles or messages)
- * into concise display codes (e.g. #ORD-00010042).
+ * into concise display codes (e.g. #ORD-00010042, #SLOT-85E6BFFC).
  */
 export function formatTextWithDisplayCodes(text?: string | null): string {
   if (!text) return '';
-  return text.replace(UUID_REGEX, (uuid) => {
+  return text.replace(UUID_REGEX, (uuid, offset: number) => {
     const clean = uuid.replace(/-/g, '').toLowerCase();
-    let prefix = 'ORD';
-    if (clean.startsWith('0002') || clean.startsWith('b002')) prefix = 'SUB';
-    else if (clean.startsWith('0005')) prefix = 'DISP';
+    let prefix: string;
+    if (clean.startsWith('0001') || clean.startsWith('b001')) prefix = 'ORD';
+    else if (clean.startsWith('0002') || clean.startsWith('b002')) prefix = 'SUB';
+    else if (clean.startsWith('0004')) prefix = 'REF';
+    else if (clean.startsWith('0005') || clean.startsWith('77777777')) prefix = 'DISP';
     else if (clean.startsWith('0006')) prefix = 'STL';
-    else if (clean.startsWith('0009')) prefix = 'PAY';
+    else if (clean.startsWith('0008') || clean.startsWith('0009')) prefix = 'PAY';
+    else if (clean.startsWith('66666666')) prefix = 'REV';
+    else prefix = inferPrefixFromContext(text, offset);
     return `#${formatDisplayCode(uuid, prefix)}`;
   });
 }

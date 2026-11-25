@@ -204,6 +204,36 @@ class VendorAdminAiFeaturesTest {
     }
 
     @Test
+    @DisplayName("Vendor Review Coaching tính chính xác số lượt đánh giá 5 sao cần thêm để đạt ngưỡng huy hiệu")
+    void testVendorReviewCoaching_ComputesExactFiveStarReviewsForBadgeProgression() {
+        // 60 reviews @ 3.4★ -> need ceil((4.5 - 3.4) * 60 / (5 - 4.5)) = 132 five-star reviews to reach 4.5★
+        var verifiedProfile = new VendorProfile(vendorId, vendorUserId, "Kajin Vina", new BigDecimal("3.40"), 60, "VERIFIED");
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(verifiedProfile));
+        when(vendorAiData.listReviews(eq(vendorId), any(), anyInt())).thenReturn(List.of(
+                new VendorReviewItem(UUID.randomUUID(), UUID.randomUUID(), "Mô tô nước", 3, "Ổn", OffsetDateTime.now())
+        ));
+
+        CoachingResult verifiedRes = reviewCoachingUseCase.execute(vendorUserId, null, LocalDate.now().minusDays(90), LocalDate.now());
+        assertThat(verifiedRes.badgeProgression().nextTier()).isEqualTo("TOP_RATED");
+        assertThat(verifiedRes.badgeProgression().reviewsNeededForNextTier()).isEqualTo(132);
+        assertThat(verifiedRes.badgeProgression().roadmapNote()).contains("132");
+
+        // 10 reviews @ 3.0★ (NONE) -> need ceil((3.5 - 3.0) * 10 / 1.5) = 4 five-star reviews to reach 3.5★
+        var noneProfile = new VendorProfile(vendorId, vendorUserId, "Shop Mới", new BigDecimal("3.00"), 10, "NONE");
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(noneProfile));
+        CoachingResult noneRes = reviewCoachingUseCase.execute(vendorUserId, null, LocalDate.now().minusDays(90), LocalDate.now());
+        assertThat(noneRes.badgeProgression().nextTier()).isEqualTo("VERIFIED");
+        assertThat(noneRes.badgeProgression().reviewsNeededForNextTier()).isEqualTo(4);
+        assertThat(noneRes.badgeProgression().roadmapNote()).contains("4");
+
+        // 2 reviews @ 4.8★ (VERIFIED) -> already >= 4.5★, needs 3 more reviews to hit minimum count 5
+        var lowCountProfile = new VendorProfile(vendorId, vendorUserId, "Shop Tốt", new BigDecimal("4.80"), 2, "VERIFIED");
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(lowCountProfile));
+        CoachingResult lowCountRes = reviewCoachingUseCase.execute(vendorUserId, null, LocalDate.now().minusDays(90), LocalDate.now());
+        assertThat(lowCountRes.badgeProgression().reviewsNeededForNextTier()).isEqualTo(3);
+    }
+
+    @Test
     @DisplayName("Vendor Smart Review Reply sinh bản nháp phản hồi thấu cảm cho khách")
     void testVendorSmartReviewReply_GeneratesEmpatheticReply() {
         var profile = new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 25, "TOP_RATED");

@@ -140,10 +140,9 @@ export function VendorProfile({ vendor, timeline, onPreview, onApproveDoc, onRej
         <span>Huy hiệu hiện tại</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <AdminBadge tone={getBadgeTierTone(vendor.badgeTier)}>{getBadgeTierLabel(vendor.badgeTier)}</AdminBadge>
-          <span className="admin-vendors-mono" style={{ fontSize: '11.5px', color: '#64748b' }}>({vendor.badgeTier})</span>
         </div>
         <p className="admin-detail-note" style={{ marginTop: '6px' }}>
-          Huy hiệu được hệ thống tự động tính từ đánh giá hiển thị của khách hàng: Chưa xếp hạng (0 đánh giá), Đã xác minh (≥ 1 đánh giá), Đối tác hàng đầu (≥ 5 đánh giá và điểm trung bình ≥ 4.0).
+          Huy hiệu được hệ thống tự động tính từ đánh giá hiển thị của khách hàng: Chưa xếp hạng (0 đánh giá hoặc &lt; 3.5★), Đã xác minh (≥ 1 đánh giá và ≥ 3.5★), Đối tác hàng đầu (≥ 5 đánh giá và điểm trung bình ≥ 4.5★).
         </p>
       </div>
       <div className="admin-vendors-supplement"><AdminButton disabled aria-describedby="vendor-supplement-note">Yêu cầu bổ sung</AdminButton>
