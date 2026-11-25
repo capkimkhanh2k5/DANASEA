@@ -117,6 +117,74 @@ export function extractRevenueChartData(data: unknown): RevenueTimeSeriesItem[] 
 }
 
 /**
+ * Map backend vendor issue enums to readable Vietnamese labels.
+ * Unknown codes are humanised (HIGH_X -> "High x") instead of leaking raw enums.
+ */
+const VENDOR_ISSUE_LABELS: Record<string, string> = {
+  HIGH_CANCELLATION: 'Tỷ lệ hủy cao',
+  LOW_RATING: 'Đánh giá thấp',
+  UNDERPERFORMING: 'Hiệu suất thấp',
+  OVERLOADED: 'Quá tải',
+};
+
+const ASSESSMENT_STATUS_LABELS: Record<string, string> = {
+  NEEDS_REVIEW: 'Cần kiểm duyệt',
+  NO_RULE_SIGNAL: 'Chưa phát hiện vi phạm',
+  CLEAN: 'Ổn định',
+  APPROVED: 'Đã duyệt',
+};
+
+const RISK_SIGNAL_LABELS: Record<string, string> = {
+  THREE_FAILED_PAYMENTS_IN_24H: '≥ 3 lần thanh toán thất bại trong 24 giờ',
+  FIVE_ORDERS_IN_1H: '≥ 5 đơn hàng trong 1 giờ',
+  THREE_REFUND_REQUESTS_IN_7D: '≥ 3 yêu cầu hoàn tiền trong 7 ngày',
+  HIGH_VELOCITY: 'Tần suất giao dịch bất thường',
+};
+
+const CONTENT_REASON_LABELS: Record<string, string> = {
+  EXTERNAL_CONTACT_DETECTED: 'Phát hiện thông tin liên hệ ngoài nền tảng',
+  EXTERNAL_CONTACT_OR_LINK: 'Phát hiện liên hệ hoặc đường link ngoài',
+  EXTERNAL_CONTACT_SOLICITATION_SIGNAL: 'Có dấu hiệu mời giao dịch ngoài nền tảng',
+  MODEL_SUGGESTS_EXTERNAL_PAYMENT: 'Nghi vấn đề nghị thanh toán ngoài nền tảng',
+  MODEL_SUGGESTS_SPAM: 'Nghi vấn nội dung spam',
+  MODEL_SUGGESTS_ABUSE: 'Nghi vấn nội dung không phù hợp',
+  MODEL_UNAVAILABLE: 'Mô hình AI tạm thời không khả dụng',
+};
+
+const EVIDENCE_TYPE_LABELS: Record<string, string> = {
+  TEXT_ONLY: 'Văn bản',
+  SERVICE_LISTING: 'Bài đăng dịch vụ',
+};
+
+function mapEnumLabel(code: string, dict: Record<string, string>): string {
+  const key = String(code || '').trim().toUpperCase();
+  if (!key) return '';
+  if (dict[key]) return dict[key];
+  const spaced = key.replace(/_/g, ' ').toLowerCase();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+export function formatVendorIssueLabel(code: string): string {
+  return mapEnumLabel(code, VENDOR_ISSUE_LABELS);
+}
+
+export function formatAssessmentStatusLabel(code: string): string {
+  return mapEnumLabel(code, ASSESSMENT_STATUS_LABELS);
+}
+
+export function formatRiskSignalLabel(code: string): string {
+  return mapEnumLabel(code, RISK_SIGNAL_LABELS);
+}
+
+export function formatContentReasonLabel(code: string): string {
+  return mapEnumLabel(code, CONTENT_REASON_LABELS);
+}
+
+export function formatEvidenceTypeLabel(code: string): string {
+  return mapEnumLabel(code, EVIDENCE_TYPE_LABELS);
+}
+
+/**
  * Extract and validate VendorDiagnosticItem list from artifact data.
  */
 export function extractVendorDiagnosticsData(data: unknown): VendorDiagnosticItem[] | null {

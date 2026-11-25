@@ -1,8 +1,11 @@
 import { useAuthStore } from "../../../store/useAuthStore";
+import { useAuthHydrated } from "../../../hooks/useAuthHydrated";
 import { useLanguageStore } from "../../../store/useLanguageStore";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useState, useEffect, useCallback } from "react";
 import { authService } from "../../../services/authService";
+import { logoutSession } from "../../../services/sessionService";
+import { toast } from "../../../store/useToastStore";
 import { customerPartnerService } from "../../../services/customerPartnerService";
 import type { PartnerApplicationResponse } from "../../../types/partnerApplication";
 import {
@@ -29,7 +32,8 @@ export function Profile() {
   const navigate = useNavigate();
   const { language } = useLanguageStore();
   const isEn = language === 'en';
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
+  const hydrated = useAuthHydrated();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>("personal");
   const [editingField, setEditingField] = useState<"name" | "phone" | null>(null);
@@ -55,6 +59,7 @@ export function Profile() {
 
   // Sync profile data from Backend /api/users/me
   useEffect(() => {
+    if (!hydrated || !user?.id) return;
     let active = true;
     authService.getMyProfile()
       .then((profile) => {
@@ -63,16 +68,17 @@ export function Profile() {
           setFullName(profile.fullName);
           setTempFullName(profile.fullName);
         }
-        if (user && profile.fullName && user.fullName !== profile.fullName) {
-          useAuthStore.getState().setAuth(
-            { ...user, fullName: profile.fullName, avatarUrl: profile.avatarUrl || user.avatarUrl },
-            useAuthStore.getState().accessToken || ''
-          );
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser && profile.fullName && currentUser.fullName !== profile.fullName) {
+          useAuthStore.getState().updateUser({
+            fullName: profile.fullName,
+            avatarUrl: profile.avatarUrl || currentUser.avatarUrl,
+          });
         }
       })
       .catch(() => {});
     return () => { active = false; };
-  }, [user]);
+  }, [hydrated, user?.id]);
 
   // Security Form states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -81,6 +87,7 @@ export function Profile() {
   const [showCurrentPass, setShowCurrentPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Partner Application states
   const [partnerApp, setPartnerApp] = useState<PartnerApplicationResponse | null>(null);
@@ -147,9 +154,13 @@ export function Profile() {
     }
   };
 
+  if (!hydrated) {
+    return <main className="w-full pt-20 bg-slate-50 min-h-[calc(100vh-80px)] flex-1" />;
+  }
+
   // Redirect unauthenticated user directly to login
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth" replace state={{ returnTo: "/profile" }} />;
   }
 
   // Redirect vendor / admin to their respective dedicated portals
@@ -166,10 +177,7 @@ export function Profile() {
       await authService.updateProfile({ fullName: tempFullName });
       setFullName(tempFullName);
       if (user) {
-        useAuthStore.getState().setAuth(
-          { ...user, fullName: tempFullName },
-          useAuthStore.getState().accessToken || ''
-        );
+        useAuthStore.getState().updateUser({ fullName: tempFullName });
       }
       setEditingField(null);
       setToastMessage(isEn ? "Legal name updated successfully!" : "Đã cập nhật tên pháp lý thành công!");
@@ -192,17 +200,27 @@ export function Profile() {
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isChangingPassword) return;
     if (newPassword !== confirmPassword) {
-      alert(isEn ? "New passwords do not match!" : "Mật khẩu xác nhận không khớp!");
+      toast.error(isEn ? "New passwords do not match!" : "Mật khẩu xác nhận không khớp!");
       return;
     }
-    setPasswordSuccess(true);
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setTimeout(() => setPasswordSuccess(false), 4000);
+    setIsChangingPassword(true);
+    try {
+      await authService.changePassword({ currentPassword, newPassword });
+      setPasswordSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPasswordSuccess(false), 4000);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || (isEn ? "Could not change password. Check your current password." : "Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại."));
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   return (
@@ -332,7 +350,7 @@ export function Profile() {
               <div className="pt-2 border-t border-slate-100 mt-2">
                 <button
                   type="button"
-                  onClick={() => { logout(); navigate("/auth"); }}
+                  onClick={async () => { await logoutSession(); navigate("/auth", { replace: true }); }}
                   className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
                 >
                   <LogOut className="w-4 h-4 text-rose-500" />
@@ -600,9 +618,10 @@ export function Profile() {
                   <div className="pt-2">
                     <button
                       type="submit"
-                      className="px-5 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
+                      disabled={isChangingPassword}
+                      className="px-5 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
                     >
-                      {isEn ? "Update Password" : "Cập nhật mật khẩu"}
+                      {isChangingPassword ? (isEn ? "Updating..." : "Đang cập nhật...") : (isEn ? "Update Password" : "Cập nhật mật khẩu")}
                     </button>
                   </div>
                 </form>

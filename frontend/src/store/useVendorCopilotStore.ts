@@ -10,15 +10,37 @@ export interface ChatUiMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  context?: AttachedContext;
+  media?: AttachedMedia[];
   artifacts?: CopilotArtifact[];
   toolsUsed?: string[];
   createdAt: string;
 }
 
+export type VendorContextType =
+  | 'ORDER'
+  | 'SERVICE'
+  | 'REVIEW'
+  | 'DISPUTE'
+  | 'REFUND'
+  | 'SLOT'
+  | 'EQUIPMENT'
+  | 'PAYOUT';
+
+export interface AttachedMedia {
+  id: string;
+  type: 'image' | 'file';
+  name: string;
+  url?: string;
+  size?: number;
+  previewUrl?: string;
+}
+
 export interface AttachedContext {
-  type: 'ORDER' | 'SERVICE';
+  type: VendorContextType;
   id: string;
   label: string;
+  meta?: Record<string, unknown>;
 }
 
 interface VendorCopilotState {
@@ -29,6 +51,7 @@ interface VendorCopilotState {
   messages: ChatUiMessage[];
   isLoading: boolean;
   attachedContext?: AttachedContext;
+  attachedMedia: AttachedMedia[];
   error?: string | null;
 
   // Actions
@@ -37,6 +60,9 @@ interface VendorCopilotState {
   toggleCopilot: () => void;
   setAttachedContext: (context?: AttachedContext) => void;
   clearAttachedContext: () => void;
+  addAttachedMedia: (media: AttachedMedia) => void;
+  removeAttachedMedia: (id: string) => void;
+  clearAttachedMedia: () => void;
   loadConversations: () => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
   startNewConversation: () => void;
@@ -53,6 +79,7 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
   messages: [],
   isLoading: false,
   attachedContext: undefined,
+  attachedMedia: [],
   error: null,
 
   openCopilot: (context?: AttachedContext, initialPrompt?: string) => {
@@ -81,6 +108,18 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
     set({ attachedContext: undefined });
   },
 
+  addAttachedMedia: (media: AttachedMedia) => {
+    set((state) => ({ attachedMedia: [...state.attachedMedia, media] }));
+  },
+
+  removeAttachedMedia: (id: string) => {
+    set((state) => ({ attachedMedia: state.attachedMedia.filter((m) => m.id !== id) }));
+  },
+
+  clearAttachedMedia: () => {
+    set({ attachedMedia: [] });
+  },
+
   loadConversations: async () => {
     try {
       set({ isSessionsLoading: true });
@@ -107,10 +146,54 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
           }
         }
         const toolsUsedList = m.toolsUsed ? m.toolsUsed.split(',').filter(Boolean) : undefined;
+
+        // Parse legacy or backend-saved prefix "[Tệp đính kèm: ...]" and "[Về ...]" out of user text into clean UI elements
+        let displayContent = m.content;
+        let extractedContext: AttachedContext | undefined;
+        if (m.contextType && m.contextId && m.role.toLowerCase() === 'user') {
+          extractedContext = {
+            type: m.contextType as VendorContextType,
+            id: m.contextId,
+            label: m.contextLabel || m.contextType,
+          };
+        }
+        const extractedMedia: AttachedMedia[] = [];
+
+        // Check for media attachment prefix
+        const mediaMatches = displayContent.matchAll(/\[Tệp đính kèm: (.+?)(?: \((https?:\/\/[^\s)]+)\))?\]\n*/g);
+        for (const match of mediaMatches) {
+          const fileName = match[1];
+          const fileUrl = match[2];
+          extractedMedia.push({
+            id: 'hist-media-' + Math.random().toString(36).substring(2, 9),
+            type: fileName.match(/\.(png|jpe?g|webp|gif)$/i) ? 'image' : 'file',
+            name: fileName,
+            url: fileUrl,
+            previewUrl: fileUrl,
+          });
+        }
+        displayContent = displayContent.replace(/\[Tệp đính kèm: .+?\]\n*/g, '').trim();
+
+        // Check for context prefix
+        const prefixMatch = displayContent.match(/^\[Về (?:\[(.+?)\] )?(.+?) \(ID: ([a-f0-9-]+)\)\] (.*)$/s);
+        if (!extractedContext && prefixMatch && m.role.toLowerCase() === 'user') {
+          const typeStr = prefixMatch[1] || 'SERVICE';
+          const labelStr = prefixMatch[2];
+          const idStr = prefixMatch[3];
+          displayContent = prefixMatch[4];
+          extractedContext = {
+            type: (typeStr.includes('Dịch vụ') ? 'SERVICE' : 'ORDER') as VendorContextType,
+            id: idStr,
+            label: labelStr,
+          };
+        }
+
         return {
           id: m.id,
           role: m.role.toLowerCase() === 'user' ? 'user' : 'assistant',
-          content: m.content,
+          content: displayContent,
+          context: extractedContext,
+          media: extractedMedia.length > 0 ? extractedMedia : undefined,
           artifacts: parsedArtifacts,
           toolsUsed: toolsUsedList,
           createdAt: m.createdAt,
@@ -140,28 +223,43 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
     const trimmed = text.trim();
     if (!trimmed || get().isLoading) return;
 
-    const { activeConversationId, attachedContext } = get();
+    const { activeConversationId, attachedContext, attachedMedia } = get();
+
+    // If media is attached, enrich prompt with media references
+    let effectiveText = trimmed;
+    if (attachedMedia.length > 0) {
+      const mediaList = attachedMedia
+        .map((m) => `[Tệp đính kèm: ${m.name}${m.url ? ` (${m.url})` : ''}]`)
+        .join('\n');
+      effectiveText = `${mediaList}\n\n${trimmed}`;
+    }
+
     const userMsgId = 'user-' + Date.now();
     const userMsg: ChatUiMessage = {
       id: userMsgId,
       role: 'user',
-      content: trimmed,
+      content: trimmed, // Clean user text without raw bracketed url prefixes
+      context: attachedContext, // Clean context chip rendered above or inside message
+      media: attachedMedia.length > 0 ? [...attachedMedia] : undefined,
       createdAt: new Date().toISOString(),
     };
 
     set((state) => ({
       messages: [...state.messages, userMsg],
       isLoading: true,
+      attachedContext: undefined, // Consume pinned context on send like LLM attachments
+      attachedMedia: [],
       error: null,
     }));
 
     try {
-      const detectedLang = detectLanguage(trimmed);
+      const detectedLang = detectLanguage(effectiveText);
       const res = await vendorAiService.chatCopilot({
         conversationId: activeConversationId,
-        message: trimmed,
+        message: effectiveText, // Send clean user message
         contextType: attachedContext?.type,
         contextId: attachedContext?.id,
+        contextLabel: attachedContext?.label,
       }, detectedLang);
 
       const assistantMsg: ChatUiMessage = {
@@ -194,7 +292,7 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
           {
             id: 'err-' + Date.now(),
             role: 'assistant',
-            content: `⚠️ ${errorText}`,
+            content: errorText,
             createdAt: new Date().toISOString(),
           },
         ],

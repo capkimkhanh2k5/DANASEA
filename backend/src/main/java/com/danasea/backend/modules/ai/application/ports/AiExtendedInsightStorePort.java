@@ -31,8 +31,16 @@ public interface AiExtendedInsightStorePort {
             String artifactsJson,
             String toolsUsed,
             boolean verified,
-            OffsetDateTime createdAt
-    ) {}
+            OffsetDateTime createdAt,
+            String contextType,
+            UUID contextId,
+            String contextLabel
+    ) {
+        public CopilotMessage(UUID id, UUID conversationId, String role, String content, String artifactsJson,
+                              String toolsUsed, boolean verified, OffsetDateTime createdAt) {
+            this(id, conversationId, role, content, artifactsJson, toolsUsed, verified, createdAt, null, null, null);
+        }
+    }
 
     record VendorInsight(
             UUID id,
@@ -89,6 +97,12 @@ public interface AiExtendedInsightStorePort {
     // Copilot Message methods
     CopilotMessage appendCopilotMessage(
             UUID conversationId, String role, String content, String artifactsJson, String toolsUsed, boolean verified);
+
+    default CopilotMessage appendCopilotMessage(
+            UUID conversationId, String role, String content, String artifactsJson, String toolsUsed, boolean verified,
+            String contextType, UUID contextId, String contextLabel) {
+        return appendCopilotMessage(conversationId, role, content, artifactsJson, toolsUsed, verified);
+    }
 
     List<CopilotMessage> listCopilotMessages(UUID conversationId);
 

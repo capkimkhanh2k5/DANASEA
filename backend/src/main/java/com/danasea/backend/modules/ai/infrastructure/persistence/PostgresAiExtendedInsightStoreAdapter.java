@@ -125,6 +125,14 @@ public class PostgresAiExtendedInsightStoreAdapter implements AiExtendedInsightS
     @Transactional
     public CopilotMessage appendCopilotMessage(
             UUID conversationId, String role, String content, String artifactsJson, String toolsUsed, boolean verified) {
+        return appendCopilotMessage(conversationId, role, content, artifactsJson, toolsUsed, verified, null, null, null);
+    }
+
+    @Override
+    @Transactional
+    public CopilotMessage appendCopilotMessage(
+            UUID conversationId, String role, String content, String artifactsJson, String toolsUsed, boolean verified,
+            String contextType, UUID contextId, String contextLabel) {
         AiCopilotMessageJpaEntity entity = new AiCopilotMessageJpaEntity();
         entity.setConversationId(conversationId);
         entity.setRole(role);
@@ -132,6 +140,9 @@ public class PostgresAiExtendedInsightStoreAdapter implements AiExtendedInsightS
         entity.setArtifactsJson(artifactsJson);
         entity.setToolsUsed(toolsUsed);
         entity.setVerified(verified);
+        entity.setContextType(contextType);
+        entity.setContextId(contextId);
+        entity.setContextLabel(contextLabel != null && contextLabel.length() > 255 ? contextLabel.substring(0, 255) : contextLabel);
         var saved = messageRepo.save(entity);
         return toRecord(saved);
     }
@@ -238,7 +249,8 @@ public class PostgresAiExtendedInsightStoreAdapter implements AiExtendedInsightS
     private CopilotMessage toRecord(AiCopilotMessageJpaEntity e) {
         return new CopilotMessage(
                 e.getId(), e.getConversationId(), e.getRole(), e.getContent(),
-                e.getArtifactsJson(), e.getToolsUsed(), e.isVerified(), e.getCreatedAt()
+                e.getArtifactsJson(), e.getToolsUsed(), e.isVerified(), e.getCreatedAt(),
+                e.getContextType(), e.getContextId(), e.getContextLabel()
         );
     }
 

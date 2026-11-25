@@ -1588,8 +1588,8 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     }
 
 
-# Replacement accepts only the exact reviewed V1-V61 table/column/FK/trigger inventory.
-REPLACEMENT_FLYWAY_VERSION = 61
+# Replacement accepts only the exact reviewed V1-V62 table/column/FK/trigger inventory.
+REPLACEMENT_FLYWAY_VERSION = 62
 RESET_INVENTORY_SQL = """
 SELECT json_build_object(
  'schemas',(SELECT json_agg(nspname ORDER BY nspname) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),

@@ -50,7 +50,7 @@ public class VendorAiController {
     public record ReviewCoachingRequestDto(UUID serviceId, Integer periodDays) {}
     public record ReplyDraftRequestDto(String tone, String customPoints) {}
     public record SlotAdvisorRequestDto(UUID serviceId, Integer horizonDays) {}
-    public record CopilotChatRequestDto(UUID conversationId, String message, String contextType, UUID contextId) {}
+    public record CopilotChatRequestDto(UUID conversationId, String message, String contextType, UUID contextId, String contextLabel) {}
     public record UpdateConversationMetaDto(String title, Boolean pinned, Boolean archived) {}
 
     private final VendorAiDataPort vendorDataPort;
@@ -113,7 +113,7 @@ public class VendorAiController {
         String ctxType = request != null ? request.contextType() : null;
         UUID ctxId = request != null ? request.contextId() : null;
 
-        return roleCopilotUseCase.processMessage(userId, "VENDOR", vendorId, convId, msg, ctxType, ctxId, lang);
+        return roleCopilotUseCase.processMessage(userId, "VENDOR", vendorId, convId, msg, ctxType, ctxId, request != null ? request.contextLabel() : null, lang);
     }
 
     @GetMapping("/copilot/conversations")
@@ -148,6 +148,13 @@ public class VendorAiController {
         UUID userId = resolveUserId();
         roleCopilotUseCase.deleteConversation(id, userId, "VENDOR", resolveVendorId());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/copilot/refunds")
+    public List<VendorAiDataPort.VendorRefundDetail> listVendorRefunds(
+            @RequestParam(defaultValue = "50") int limit
+    ) {
+        return vendorDataPort.listRefunds(resolveVendorId(), limit);
     }
 
     // ==================== HELPERS ====================

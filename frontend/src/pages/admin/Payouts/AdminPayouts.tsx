@@ -113,7 +113,7 @@ export function AdminPayouts() {
               status: p.status as unknown as PayoutExtended['status'],
               processedBy: p.processedBy ? 'Ban Quản trị DANASEA' : '',
               processedAt: p.processedAt || p.updatedAt,
-              vendorName: v?.businessName || `Đối tác ${p.vendorId.substring(0, 8)}`,
+              vendorName: v?.businessName || `Đối tác #${formatDisplayCode(p.vendorId, 'VND')}`,
               bankName: v?.bankName || 'Chưa cập nhật ngân hàng',
               bankAccountNumber: v?.bankAccountNumber || '****',
               bankAccountHolder: v?.bankAccountHolder || v?.businessName || 'Chủ tài khoản đối tác',
@@ -139,7 +139,7 @@ export function AdminPayouts() {
               status: (s.status === 'PAID' || s.status === 'FINALIZED' ? 'PAID' : (s.status as string) === 'APPROVED' ? 'APPROVED' : 'REQUESTED') as unknown as PayoutExtended['status'],
               processedBy: s.status === 'FINALIZED' ? 'Ban Quản trị DANASEA' : '',
               processedAt: s.updatedAt,
-              vendorName: v?.businessName || `Đối tác ${s.vendorId.substring(0, 8)}`,
+              vendorName: v?.businessName || `Đối tác #${formatDisplayCode(s.vendorId, 'VND')}`,
               bankName: v?.bankName || 'Chưa cập nhật ngân hàng',
               bankAccountNumber: v?.bankAccountNumber || 'Chưa cập nhật số TK',
               bankAccountHolder: v?.bankAccountHolder || v?.businessName || 'Chưa cập nhật chủ TK',
@@ -254,7 +254,7 @@ export function AdminPayouts() {
           processedAt: new Date().toISOString() 
         } : p));
         setIsApproveModalOpen(false);
-        setNotice(`Đã phê duyệt lệnh chi trả #${selectedPayout.id.slice(0, 8).toUpperCase()}. Tiếp theo có thể bấm xác nhận giải ngân chuyển khoản.`);
+        setNotice(`Đã phê duyệt lệnh chi trả #${formatDisplayCode(selectedPayout.id, 'PAY')}. Tiếp theo có thể bấm xác nhận giải ngân chuyển khoản.`);
         return;
       }
 
@@ -298,7 +298,7 @@ export function AdminPayouts() {
 
       setPayouts(updatedList);
       setIsRejectModalOpen(false);
-      setNotice(`Đã từ chối lệnh chi trả #${targetPayout?.id}`);
+      setNotice(`Đã từ chối lệnh chi trả #${formatDisplayCode(targetPayout?.id || '', 'PAY')}`);
       return;
     }
 
@@ -312,7 +312,7 @@ export function AdminPayouts() {
         processedAt: new Date().toISOString() 
       } : p));
       setIsRejectModalOpen(false);
-      setNotice(`Đã từ chối lệnh chi trả #${selectedPayout.id.slice(0, 8).toUpperCase()}: ${rejectReason}`);
+      setNotice(`Đã từ chối lệnh chi trả #${formatDisplayCode(selectedPayout.id, 'PAY')}: ${rejectReason}`);
     } catch (err) {
       const msg = getAdminSettlementError(err, 'Lỗi khi từ chối lệnh chi trả.');
       setNotice(msg);
@@ -335,7 +335,7 @@ export function AdminPayouts() {
       });
       setIsGenerating(false);
       setIsGenerateModalOpen(false);
-      setNotice(`Khởi tạo kỳ đối soát #${newSettlement.id.substring(0, 8)} thành công!`);
+      setNotice(`Khởi tạo kỳ đối soát #${formatDisplayCode(newSettlement.id, 'STL')} thành công!`);
       loadSettlementsData();
       setSelectedPayoutId(newSettlement.id);
     } catch (err) {
@@ -755,7 +755,7 @@ export function AdminPayouts() {
                     <div key={item.id} className="admin-payouts__orders-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
                       <div>
                         <div style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--admin-ink, #171717)', fontSize: 13 }}>
-                          #VE-{item.subOrderId.substring(0, 8).toUpperCase()}
+                          #{formatDisplayCode(item.subOrderId, 'SUB')}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--admin-muted, #64748b)' }}>
                           Doanh thu: {item.grossAmount.toLocaleString('vi-VN')} đ • Phí sàn: -{item.commissionAmount.toLocaleString('vi-VN')} đ ({Math.round(item.commissionRate * 100)}%)
@@ -971,7 +971,7 @@ export function AdminPayouts() {
               <option value="">-- Chọn đối tác --</option>
               {vendors.map(v => (
                 <option key={v.id} value={v.id}>
-                  {v.businessName || v.id}
+                  {v.businessName || `#${formatDisplayCode(v.id, 'VND')}`}
                 </option>
               ))}
             </select>

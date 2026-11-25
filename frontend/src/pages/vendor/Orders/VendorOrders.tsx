@@ -37,6 +37,7 @@ import {
 import { toast } from "../../../store/useToastStore";
 import { extractErrorMessage } from "../../../utils/errorHandler";
 import { getAuthoritativeCustomer } from "../../../data/demoCustomerMap";
+import { formatDisplayCode, matchesDisplayCodeOrId } from "../../../utils/displayCode";
 import type { VendorServiceDto, VendorServiceSlotDto } from "../../../types/vendorService";
 import type { VendorSubOrderDto, VendorBookingItemDto, EarlyDispatchSuggestion } from "../../../types/vendorOrder";
 
@@ -333,7 +334,7 @@ export function VendorOrders() {
           availableCapacity: 4,
           date: new Date().toISOString().slice(0, 10)
         },
-        message: `Xác thực thành công! Đơn #${demoOrder.id.slice(0, 8)} (${demoOrder.guestCount} khách) sẵn sàng xuất bến!`
+        message: `Xác thực thành công! Đơn #${formatDisplayCode(demoOrder.id, 'SUB')} (${demoOrder.guestCount} khách) sẵn sàng xuất bến!`
       });
       return;
     }
@@ -341,14 +342,19 @@ export function VendorOrders() {
     // Backend VerifyCheckinUseCase requires an HMAC-SHA256 signed QR token formatted as '<subOrderId>:<expiresAt>.<signature>'
     if (!rawInput.includes(".") || !rawInput.includes(":")) {
       const matched = orders.find(
-        (o) => o.id.toUpperCase() === rawInput.toUpperCase() || o.orderNumber.toUpperCase() === rawInput.toUpperCase()
+        (o) =>
+          matchesDisplayCodeOrId(rawInput, o.id, 'SUB') ||
+          matchesDisplayCodeOrId(rawInput, o.id, 'ORD') ||
+          o.id.toUpperCase() === rawInput.toUpperCase() ||
+          o.orderNumber.toUpperCase() === rawInput.toUpperCase()
       );
       if (matched) {
+        const subDisplayCode = formatDisplayCode(matched.id, 'SUB');
         if (matched.checked_in_at !== null) {
           setScannerResult({
             type: "USED",
             order: matched,
-            message: `Vé #${matched.id} của khách ${matched.customerName} đã được check-in vào lúc ${matched.checked_in_at}. Không được check-in lặp lại!`
+            message: `Vé #${subDisplayCode} của khách ${matched.customerName} đã được check-in vào lúc ${matched.checked_in_at}. Không được check-in lặp lại!`
           });
           return;
         }
@@ -356,7 +362,7 @@ export function VendorOrders() {
           setScannerResult({
             type: "INVALID",
             order: matched,
-            message: `Đơn hàng #${matched.id} chưa được thanh toán/xác nhận, chưa thể thực hiện check-in!`
+            message: `Đơn hàng #${subDisplayCode} chưa được thanh toán/xác nhận, chưa thể thực hiện check-in!`
           });
           return;
         }
@@ -364,7 +370,7 @@ export function VendorOrders() {
           setScannerResult({
             type: "INVALID",
             order: matched,
-            message: `Đơn hàng #${matched.id} ở trạng thái ${matched.status}, không thể thực hiện check-in!`
+            message: `Đơn hàng #${subDisplayCode} ở trạng thái ${matched.status}, không thể thực hiện check-in!`
           });
           return;
         }
@@ -395,9 +401,9 @@ export function VendorOrders() {
         order: matched,
         subOrderId: verifyRes.subOrderId || rawInput,
         earlyDispatchSuggestion: verifyRes.earlyDispatchSuggestion?.available ? verifyRes.earlyDispatchSuggestion : null,
-        message: `Xác thực thành công! Đơn #${(verifyRes.subOrderId || rawInput).slice(0, 8)}... (${verifyRes.quantity || 1} khách) sẵn sàng xuất bến!`
+        message: `Xác thực thành công! Đơn #${formatDisplayCode(verifyRes.subOrderId || rawInput, 'SUB')} (${verifyRes.quantity || 1} khách) sẵn sàng xuất bến!`
       });
-      toast.success(`Check-in thành công đơn #${(verifyRes.subOrderId || rawInput).slice(0, 8)}...!`);
+      toast.success(`Check-in thành công đơn #${formatDisplayCode(verifyRes.subOrderId || rawInput, 'SUB')}!`);
     } catch (err: unknown) {
       let errMsg = extractErrorMessage(err);
       const targetSubOrderId = rawInput.includes(":") ? rawInput.split(":")[0] : rawInput;
@@ -427,11 +433,12 @@ export function VendorOrders() {
       } else {
         const matched = orders.find((o) => o.id.toUpperCase() === rawInput.toUpperCase() || o.orderNumber.toUpperCase() === rawInput.toUpperCase());
         if (matched) {
+          const subDisplayCode = formatDisplayCode(matched.id, 'SUB');
           if (matched.checked_in_at !== null) {
             setScannerResult({
               type: "USED",
               order: matched,
-              message: `Vé #${matched.id} của khách ${matched.customerName} đã được check-in vào lúc ${matched.checked_in_at}. Không được check-in lặp lại!`
+              message: `Vé #${subDisplayCode} của khách ${matched.customerName} đã được check-in vào lúc ${matched.checked_in_at}. Không được check-in lặp lại!`
             });
             return;
           }
@@ -439,7 +446,7 @@ export function VendorOrders() {
             setScannerResult({
               type: "INVALID",
               order: matched,
-              message: `Đơn hàng #${matched.id} chưa được xác nhận, chưa thể thực hiện check-in!`
+              message: `Đơn hàng #${subDisplayCode} chưa được xác nhận, chưa thể thực hiện check-in!`
             });
             return;
           }
@@ -447,7 +454,7 @@ export function VendorOrders() {
             setScannerResult({
               type: "INVALID",
               order: matched,
-              message: `Đơn hàng #${matched.id} ở trạng thái ${matched.status}, không thể thực hiện check-in!`
+              message: `Đơn hàng #${subDisplayCode} ở trạng thái ${matched.status}, không thể thực hiện check-in!`
             });
             return;
           }
@@ -482,9 +489,9 @@ export function VendorOrders() {
     );
     setScannerResult({
       type: "USED",
-      message: `Đã check-in thành công và cấp phát phao bảo hộ cho đơn #${orderId.slice(0, 8)}...! (${checkinTime})`
+      message: `Đã check-in thành công và cấp phát phao bảo hộ cho đơn #${formatDisplayCode(orderId, 'SUB')}! (${checkinTime})`
     });
-    toast.success(`Check-in thành công đơn #${orderId.slice(0, 8)}...! Đã ghi nhận thời gian xuất bến.`);
+    toast.success(`Check-in thành công đơn #${formatDisplayCode(orderId, 'SUB')}! Đã ghi nhận thời gian xuất bến.`);
   };
 
   // Điều phối khách chơi ca sớm (FIFO Early Dispatch)
@@ -528,7 +535,7 @@ export function VendorOrders() {
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: "CONFIRMED" } : o))
     );
-    toast.success(`Đã duyệt xác nhận đơn #${orderId.slice(0, 8)}...! Khách có thể đến xuất bến.`);
+    toast.success(`Đã duyệt xác nhận đơn #${formatDisplayCode(orderId, 'SUB')}! Khách có thể đến xuất bến.`);
   };
 
   // Reject order
@@ -543,7 +550,7 @@ export function VendorOrders() {
       setOrders((prev) =>
         prev.map((o) => (o.id === rejectOrderId ? { ...o, status: "REJECTED" } : o))
       );
-      toast.success(`Đã từ chối đơn #${rejectOrderId.slice(0, 8)}... với lý do: ${rejectReason}`);
+      toast.success(`Đã từ chối đơn #${formatDisplayCode(rejectOrderId, 'SUB')} với lý do: ${rejectReason}`);
       setRejectOrderId(null);
     } catch (err: unknown) {
       setOrders((prev) =>
@@ -650,6 +657,30 @@ export function VendorOrders() {
   // Selected Order for Drawer
   const drawerOrder = orders.find((o) => o.id === drawerOrderId) || null;
 
+  // Real-time refresh of suborder when inspecting via drawer
+  useEffect(() => {
+    if (!drawerOrderId) return;
+    vendorOrderService.getSubOrder(drawerOrderId)
+      .then((detail) => {
+        if (detail && detail.status) {
+          setOrders((prev) =>
+            prev.map((o) =>
+              o.id === drawerOrderId
+                ? {
+                    ...o,
+                    status: (detail.status as OrderItem['status']) || o.status,
+                    totalAmount: detail.finalAmount ?? o.totalAmount,
+                  }
+                : o
+            )
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn('[VendorOrders] Could not refresh suborder detail from server:', err);
+      });
+  }, [drawerOrderId]);
+
   // Financial calculations matching Atlas Orders
   const totalGrossRevenue = useMemo(() => {
     return orders
@@ -702,7 +733,6 @@ export function VendorOrders() {
       <div className="w-full px-6 py-5 space-y-5">
         <AtlasPageHeader
           title="Quản lý Đơn hàng & Đặt vé"
-          subtitle="Theo dõi, tiếp nhận và điều phối khách đặt chỗ trên toàn hệ thống."
           actions={
             <>
               <AtlasButton
@@ -844,17 +874,17 @@ export function VendorOrders() {
           <div className="overflow-x-auto flex-1 scrollbar-thin">
             <table className="w-full text-left text-sm border-collapse table-auto">
               <thead>
-                <tr className="bg-[#f8f9fa] text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200/80">
-                  <th className="py-3.5 px-4 w-[120px]">ORDER</th>
-                  <th className="py-3.5 px-4 w-[160px]">DATE</th>
-                  <th className="py-3.5 px-4">CUSTOMER</th>
-                  <th className="py-3.5 px-4">PRODUCT</th>
-                  <th className="py-3.5 px-4 w-[150px]">CHANNEL</th>
-                  <th className="py-3.5 px-4 text-right w-[140px]">TOTAL</th>
+                <tr className="bg-[#f8f9fa] text-slate-600 text-xs font-semibold border-b border-slate-200/80">
+                  <th className="py-3.5 px-4 w-[120px]">Mã đơn</th>
+                  <th className="py-3.5 px-4 w-[160px]">Ngày &amp; giờ</th>
+                  <th className="py-3.5 px-4">Khách hàng</th>
+                  <th className="py-3.5 px-4">Dịch vụ</th>
+                  <th className="py-3.5 px-4 w-[150px]">Kênh</th>
+                  <th className="py-3.5 px-4 text-right w-[140px]">Tổng tiền</th>
                   {showFinancials && (
-                    <th className="py-3.5 px-4 text-right w-[140px]">THỰC NHẬN</th>
+                    <th className="py-3.5 px-4 text-right w-[140px]">Thực nhận</th>
                   )}
-                  <th className="py-3.5 px-4 text-center w-[130px]">STATUS</th>
+                  <th className="py-3.5 px-4 text-center w-[130px]">Trạng thái</th>
                   <th className="py-3.5 px-3 text-center w-[50px]"></th>
                 </tr>
               </thead>
@@ -907,7 +937,7 @@ export function VendorOrders() {
                       >
                         {/* 1. ORDER (Mã đơn - Unique single line font-mono) */}
                         <td className="py-3.5 px-4 whitespace-nowrap font-mono text-sm font-bold text-slate-900" title={`ID gốc: ${order.id}`}>
-                          #{order.orderNumber || order.id.slice(-6).toUpperCase()}
+                          #{order.orderNumber || formatDisplayCode(order.id, 'SUB')}
                         </td>
 
                         {/* 2. DATE (Ngày & giờ - Dedicated separate column, font-mono) */}
@@ -1096,8 +1126,8 @@ export function VendorOrders() {
             <div className="p-5 border-b border-slate-200/80 bg-slate-50/50 flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2.5">
-                  <span className="font-mono text-sm font-bold text-slate-900">
-                    #{drawerOrder.id.slice(0, 8).toUpperCase()}
+                  <span className="font-mono text-sm font-bold text-slate-900" title={drawerOrder.id}>
+                    #{formatDisplayCode(drawerOrder.id, 'SUB')}
                   </span>
                   {drawerOrder.status === "PENDING" && <AtlasBadge label="Chờ duyệt" variant="warning" />}
                   {drawerOrder.status === "CONFIRMED" && <AtlasBadge label="Đã xác nhận" variant="info" />}
@@ -1447,7 +1477,7 @@ export function VendorOrders() {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 p-4 animate-scale-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200/90 flex flex-col gap-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-semibold text-slate-900 text-base">Từ chối đơn #{rejectOrderId.slice(0, 8).toUpperCase()}</h3>
+              <h3 className="font-semibold text-slate-900 text-base">Từ chối đơn #{formatDisplayCode(rejectOrderId, 'SUB')}</h3>
               <button
                 type="button"
                 onClick={() => setRejectOrderId(null)}
@@ -1516,7 +1546,7 @@ export function VendorOrders() {
             <div className="flex flex-col gap-2.5 text-xs">
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Mã đơn con:</span>
-                <span className="font-medium text-slate-900 font-mono">#{selectedRefundOrder.id.slice(0, 8).toUpperCase()}</span>
+                <span className="font-medium text-slate-900 font-mono">#{formatDisplayCode(selectedRefundOrder.id, 'SUB')}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Số tiền hoàn:</span>
@@ -1560,7 +1590,7 @@ export function VendorOrders() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <CalendarClock className="w-5 h-5 text-slate-700" />
-                <h3 className="font-semibold text-slate-900 text-base">Đề xuất đổi ca (#{drawerOrder.id.slice(0, 8).toUpperCase()})</h3>
+                <h3 className="font-semibold text-slate-900 text-base">Đề xuất đổi ca (#{formatDisplayCode(drawerOrder.id, 'SUB')})</h3>
               </div>
               <button
                 type="button"

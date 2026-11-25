@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, Navigate, Link, useNavigate } from 'react-router-dom';
 import { FlaskConical, Menu, PanelLeftClose, PanelLeft, ShieldAlert, X } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
+import { useAuthHydrated } from '../hooks/useAuthHydrated';
 import { adminPages } from '../components/admin/adminRoutes';
 import { AdminNavigation } from '../components/admin/AdminNavigation';
 import { AdminAccount } from '../components/admin/AdminAccount';
@@ -18,10 +19,7 @@ export function AdminLayout() {
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
 
   // Hydration state check: do not prematurely redirect while Zustand persist is loading from localStorage
-  const [hydrated, setHydrated] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return useAuthStore.persist?.hasHydrated?.() ?? true;
-  });
+  const hydrated = useAuthHydrated();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -41,16 +39,6 @@ export function AdminLayout() {
   const [days, setDays] = useState<7 | 30>(7);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const unsub = useAuthStore.persist?.onFinishHydration?.(() => {
-      setHydrated(true);
-    });
-    return () => {
-      unsub?.();
-    };
-  }, []);
 
   function closeOverlays() {
     setMobileOpen(false);
@@ -138,6 +126,7 @@ export function AdminLayout() {
   const demo = accessResult.allowed && accessResult.reason === 'demo';
   const page = adminPages.find(item => item.to === location.pathname) ?? adminPages[0];
   const isExpanded = mobileOpen || isPinned || isHovered;
+  const isCopilot = location.pathname.startsWith('/admin/copilot');
 
   return (
     <div className={`admin-shell flex min-h-screen bg-[#f5f8fa] text-slate-800 ${isPinned ? 'admin-shell--pinned' : ''}`}>
@@ -260,7 +249,7 @@ export function AdminLayout() {
 
       {/* WORKSPACE AREA - NO TOPBAR */}
       <div
-        className="admin-workspace flex-1 flex flex-col min-w-0"
+        className={`admin-workspace flex-1 flex flex-col min-w-0 ${isCopilot ? 'admin-workspace--copilot' : ''}`}
         style={{ marginLeft: 0 }}
         inert={mobileOpen || undefined}
       >
@@ -270,8 +259,8 @@ export function AdminLayout() {
             <span>Phiên hiện tại mang vai trò <strong>{user.role === 'VENDOR' ? 'Đối tác (Vendor)' : 'Khách hàng'}</strong>. Dữ liệu Admin vẫn yêu cầu quyền do Backend kiểm tra.</span>
           </div>
         )}
-        <div id="admin-content" className="admin-content" tabIndex={-1}>
-          <header className="admin-main-header">
+        <div id="admin-content" className={`admin-content ${isCopilot ? 'admin-content--copilot' : ''}`} tabIndex={-1}>
+          <header className={`admin-main-header ${isCopilot ? 'admin-main-header--copilot' : ''}`}>
             <div className="admin-main-header-row">
               <div className="admin-main-header-left">
                 <button

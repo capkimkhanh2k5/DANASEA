@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { translateDisplayCodesToUuids, resolveDisplayCodeToUuid } from '../utils/displayCode';
 import type { 
   CoachingResult, 
   ReplyDraftResult, 
@@ -15,7 +16,7 @@ import type {
 export const vendorAiService = {
   /**
    * POST /api/vendor/ai/listings/optimize
-   * AI tối ưu hóa tiêu đề, mô tả chuẩn SEO, trang bị an toàn và đa ngữ cho Tour
+   * Gợi ý tiêu đề, mô tả, trang bị an toàn và đa ngữ cho Tour
    */
   async optimizeListing(req: OptimizeListingRequest): Promise<OptimizeListingResult> {
     const res = await apiClient.post<OptimizeListingResult>('/vendor/ai/listings/optimize', req);
@@ -27,7 +28,12 @@ export const vendorAiService = {
    * Chat hỏi đáp KPIs, doanh thu, phân tích đơn hàng và hỗ trợ đính kèm ngữ cảnh
    */
   async chatCopilot(req: CopilotChatRequest, language: 'vi' | 'en' = 'vi'): Promise<CopilotChatResponse> {
-    const res = await apiClient.post<CopilotChatResponse>('/vendor/ai/copilot/chat', req, {
+    const effectiveReq: CopilotChatRequest = {
+      ...req,
+      message: translateDisplayCodesToUuids(req.message),
+      contextId: req.contextId ? resolveDisplayCodeToUuid(req.contextId) : req.contextId,
+    };
+    const res = await apiClient.post<CopilotChatResponse>('/vendor/ai/copilot/chat', effectiveReq, {
       headers: { 'Accept-Language': language },
     });
     return res.data;
@@ -104,5 +110,16 @@ export const vendorAiService = {
       horizonDays,
     });
     return res.data;
+  },
+
+  /**
+   * GET /api/vendor/ai/copilot/refunds
+   * Lấy danh sách yêu cầu hoàn tiền thuộc gian hàng vendor để đính kèm ngữ cảnh Copilot
+   */
+  async getCopilotRefunds(limit = 50): Promise<import('../types/vendorAi').VendorCopilotRefundDto[]> {
+    const res = await apiClient.get<import('../types/vendorAi').VendorCopilotRefundDto[]>('/vendor/ai/copilot/refunds', {
+      params: { limit },
+    });
+    return res.data || [];
   },
 };

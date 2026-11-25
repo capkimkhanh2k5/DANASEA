@@ -24,7 +24,11 @@ import {
   Layers,
   ChevronDown,
   Trash2,
+  AlertTriangle,
+  CalendarOff,
+  Loader2,
 } from "lucide-react";
+import type { OperatingScheduleExceptionDto } from "../../../services/vendorService";
 import {
   AtlasPageHeader,
   AtlasBadge,
@@ -78,6 +82,21 @@ export function Schedule() {
   const [inputStatus, setInputStatus] = useState<SlotStatus>("OPEN");
   const [capacityError, setCapacityError] = useState<string | null>(null);
   const [isUpdatingSlot, setIsUpdatingSlot] = useState(false);
+  const [nowTimestamp] = useState(() => Date.now());
+
+  // Modal State: Cancel Departure (Bão biển / Sự cố)
+  const [cancellingSlot, setCancellingSlot] = useState<VendorServiceSlotDto | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+
+  // Modal State: Operating Schedule Exceptions (Ngày nghỉ / Ngoại lệ)
+  const [isExceptionsModalOpen, setIsExceptionsModalOpen] = useState(false);
+  const [exceptions, setExceptions] = useState<OperatingScheduleExceptionDto[]>([]);
+  const [isLoadingExceptions, setIsLoadingExceptions] = useState(false);
+  const [newExDateFrom, setNewExDateFrom] = useState(todayStr);
+  const [newExDateTo, setNewExDateTo] = useState(todayStr);
+  const [newExReason, setNewExReason] = useState("");
+  const [isSubmittingException, setIsSubmittingException] = useState(false);
 
   // Close create menu when clicking outside
   useEffect(() => {
@@ -232,6 +251,82 @@ export function Schedule() {
     }
   };
 
+  // Exceptions management
+  const loadExceptions = useCallback(async (serviceId: string) => {
+    if (!serviceId) return;
+    setIsLoadingExceptions(true);
+    try {
+      const data = await vendorService.getOperatingScheduleExceptions(serviceId);
+      setExceptions(data || []);
+    } catch (err) {
+      console.error("[Schedule] Lỗi nạp lịch ngoại lệ:", err);
+    } finally {
+      setIsLoadingExceptions(false);
+    }
+  }, []);
+
+  const handleOpenExceptions = () => {
+    if (!selectedServiceId) {
+      toast.warning("Vui lòng chọn một dịch vụ để quản lý lịch ngoại lệ.");
+      return;
+    }
+    setIsExceptionsModalOpen(true);
+    loadExceptions(selectedServiceId);
+  };
+
+  const handleAddException = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedServiceId || !newExReason.trim()) return;
+    setIsSubmittingException(true);
+    try {
+      await vendorService.addOperatingScheduleException(selectedServiceId, {
+        dateFrom: newExDateFrom,
+        dateTo: newExDateTo,
+        reason: newExReason.trim(),
+      });
+      toast.success("Đã thêm ngày nghỉ / lịch ngoại lệ thành công!");
+      setNewExReason("");
+      loadExceptions(selectedServiceId);
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Không thể thêm ngày nghỉ ngoại lệ"));
+    } finally {
+      setIsSubmittingException(false);
+    }
+  };
+
+  const handleRemoveException = async (exceptionId: string) => {
+    if (!selectedServiceId) return;
+    try {
+      await vendorService.removeOperatingScheduleException(selectedServiceId, exceptionId);
+      toast.success("Đã xóa ngày nghỉ ngoại lệ.");
+      setExceptions((prev) => prev.filter((ex) => ex.id !== exceptionId));
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Không thể xóa lịch ngoại lệ"));
+    }
+  };
+
+  // Departure cancellation
+  const handleOpenCancelDeparture = (slot: VendorServiceSlotDto) => {
+    setCancellingSlot(slot);
+    setCancelReason("Bão biển / Thời tiết xấu, cảng vụ yêu cầu ngừng xuất bến để đảm bảo an toàn hàng hải.");
+  };
+
+  const handleConfirmCancelDeparture = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cancellingSlot || !selectedServiceId || !cancelReason.trim()) return;
+    setIsSubmittingCancel(true);
+    try {
+      await vendorService.cancelSlotDeparture(selectedServiceId, cancellingSlot.id, cancelReason.trim());
+      toast.success("Đã xác nhận hủy ca xuất bến và kích hoạt đối soát hoàn tiền cho khách!");
+      setCancellingSlot(null);
+      loadSlots(selectedServiceId);
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Hủy ca xuất bến thất bại"));
+    } finally {
+      setIsSubmittingCancel(false);
+    }
+  };
+
   // Create New Slot
   const handleCreateSlot = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -327,7 +422,18 @@ export function Schedule() {
       <AtlasPageHeader
         title="Lịch Khởi hành & Điều phối Ca"
         actions={
-          <div className="relative" data-create-menu-container>
+          <div className="flex items-center gap-2">
+            <AtlasButton
+              variant="outline"
+              size="md"
+              onClick={handleOpenExceptions}
+              disabled={!selectedServiceId}
+              icon={<CalendarOff className="w-4 h-4 text-slate-500" />}
+            >
+              Lịch ngoại lệ / Ngày nghỉ
+            </AtlasButton>
+
+            <div className="relative" data-create-menu-container>
             <button
               type="button"
               disabled={!selectedServiceId}
@@ -393,6 +499,7 @@ export function Schedule() {
                 </button>
               </div>
             )}
+            </div>
           </div>
         }
       />
@@ -504,13 +611,16 @@ export function Schedule() {
                 const available = slot.availableCapacity != null ? slot.availableCapacity : (slot.capacity - booked);
                 const isClosed = slot.status === "CLOSED";
                 const isFull = available <= 0;
-                const isPastSlot = slot.date < todayStr;
+                const slotDateTime = new Date(`${slot.date}T${slot.endTime || '23:59:59'}`);
+                const isPastSlot = slot.date < todayStr || slotDateTime.getTime() < nowTimestamp;
 
                 return (
                   <div
                     key={slot.id}
                     className={`rounded-xl border p-5 bg-white shadow-xs transition-all flex flex-col justify-between ${
-                      isClosed
+                      isPastSlot
+                        ? "border-slate-200/50 bg-slate-50/70 opacity-85"
+                        : isClosed
                         ? "border-slate-200/60 opacity-80 bg-slate-50/50"
                         : "border-slate-200/80 hover:border-slate-300"
                     }`}
@@ -534,6 +644,8 @@ export function Schedule() {
                             ) : (
                               <AtlasBadge label="Ca đã qua" variant="neutral" />
                             )
+                          ) : (slot.status as string) === "CANCELLED" ? (
+                            <AtlasBadge label="Đã hủy xuất bến" variant="danger" />
                           ) : isClosed ? (
                             <AtlasBadge label="Đã đóng" variant="neutral" />
                           ) : isFull ? (
@@ -599,32 +711,47 @@ export function Schedule() {
                     </div>
 
                     {/* Actions */}
-                    <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                      <span className="inline-block" title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}>
-                        <AtlasButton
-                          variant={isClosed ? "secondary" : "outline"}
-                          size="sm"
-                          disabled={isPastSlot}
-                          title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}
-                          onClick={() => handleToggleStatus(slot)}
-                          icon={isClosed ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                        >
-                          {isClosed ? "Mở nhận khách" : "Đóng ca"}
-                        </AtlasButton>
-                      </span>
+                    {/* Actions */}
+                    <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block" title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}>
+                          <AtlasButton
+                            variant={isClosed ? "secondary" : "outline"}
+                            size="sm"
+                            disabled={isPastSlot}
+                            title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}
+                            onClick={() => handleToggleStatus(slot)}
+                            icon={isClosed ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                          >
+                            {isClosed ? "Mở nhận khách" : "Đóng ca"}
+                          </AtlasButton>
+                        </span>
 
-                      <span className="inline-block" title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}>
-                        <AtlasButton
-                          variant="primary"
-                          size="sm"
-                          disabled={isPastSlot}
-                          title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}
-                          onClick={() => handleOpenEditCapacity(slot)}
-                          icon={<Edit2 className="w-3.5 h-3.5" />}
+                        <span className="inline-block" title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}>
+                          <AtlasButton
+                            variant="primary"
+                            size="sm"
+                            disabled={isPastSlot}
+                            title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}
+                            onClick={() => handleOpenEditCapacity(slot)}
+                            icon={<Edit2 className="w-3.5 h-3.5" />}
+                          >
+                            Điều chỉnh
+                          </AtlasButton>
+                        </span>
+                      </div>
+
+                      {!isPastSlot && (slot.status as string) !== "CANCELLED" && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCancelDeparture(slot)}
+                          className="px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg border border-rose-200/80 transition-colors cursor-pointer flex items-center gap-1"
+                          title="Hủy ca do bão biển hoặc sự cố kỹ thuật"
                         >
-                          Điều chỉnh
-                        </AtlasButton>
-                      </span>
+                          <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                          <span>Hủy ca</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -991,6 +1118,191 @@ export function Schedule() {
                   disabled={isUpdatingSlot}
                 >
                   {isUpdatingSlot ? "Đang lưu..." : "Lưu thay đổi"}
+                </AtlasButton>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal: Cancel Departure (Bão biển / Sự cố) */}
+      {cancellingSlot && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-2xs p-4 animate-in fade-in duration-100">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4 text-xs animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                <h4 className="font-bold text-slate-900 text-sm">Hủy ca xuất bến & Hoàn tiền</h4>
+              </div>
+              <button
+                onClick={() => setCancellingSlot(null)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/80 text-amber-900 space-y-1">
+              <p className="font-semibold text-xs flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-700" />
+                <span>Ca: {cancellingSlot.startTime.slice(0, 5)} - {cancellingSlot.endTime.slice(0, 5)} ngày {cancellingSlot.date}</span>
+              </p>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Đã có <strong className="font-mono font-bold text-slate-900">{cancellingSlot.bookedCount || 0}</strong> khách đặt chỗ.
+                Khi xác nhận hủy, hệ thống sẽ tự động hủy các booking đang giữ chỗ và kích hoạt đối soát hoàn tiền cho khách.
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmCancelDeparture} className="space-y-3">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Lý do hủy xuất bến (bắt buộc):
+                </label>
+                <textarea
+                  rows={3}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Ví dụ: Bão số 6, cảng vụ cấm tàu thuyền xuất bến bảo đảm an toàn..."
+                  className="w-full text-xs p-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 resize-none leading-relaxed"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <AtlasButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCancellingSlot(null)}
+                >
+                  Đóng
+                </AtlasButton>
+                <AtlasButton
+                  type="submit"
+                  variant="danger"
+                  size="sm"
+                  disabled={isSubmittingCancel || !cancelReason.trim()}
+                >
+                  {isSubmittingCancel ? "Đang xử lý..." : "Xác nhận hủy ca"}
+                </AtlasButton>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal: Operating Schedule Exceptions (Lịch ngoại lệ / Ngày nghỉ) */}
+      {isExceptionsModalOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-2xs p-4 animate-in fade-in duration-100">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4 text-xs animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <CalendarOff className="w-5 h-5 text-slate-700 shrink-0" />
+                <h4 className="font-bold text-slate-900 text-sm">Lịch ngoại lệ & Ngày nghỉ</h4>
+              </div>
+              <button
+                onClick={() => setIsExceptionsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Existing Exceptions List */}
+            <div className="space-y-2">
+              <span className="font-semibold text-slate-700 block">Danh sách ngày nghỉ đã đăng ký:</span>
+              {isLoadingExceptions ? (
+                <div className="py-6 text-center text-slate-400 flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
+                  <span>Đang tải lịch ngoại lệ...</span>
+                </div>
+              ) : exceptions.length === 0 ? (
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 text-center text-slate-500 text-xs">
+                  Chưa có ngày nghỉ ngoại lệ nào cho dịch vụ này.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {exceptions.map((ex) => (
+                    <div
+                      key={ex.id}
+                      className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div>
+                        <div className="font-bold text-slate-900 font-mono">
+                          {ex.dateFrom} {ex.dateTo !== ex.dateFrom ? `đến ${ex.dateTo}` : ''}
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-0.5">{ex.reason}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveException(ex.id)}
+                        className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"
+                        title="Xóa ngày nghỉ này"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add Exception Form */}
+            <form onSubmit={handleAddException} className="space-y-3 pt-3 border-t border-slate-100">
+              <span className="font-semibold text-slate-700 block">Thêm ngày nghỉ mới:</span>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] text-slate-500 block mb-1">Từ ngày:</label>
+                  <input
+                    type="date"
+                    value={newExDateFrom}
+                    onChange={(e) => setNewExDateFrom(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-500 block mb-1">Đến ngày:</label>
+                  <input
+                    type="date"
+                    value={newExDateTo}
+                    onChange={(e) => setNewExDateTo(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] text-slate-500 block mb-1">Lý do nghỉ / ngoại lệ:</label>
+                <input
+                  type="text"
+                  value={newExReason}
+                  onChange={(e) => setNewExReason(e.target.value)}
+                  placeholder="Ví dụ: Nghỉ bảo dưỡng định kỳ cano, nghỉ Tết..."
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <AtlasButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsExceptionsModalOpen(false)}
+                >
+                  Đóng
+                </AtlasButton>
+                <AtlasButton
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={isSubmittingException || !newExReason.trim()}
+                >
+                  {isSubmittingException ? "Đang lưu..." : "Thêm ngày nghỉ"}
                 </AtlasButton>
               </div>
             </form>

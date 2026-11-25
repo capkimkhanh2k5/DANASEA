@@ -32,4 +32,13 @@ public class AiCopilotMessageJpaEntity extends BaseJpaEntity {
 
     @Column(nullable = false)
     private boolean verified = false;
+
+    @Column(length = 50)
+    private String contextType;
+
+    @Column
+    private UUID contextId;
+
+    @Column(length = 255)
+    private String contextLabel;
 }

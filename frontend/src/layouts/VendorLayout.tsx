@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuthStore } from "../store/useAuthStore";
+import { useAuthHydrated } from "../hooks/useAuthHydrated";
 import { createPortal } from "react-dom";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { notificationService } from "../services/notificationService";
+import { logoutSession } from "../services/sessionService";
 import type { NotificationResponse } from "../types/notification";
 import { 
   LayoutDashboard, 
@@ -22,12 +24,13 @@ import {
   CheckCheck,
   LifeBuoy,
   Star,
-  Bot
+  Sparkles
 } from "lucide-react";
 import { AtlasAvatar } from "../components/vendor/atlas/AtlasDesignSystem";
 import { toast } from "../store/useToastStore";
-import { useVendorCopilotStore } from "../store/useVendorCopilotStore";
+import { formatDisplayCode } from "../utils/displayCode";
 import { VendorCopilotDrawer } from "../components/vendor/copilot/VendorCopilotDrawer";
+import { DraggableFloatingCopilot } from "../components/vendor/copilot/DraggableFloatingCopilot";
 
 interface NavItem {
   to: string;
@@ -46,7 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupTitle: "VẬN HÀNH & ĐIỀU PHỐI",
     items: [
       { to: "/vendor", label: "Tổng quan", icon: LayoutDashboard, exact: true },
-      { to: "/vendor/copilot", label: "Trợ lý Copilot", icon: Bot },
+      { to: "/vendor/copilot", label: "Trợ lý Copilot", icon: Sparkles },
       { to: "/vendor/analytics", label: "Phân tích kinh doanh", icon: TrendingUp },
       { to: "/vendor/orders", label: "Đơn đặt chỗ & Vé", icon: Ticket },
       { to: "/vendor/messages", label: "Tin nhắn khách hàng", icon: MessageSquare },
@@ -76,6 +79,7 @@ const VENDOR_PAGE_ORDER: Record<string, number> = {
   "/vendor": 0,
   "/vendor/copilot": 0.5,
   "/vendor/analytics": 1,
+  "/vendor/reports": 1,
   "/vendor/orders": 2,
   "/vendor/messages": 2.5,
   "/vendor/schedule": 3,
@@ -116,8 +120,10 @@ export function VendorLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, accessToken } = useAuthStore();
-  const isCopilotOpen = useVendorCopilotStore((s) => s.isOpen);
-  const toggleCopilot = useVendorCopilotStore((s) => s.toggleCopilot);
+  const hydrated = useAuthHydrated();
+  const isAuthorizedVendor = Boolean(
+    hydrated && accessToken && isAuthenticated && user && (user.role === "VENDOR" || user.role === "ADMIN")
+  );
 
   const vendorDisplayName = 
     (user?.email && VENDOR_BRAND_MAP[user.email]) ||
@@ -126,15 +132,19 @@ export function VendorLayout() {
     "Công ty TNHH Kajin Vina";
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!accessToken || !isAuthenticated) {
-      navigate("/auth", { replace: true });
+      navigate("/auth", {
+        replace: true,
+        state: { returnTo: `${location.pathname}${location.search}` },
+      });
       return;
     }
     if (user && user.role !== "VENDOR" && user.role !== "ADMIN") {
       toast.warning("Tài khoản chưa được kích hoạt quyền Đối tác vận hành.");
       navigate("/profile", { replace: true });
     }
-  }, [accessToken, isAuthenticated, user, navigate]);
+  }, [hydrated, accessToken, isAuthenticated, user, navigate, location.pathname, location.search]);
 
   const [prevPath, setPrevPath] = useState(location.pathname);
   const [animationClass, setAnimationClass] = useState("animate-fade-in-up");
@@ -205,12 +215,20 @@ export function VendorLayout() {
 
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthorizedVendor) {
       loadNotifications();
     }
-  }, [isAuthenticated, loadNotifications]);
+  }, [isAuthorizedVendor, loadNotifications]);
 
-  if (!accessToken || !isAuthenticated) {
+  if (!hydrated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-600">
+        <p className="text-sm font-semibold">Đang khôi phục phiên làm việc…</p>
+      </div>
+    );
+  }
+
+  if (!accessToken || !isAuthenticated || (user && user.role !== "VENDOR" && user.role !== "ADMIN")) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-600">
         <p className="text-sm font-semibold">Chuyển hướng xác thực tài khoản đối tác...</p>
@@ -269,8 +287,8 @@ export function VendorLayout() {
                 <span className="font-extrabold text-base tracking-tight text-slate-900 leading-none">
                   DANASEA
                 </span>
-                <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase mt-1 whitespace-nowrap">
-                  KÊNH ĐỐI TÁC
+                <span className="text-[11px] text-slate-500 font-medium mt-1 whitespace-nowrap">
+                  Kênh đối tác
                 </span>
               </div>
             </div>
@@ -303,7 +321,7 @@ export function VendorLayout() {
                 {/* Group Title / Divider */}
                 {isExpanded ? (
                   <div className="pt-2 pb-1 px-3">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 select-none">
+                    <span className="text-xs font-semibold text-slate-500 select-none">
                       {group.groupTitle}
                     </span>
                   </div>
@@ -495,9 +513,9 @@ export function VendorLayout() {
 
           {/* Logout Button */}
           <button
-            onClick={() => {
-              useAuthStore.getState().logout();
-              navigate("/auth");
+            onClick={async () => {
+              await logoutSession();
+              navigate("/auth", { replace: true });
             }}
             title={!isExpanded ? "Đăng xuất" : undefined}
             className={`group flex items-center h-9 rounded-xl text-xs font-medium text-rose-600 hover:bg-rose-50 transition-all duration-150 cursor-pointer ${
@@ -541,31 +559,8 @@ export function VendorLayout() {
         </main>
       </div>
 
-      {/* Floating Copilot Trigger Button (Styled identically to Customer deck) */}
-      {location.pathname !== "/vendor/copilot" && (
-        <aside
-          aria-label="Menu Trợ lý Copilot"
-          className="fixed bottom-6 right-6 z-40 flex flex-col items-center select-none print:hidden"
-        >
-          <div className="relative group/btn flex items-center">
-            <span className="absolute right-full mr-2.5 px-2.5 py-1 rounded-lg bg-slate-900/90 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none shadow-md">
-              DANASEA Copilot
-            </span>
-            <button
-              type="button"
-              onClick={toggleCopilot}
-              aria-label="Trợ lý kinh doanh DANASEA Copilot"
-              className={`relative w-11 h-11 rounded-2xl flex items-center justify-center border shadow-md transition-all cursor-pointer ${
-                isCopilotOpen
-                  ? "bg-slate-900 text-white border-slate-900 shadow-slate-900/20"
-                  : "bg-white text-slate-900 border-slate-200/90 hover:border-slate-400 hover:shadow-lg"
-              }`}
-            >
-              <Bot className="w-5 h-5 text-current transition-transform group-hover/btn:scale-110" />
-            </button>
-          </div>
-        </aside>
-      )}
+      {/* Draggable Floating Copilot Trigger Button */}
+      <DraggableFloatingCopilot />
 
       {/* Vendor Copilot Slide-over Drawer */}
       <VendorCopilotDrawer />
@@ -598,7 +593,7 @@ export function VendorLayout() {
               {/* Related entity link */}
               {selectedNoti.relatedEntityId && (
                 <div className="p-2.5 rounded-xl bg-sky-50 text-sky-900 text-[12px] flex items-center justify-between">
-                  <span>Thực thể liên quan: <strong>{selectedNoti.relatedEntityType || 'Đối tượng'} #{selectedNoti.relatedEntityId.slice(0, 8)}</strong></span>
+                  <span>Thực thể liên quan: <strong>{selectedNoti.relatedEntityType || 'Đối tượng'} #{formatDisplayCode(selectedNoti.relatedEntityId, selectedNoti.relatedEntityType === 'ORDER' ? 'ORD' : 'SUB')}</strong></span>
                   <button 
                     onClick={() => {
                       setSelectedNoti(null);

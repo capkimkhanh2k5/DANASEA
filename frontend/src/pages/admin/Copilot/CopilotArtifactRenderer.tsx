@@ -20,6 +20,11 @@ import {
   formatCompactVND,
   formatPercent,
   formatNumber,
+  formatVendorIssueLabel,
+  formatAssessmentStatusLabel,
+  formatRiskSignalLabel,
+  formatContentReasonLabel,
+  formatEvidenceTypeLabel,
   extractRevenueChartData,
   extractVendorDiagnosticsData,
   extractCancellationBreakdownData,
@@ -407,7 +412,7 @@ const VendorDiagnosticsTableCard: React.FC<{ artifact: CopilotArtifact }> = ({ a
                   <td style={{ textAlign: 'center' }}>
                     {v.ratingAvg > 0 ? (
                       <span>
-                        ★ {v.ratingAvg.toFixed(1)} <small>({v.ratingCount})</small>
+                        {v.ratingAvg.toFixed(1)} sao <small>({v.ratingCount})</small>
                       </span>
                     ) : (
                       <span style={{ color: '#94a3b8' }}>Chưa có</span>
@@ -432,8 +437,8 @@ const VendorDiagnosticsTableCard: React.FC<{ artifact: CopilotArtifact }> = ({ a
                     {v.issueTypes && v.issueTypes.length > 0 ? (
                       <div className="copilot-issue-tag-group">
                         {v.issueTypes.map((issue, iIdx) => (
-                          <span key={iIdx} className="copilot-issue-tag">
-                            {issue}
+                          <span key={iIdx} className="copilot-issue-tag" title={issue}>
+                            {formatVendorIssueLabel(issue)}
                           </span>
                         ))}
                       </div>
@@ -499,7 +504,7 @@ const CancellationBreakdownCard: React.FC<{ artifact: CopilotArtifact }> = ({ ar
       label: 'Tranh chấp khiếu nại bồi hoàn',
       count: data.disputeCancellations,
       icon: ShieldAlert,
-      color: '#9333ea',
+      color: '#e11d48',
     },
     {
       label: 'Can thiệp từ Quản trị viên sàn',
@@ -779,10 +784,10 @@ const OrderRiskAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ arti
             <ShieldAlert size={12} />
             Đánh giá rủi ro
           </span>
-          <span className="copilot-artifact-title">Đơn #{risk.orderId.slice(0, 8)}</span>
+          <span className="copilot-artifact-title">Đơn #{formatDisplayCode(risk.orderId, 'ORD')}</span>
         </div>
-        <div className="copilot-artifact-period">
-          {risk.ruleVersion} · {risk.status}
+        <div className="copilot-artifact-period" title={risk.status}>
+          {risk.ruleVersion} · {formatAssessmentStatusLabel(risk.status)}
         </div>
       </div>
 
@@ -798,7 +803,7 @@ const OrderRiskAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ arti
         {risk.caseId && (
           <div>
             <span className="copilot-info-label">Mã case:</span>{' '}
-            <code>#{risk.caseId.slice(0, 8)}</code>
+            <code>#{formatDisplayCode(risk.caseId, 'CASE')}</code>
           </div>
         )}
       </div>
@@ -808,9 +813,9 @@ const OrderRiskAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ arti
           <div className="copilot-dispute-facts-title">Tín hiệu rủi ro ghi nhận:</div>
           <ul className="copilot-dispute-facts-list">
             {risk.riskSignals.map((sig, idx) => (
-              <li key={idx}>
+              <li key={idx} title={sig}>
                 <AlertTriangle size={13} className="copilot-icon-warn" />
-                <span>{sig}</span>
+                <span>{formatRiskSignalLabel(sig)}</span>
               </li>
             ))}
           </ul>
@@ -841,10 +846,12 @@ const ContentAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifa
             <ShieldAlert size={12} />
             Kiểm duyệt nội dung
           </span>
-          <span className="copilot-artifact-title">{assessment.status}</span>
+          <span className="copilot-artifact-title" title={assessment.status}>
+            {formatAssessmentStatusLabel(assessment.status)}
+          </span>
         </div>
-        <div className="copilot-artifact-period">
-          {assessment.evidenceType} · Không tự duyệt xuất bản
+        <div className="copilot-artifact-period" title={assessment.evidenceType}>
+          {formatEvidenceTypeLabel(assessment.evidenceType)} · Không tự duyệt xuất bản
         </div>
       </div>
 
@@ -852,7 +859,7 @@ const ContentAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifa
         {assessment.serviceId && (
           <div>
             <span className="copilot-info-label">Dịch vụ:</span>{' '}
-            <code>#{assessment.serviceId.slice(0, 8)}</code>
+            <code>#{formatDisplayCode(assessment.serviceId, 'SRV')}</code>
           </div>
         )}
         {assessment.suggestedCategory && (
@@ -874,9 +881,9 @@ const ContentAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifa
           <div className="copilot-dispute-facts-title">Mã lý do & tín hiệu:</div>
           <ul className="copilot-dispute-facts-list">
             {assessment.reasonCodes.map((code) => (
-              <li key={code}>
+              <li key={code} title={code}>
                 <Info size={13} />
-                <span>{code}</span>
+                <span>{formatContentReasonLabel(code)}</span>
               </li>
             ))}
           </ul>
