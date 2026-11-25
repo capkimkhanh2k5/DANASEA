@@ -205,29 +205,34 @@ public class VendorReviewCoachingUseCase {
         String currentTier = profile.badgeTier() != null ? profile.badgeTier() : "NONE";
         String nextTier = "TOP_RATED";
         int needed = 0;
-        BigDecimal target = BigDecimal.valueOf(4.0);
+        BigDecimal target = new BigDecimal("4.5");
         String roadmapNote;
 
         int currentCount = profile.ratingCount() != null ? profile.ratingCount() : 0;
+        BigDecimal vendorAvg = (currentCount > 0 && profile.ratingAvg() != null) ? profile.ratingAvg() : avgRating;
         if ("NONE".equalsIgnoreCase(currentTier)) {
             nextTier = "VERIFIED";
-            needed = Math.max(1, 1 - currentCount);
+            target = new BigDecimal("3.5");
+            needed = computeFiveStarReviewsNeeded(currentCount, vendorAvg, 1, target);
             roadmapNote = isEn
-                    ? "You need at least 1 valid review to unlock the VERIFIED badge."
-                    : "Bạn cần có ít nhất 1 đánh giá hợp lệ đầu tiên để đạt huy hiệu VERIFIED.";
+                    ? "You need at least 1 valid review with an average rating >= 3.5 to unlock the VERIFIED badge."
+                            + (needed > 0 ? " Approximately " + needed + " more 5-star review(s) needed." : "")
+                    : "Bạn cần tối thiểu 1 đánh giá hợp lệ với điểm trung bình >= 3.5 để đạt huy hiệu Đã xác minh (VERIFIED)."
+                            + (needed > 0 ? " Cần thêm khoảng " + needed + " lượt đánh giá 5 sao." : "");
         } else if ("VERIFIED".equalsIgnoreCase(currentTier)) {
             nextTier = "TOP_RATED";
-            int countGap = Math.max(0, 5 - currentCount);
-            needed = Math.max(countGap, avgRating.compareTo(target) < 0 ? 3 : 0);
+            target = new BigDecimal("4.5");
+            needed = computeFiveStarReviewsNeeded(currentCount, vendorAvg, 5, target);
             roadmapNote = isEn
-                    ? "To reach TOP_RATED, you need at least 5 reviews and an average rating >= 4.0. Approximately " + needed + " more 5-star review(s) needed."
-                    : "Để đạt TOP_RATED, bạn cần tối thiểu 5 đánh giá và điểm trung bình >= 4.0. Cần thêm khoảng " + needed + " lượt đánh giá 5 sao.";
+                    ? "To reach TOP_RATED (priority search placement & Safety Rebate +2% eligibility at >= 4.8), you need at least 5 reviews and an average rating >= 4.5. Approximately " + needed + " more 5-star review(s) needed."
+                    : "Để đạt Đối tác hàng đầu (TOP_RATED — ưu tiên hiển thị tìm kiếm và mở khóa điều kiện Quỹ thưởng An toàn +2% khi đạt >= 4.8★), bạn cần tối thiểu 5 đánh giá và điểm trung bình >= 4.5. Cần thêm khoảng " + needed + " lượt đánh giá 5 sao.";
         } else {
             nextTier = "TOP_RATED (MAINTAINED)";
+            target = new BigDecimal("4.8");
             needed = 0;
             roadmapNote = isEn
-                    ? "Great job! You hold the prestigious TOP_RATED badge. Keep delivering consistent marine experiences to maintain your rank."
-                    : "Tuyệt vời! Đối tác đang giữ huy hiệu TOP_RATED xuất sắc. Hãy duy trì chất lượng phục vụ để giữ vững thứ hạng.";
+                    ? "Great job! You hold the TOP_RATED badge with priority search visibility. Maintain >= 4.8 average rating with zero disputes/faults to unlock the +2% Safety Rebate on settlements."
+                    : "Tuyệt vời! Đối tác đang giữ huy hiệu Đối tác hàng đầu (TOP_RATED) với ưu tiên hiển thị tìm kiếm. Hãy duy trì điểm trung bình >= 4.8 cùng 0 lỗi vận hành/khiếu nại để nhận Quỹ thưởng An toàn +2% khi quyết toán.";
         }
 
         BadgeProgression progression = new BadgeProgression(currentTier, nextTier, needed, target, roadmapNote);
@@ -317,5 +322,30 @@ public class VendorReviewCoachingUseCase {
         } catch (Exception ignored) {}
 
         return new ReplyDraftResult(reviewId, rating, comment, draft, altDraft, selectedTone, safe);
+    }
+
+    /**
+     * Computes the exact minimum number of additional 5-star reviews required to reach both
+     * {@code minCount} total reviews and an average rating {@code >= targetAvg}.
+     * Solves {@code (currentAvg * n + 5 * k) / (n + k) >= targetAvg} using exact ceiling arithmetic.
+     */
+    static int computeFiveStarReviewsNeeded(int currentCount, BigDecimal currentAvg, int minCount, BigDecimal targetAvg) {
+        int n = Math.max(0, currentCount);
+        int countGap = Math.max(0, minCount - n);
+        BigDecimal avg = currentAvg != null ? currentAvg : BigDecimal.ZERO;
+        if (n == 0) {
+            return Math.max(1, countGap);
+        }
+        if (avg.compareTo(targetAvg) >= 0) {
+            return countGap;
+        }
+        BigDecimal five = BigDecimal.valueOf(5);
+        BigDecimal denom = five.subtract(targetAvg);
+        if (denom.compareTo(BigDecimal.ZERO) <= 0) {
+            return countGap;
+        }
+        BigDecimal numerator = targetAvg.subtract(avg).multiply(BigDecimal.valueOf(n));
+        int ratingGap = numerator.divide(denom, 0, RoundingMode.CEILING).intValueExact();
+        return Math.max(countGap, Math.max(0, ratingGap));
     }
 }

@@ -5,6 +5,8 @@ import com.danasea.backend.modules.operation.infrastructure.persistence.entities
 import com.danasea.backend.modules.operation.infrastructure.persistence.repositories.JpaPayoutRequestRepository;
 import com.danasea.backend.modules.settlement.application.dtos.PayoutRequestResponse;
 import com.danasea.backend.modules.settlement.infrastructure.persistence.mappers.PayoutRequestMapper;
+import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,21 +21,35 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class GetAdminPayoutRequestsUseCase {
 
     private final JpaPayoutRequestRepository payoutRequestRepository;
     private final PayoutRequestMapper mapper;
+    private final VendorInternalApi vendorInternalApi;
 
     @Autowired
     public GetAdminPayoutRequestsUseCase(
             JpaPayoutRequestRepository payoutRequestRepository,
-            PayoutRequestMapper mapper
+            PayoutRequestMapper mapper,
+            @Autowired(required = false) VendorInternalApi vendorInternalApi
     ) {
         this.payoutRequestRepository = payoutRequestRepository;
         this.mapper = mapper;
+        this.vendorInternalApi = vendorInternalApi;
+    }
+
+    public GetAdminPayoutRequestsUseCase(
+            JpaPayoutRequestRepository payoutRequestRepository,
+            PayoutRequestMapper mapper
+    ) {
+        this(payoutRequestRepository, mapper, null);
     }
 
     @Transactional(readOnly = true)
@@ -70,6 +86,22 @@ public class GetAdminPayoutRequestsUseCase {
         };
 
         Page<PayoutRequestJpaEntity> page = payoutRequestRepository.findAll(spec, pageable);
-        return page.map(mapper::toResponse);
+        Map<UUID, BadgeTier> badgeTiers = Map.of();
+        if (vendorInternalApi != null && page.hasContent()) {
+            Set<UUID> vendorIds = page.getContent().stream()
+                    .map(PayoutRequestJpaEntity::getVendorId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (!vendorIds.isEmpty()) {
+                Map<UUID, BadgeTier> fetched = vendorInternalApi.findBadgeTiersByVendorIds(vendorIds);
+                if (fetched != null) {
+                    badgeTiers = fetched;
+                }
+            }
+        }
+        Map<UUID, BadgeTier> resolvedBadgeTiers = badgeTiers;
+        return page.map(entity -> mapper.toResponse(
+                entity,
+                entity.getVendorId() != null ? resolvedBadgeTiers.getOrDefault(entity.getVendorId(), BadgeTier.NONE) : BadgeTier.NONE));
     }
 }

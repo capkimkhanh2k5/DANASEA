@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /** Chỉ số hoạt động tổng quan (Real-time Dashboard Metrics) cho Admin hoặc Vendor. */
@@ -18,6 +20,7 @@ public final class DashboardMetrics {
     private final double completionRate;
     private final double cancellationRate;
     private final List<VendorDiagnosisAlert> alerts;
+    private final Map<String, Long> vendorBadgeDistribution;
 
     public DashboardMetrics(
             BigDecimal totalRevenue,
@@ -28,6 +31,28 @@ public final class DashboardMetrics {
             double completionRate,
             double cancellationRate,
             List<VendorDiagnosisAlert> alerts) {
+        this(
+                totalRevenue,
+                netRevenue,
+                newOrders,
+                completedOrders,
+                cancelledOrders,
+                completionRate,
+                cancellationRate,
+                alerts,
+                Collections.emptyMap());
+    }
+
+    public DashboardMetrics(
+            BigDecimal totalRevenue,
+            BigDecimal netRevenue,
+            long newOrders,
+            long completedOrders,
+            long cancelledOrders,
+            double completionRate,
+            double cancellationRate,
+            List<VendorDiagnosisAlert> alerts,
+            Map<String, Long> vendorBadgeDistribution) {
         this.totalRevenue = totalRevenue != null ? totalRevenue : BigDecimal.ZERO;
         this.netRevenue = netRevenue != null ? netRevenue : BigDecimal.ZERO;
         this.newOrders = newOrders;
@@ -39,6 +64,10 @@ public final class DashboardMetrics {
                 alerts != null
                         ? Collections.unmodifiableList(new ArrayList<>(alerts))
                         : Collections.emptyList();
+        this.vendorBadgeDistribution =
+                vendorBadgeDistribution != null
+                        ? Collections.unmodifiableMap(new LinkedHashMap<>(vendorBadgeDistribution))
+                        : Collections.emptyMap();
     }
 
     /** Tạo DashboardMetrics với tính toán tỷ lệ tự động và an toàn (tránh chia cho 0). */
@@ -49,6 +78,24 @@ public final class DashboardMetrics {
             long completedOrders,
             long cancelledOrders,
             List<VendorDiagnosisAlert> alerts) {
+        return of(
+                totalRevenue,
+                netRevenue,
+                newOrders,
+                completedOrders,
+                cancelledOrders,
+                alerts,
+                Collections.emptyMap());
+    }
+
+    public static DashboardMetrics of(
+            BigDecimal totalRevenue,
+            BigDecimal netRevenue,
+            long newOrders,
+            long completedOrders,
+            long cancelledOrders,
+            List<VendorDiagnosisAlert> alerts,
+            Map<String, Long> vendorBadgeDistribution) {
         long totalOrders = newOrders;
         if (totalOrders <= 0) {
             totalOrders = completedOrders + cancelledOrders;
@@ -75,7 +122,8 @@ public final class DashboardMetrics {
                 cancelledOrders,
                 completionRate,
                 cancellationRate,
-                alerts);
+                alerts,
+                vendorBadgeDistribution);
     }
 
     public static DashboardMetrics empty() {
@@ -113,6 +161,10 @@ public final class DashboardMetrics {
 
     public List<VendorDiagnosisAlert> getAlerts() {
         return alerts;
+    }
+
+    public Map<String, Long> getVendorBadgeDistribution() {
+        return vendorBadgeDistribution;
     }
 
     @Override

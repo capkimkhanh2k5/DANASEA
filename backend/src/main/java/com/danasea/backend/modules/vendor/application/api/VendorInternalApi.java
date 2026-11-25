@@ -6,16 +6,23 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import com.danasea.backend.modules.vendor.domain.models.VerificationStatus;
 import com.danasea.backend.modules.vendor.domain.models.DocType;
 import com.danasea.backend.modules.vendor.domain.models.VendorDocument;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 
 public interface VendorInternalApi {
     Optional<Vendor> findByUserId(UUID userId);
 
     Optional<Vendor> findById(UUID vendorId);
+
+    default Map<UUID, BadgeTier> findBadgeTiersByVendorIds(Set<UUID> vendorIds) {
+        return Collections.emptyMap();
+    }
 
     boolean isVendorApproved(UUID vendorId);
 

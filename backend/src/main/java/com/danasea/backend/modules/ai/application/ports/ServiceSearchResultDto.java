@@ -17,4 +17,9 @@ public class ServiceSearchResultDto {
     private BigDecimal price;
     private BigDecimal avgRating;
     private String matchType; // e.g., "exact", "filter", "semantic"
+    private String vendorBadgeTier;
+
+    public ServiceSearchResultDto(UUID serviceId, String name, BigDecimal price, BigDecimal avgRating, String matchType) {
+        this(serviceId, name, price, avgRating, matchType, null);
+    }
 }

@@ -1,5 +1,5 @@
 {
-  "reviewedMigrations": "V1-V61",
+  "reviewedMigrations": "V1-V62",
   "classification": {
     "ai_assessment_cases": "replace",
     "ai_chat_requests": "replace",
@@ -553,6 +553,24 @@
             "updated_at",
             "timestamp with time zone",
             true,
+            ""
+          ],
+          [
+            "context_type",
+            "character varying(50)",
+            false,
+            ""
+          ],
+          [
+            "context_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "context_label",
+            "character varying(255)",
+            false,
             ""
           ]
         ]

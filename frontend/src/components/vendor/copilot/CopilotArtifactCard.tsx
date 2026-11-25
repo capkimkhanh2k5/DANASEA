@@ -10,20 +10,11 @@ import {
   Tag
 } from 'lucide-react';
 import type { CopilotArtifact } from '../../../types/vendorAi';
+import { getBadgeTierLabel, normalizeBadgeTier } from '../../../utils/badgeTier';
 import {
   formatAssessmentStatusLabel,
   formatContentReasonLabel,
 } from '../../../pages/admin/Copilot/copilotArtifactHelpers';
-
-const BADGE_TIER_LABELS: Record<string, string> = {
-  NONE: 'Chưa xếp hạng',
-  STANDARD: 'Tiêu chuẩn',
-  VERIFIED: 'Đã xác minh',
-  BRONZE: 'Đồng',
-  SILVER: 'Bạc',
-  GOLD: 'Vàng',
-  PLATINUM: 'Bạch kim',
-};
 
 const REVIEW_PILLAR_LABELS: Record<string, string> = {
   GUIDE: 'Hướng dẫn viên',
@@ -62,7 +53,7 @@ export function CopilotArtifactCard({ artifact }: CopilotArtifactCardProps) {
     const cancellationRate = Number(data.cancellationRate || 0);
     const ratingAvg = Number(data.ratingAvg || 0);
     const ratingCount = Number(data.ratingCount || 0);
-    const badgeTier = String(data.badgeTier || 'STANDARD');
+    const badgeTier = normalizeBadgeTier(typeof data.badgeTier === 'string' ? data.badgeTier : undefined);
 
     return (
       <div className="mt-3 p-3.5 bg-white border border-slate-200/90 rounded-xl shadow-xs text-xs flex flex-col gap-3">
@@ -71,8 +62,11 @@ export function CopilotArtifactCard({ artifact }: CopilotArtifactCardProps) {
             <TrendingUp className="w-3.5 h-3.5 text-sky-600" />
             <span>Chỉ số kinh doanh gian hàng</span>
           </div>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700" title={badgeTier}>
-            Hạng: {BADGE_TIER_LABELS[badgeTier.toUpperCase()] || badgeTier}
+          <span
+            className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700"
+            title={badgeTier}
+          >
+            Hạng: {getBadgeTierLabel(badgeTier)}
           </span>
         </div>
 

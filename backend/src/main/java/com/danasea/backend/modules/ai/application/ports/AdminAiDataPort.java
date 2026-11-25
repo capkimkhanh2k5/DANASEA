@@ -2,6 +2,7 @@ package com.danasea.backend.modules.ai.application.ports;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +93,52 @@ public interface AdminAiDataPort {
             long openDisputesCount
     ) {}
 
+    record AdminOrderDetail(
+            UUID subOrderId,
+            UUID masterOrderId,
+            UUID vendorId,
+            String vendorBusinessName,
+            UUID serviceId,
+            String serviceTitle,
+            String customerName,
+            LocalDate slotDate,
+            LocalTime slotStartTime,
+            LocalTime slotEndTime,
+            Integer quantity,
+            BigDecimal finalAmount,
+            BigDecimal commissionAmount,
+            BigDecimal vendorPayoutAmount,
+            String status,
+            String paymentStatus,
+            String cancellationReason,
+            OffsetDateTime checkedInAt,
+            OffsetDateTime createdAt
+    ) {}
+
+    record AdminServiceDetail(
+            UUID id,
+            UUID vendorId,
+            String vendorBusinessName,
+            String title,
+            String categoryName,
+            String status,
+            BigDecimal basePrice,
+            Integer durationMinutes,
+            Integer capacityPerSlot,
+            BigDecimal averageRating,
+            Integer reviewCount
+    ) {}
+
+    record AdminVendorDetail(
+            UUID id,
+            String businessName,
+            String status,
+            String badgeTier,
+            BigDecimal ratingAvg,
+            Integer ratingCount,
+            long publishedServicesCount
+    ) {}
+
     PlatformDashboardMetrics getPlatformDashboardMetrics();
 
     List<RevenueTimeSeriesItem> getRevenueTimeSeries(LocalDate from, LocalDate to, String groupBy);
@@ -103,4 +150,16 @@ public interface AdminAiDataPort {
     Optional<DisputeFullEvidence> getDisputeFullEvidence(UUID disputeId);
 
     QueueOverview getQueueOverview();
+
+    default Optional<AdminOrderDetail> getOrderDetail(UUID orderOrSubOrderId) {
+        return Optional.empty();
+    }
+
+    default Optional<AdminServiceDetail> getServiceDetail(UUID serviceId) {
+        return Optional.empty();
+    }
+
+    default Optional<AdminVendorDetail> getVendorDetail(UUID vendorId) {
+        return Optional.empty();
+    }
 }

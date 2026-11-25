@@ -10,7 +10,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.sql.ResultSet;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -21,6 +23,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 
 import com.danasea.backend.modules.account.infrastructure.persistence.entities.UserJpaEntity;
 import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository;
@@ -272,6 +276,162 @@ class AiReportingAdaptersTest {
         assertThat(vendorAdapter.getPerformanceMetrics(vendorId, today, today).badgeTier()).isEqualTo("VERIFIED");
         vendor.setBadgeTier(null);
         assertThat(vendorAdapter.getPerformanceMetrics(vendorId, today, today).badgeTier()).isEqualTo("NONE");
+    }
+
+    @Test
+    void vendorJdbcLookupsReturnEmptyWhenJdbcNullAndMapVerifiedRowsWhenPresent() throws Exception {
+        UUID entityId = UUID.randomUUID();
+        UUID masterId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.parse("2026-11-25T09:00:00+07:00");
+
+        // Null jdbc guards
+        assertThat(vendorAdapter.getOrderDetail(vendorId, entityId)).isEmpty();
+        assertThat(vendorAdapter.getDisputeDetail(vendorId, entityId)).isEmpty();
+        assertThat(vendorAdapter.getRefundDetail(vendorId, entityId)).isEmpty();
+        assertThat(vendorAdapter.listRefunds(vendorId, 10)).isEmpty();
+        assertThat(vendorAdapter.getEquipmentDetail(vendorId, entityId)).isEmpty();
+        assertThat(vendorAdapter.getPayoutDetail(vendorId, entityId)).isEmpty();
+        assertThat(vendorAdapter.getSlotDetail(vendorId, entityId)).isEmpty();
+        assertThat(vendorAdapter.getReviewDetail(vendorId, entityId)).isEmpty();
+
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        var adapter = new JpaVendorAiDataAdapter(vendors, services, categories, slots, reviews, vendorReports, null, jdbc);
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getObject("id", UUID.class)).thenReturn(entityId);
+        when(rs.getObject("master_order_id", UUID.class)).thenReturn(masterId);
+        when(rs.getObject("service_id", UUID.class)).thenReturn(serviceId);
+        when(rs.getObject("sub_order_id", UUID.class)).thenReturn(entityId);
+        when(rs.getObject("order_id", UUID.class)).thenReturn(masterId);
+        when(rs.getObject("settlement_id", UUID.class)).thenReturn(masterId);
+        when(rs.getString("service_title")).thenReturn("Mô tô nước");
+        when(rs.getObject("slot_date", LocalDate.class)).thenReturn(today);
+        when(rs.getObject("slot_start", LocalTime.class)).thenReturn(LocalTime.of(9, 0));
+        when(rs.getObject("slot_end", LocalTime.class)).thenReturn(LocalTime.of(10, 0));
+        when(rs.getObject("date", LocalDate.class)).thenReturn(today);
+        when(rs.getObject("start_time", LocalTime.class)).thenReturn(LocalTime.of(9, 0));
+        when(rs.getObject("end_time", LocalTime.class)).thenReturn(LocalTime.of(10, 0));
+        when(rs.getObject("quantity")).thenReturn(2);
+        when(rs.getBigDecimal("unit_price")).thenReturn(BigDecimal.valueOf(300_000));
+        when(rs.getBigDecimal("subtotal_amount")).thenReturn(BigDecimal.valueOf(600_000));
+        when(rs.getBigDecimal("discount_amount")).thenReturn(BigDecimal.ZERO);
+        when(rs.getBigDecimal("final_amount")).thenReturn(BigDecimal.valueOf(600_000));
+        when(rs.getBigDecimal("commission_amount")).thenReturn(BigDecimal.valueOf(60_000));
+        when(rs.getBigDecimal("vendor_payout_amount")).thenReturn(BigDecimal.valueOf(540_000));
+        when(rs.getBigDecimal("order_final_amount")).thenReturn(BigDecimal.valueOf(600_000));
+        when(rs.getBigDecimal("refund_percentage")).thenReturn(BigDecimal.valueOf(50));
+        when(rs.getBigDecimal("amount")).thenReturn(BigDecimal.valueOf(300_000));
+        when(rs.getString("status")).thenReturn("COMPLETED");
+        when(rs.getString("payment_status")).thenReturn("PAID");
+        when(rs.getString("cancellation_reason")).thenReturn(null);
+        when(rs.getObject("checked_in_at", OffsetDateTime.class)).thenReturn(now);
+        when(rs.getObject("created_at", OffsetDateTime.class)).thenReturn(now);
+        when(rs.getObject("resolved_at", OffsetDateTime.class)).thenReturn(now);
+        when(rs.getObject("processed_at", OffsetDateTime.class)).thenReturn(now);
+        when(rs.getString("reason")).thenReturn("DISPUTE");
+        when(rs.getString("description")).thenReturn("Details");
+        when(rs.getString("vendor_response")).thenReturn("Response");
+        when(rs.getString("admin_note")).thenReturn("Note");
+        when(rs.getString("provider")).thenReturn("VNPAY");
+        when(rs.getString("name")).thenReturn("Cano #1");
+        when(rs.getString("compatibility_group")).thenReturn("SPEEDBOAT");
+        when(rs.getInt("capacity")).thenReturn(10);
+        when(rs.getInt("booked_count")).thenReturn(3);
+        when(rs.getInt("rating")).thenReturn(4);
+        when(rs.getString("comment")).thenReturn("Tốt");
+        when(rs.getString("vendor_reply")).thenReturn("Cảm ơn");
+        when(rs.getString("bank_reference")).thenReturn("VCB-1");
+        when(rs.getString("vendor_note")).thenReturn("Rút tiền");
+        when(rs.getString("rejection_reason")).thenReturn(null);
+        when(rs.getObject("starts_at", LocalDateTime.class)).thenReturn(LocalDateTime.of(2026, 11, 26, 8, 0));
+        when(rs.getObject("ends_at", LocalDateTime.class)).thenReturn(LocalDateTime.of(2026, 11, 26, 12, 0));
+        when(rs.getBoolean("urgent")).thenReturn(true);
+
+        when(jdbc.query(any(String.class), any(RowMapper.class), any(Object[].class))).thenAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            RowMapper<Object> mapper = inv.getArgument(1);
+            return List.of(mapper.mapRow(rs, 0));
+        });
+
+        assertThat(adapter.getOrderDetail(vendorId, entityId)).isPresent()
+                .get().satisfies(o -> assertThat(o.vendorPayoutAmount()).isEqualByComparingTo("540000"));
+        assertThat(adapter.getDisputeDetail(vendorId, entityId)).isPresent()
+                .get().satisfies(d -> assertThat(d.reason()).isEqualTo("DISPUTE"));
+        assertThat(adapter.getRefundDetail(vendorId, entityId)).isPresent()
+                .get().satisfies(r -> assertThat(r.amount()).isEqualByComparingTo("300000"));
+        assertThat(adapter.listRefunds(vendorId, 20)).hasSize(1);
+        assertThat(adapter.getEquipmentDetail(vendorId, entityId)).isPresent()
+                .get().satisfies(e -> {
+                    assertThat(e.name()).isEqualTo("Cano #1");
+                    assertThat(e.upcomingMaintenanceCount()).isEqualTo(1);
+                    assertThat(e.nextMaintenanceSummary()).contains("[URGENT]");
+                });
+        assertThat(adapter.getPayoutDetail(vendorId, entityId)).isPresent()
+                .get().satisfies(p -> assertThat(p.bankReference()).isEqualTo("VCB-1"));
+        assertThat(adapter.getSlotDetail(vendorId, entityId)).isPresent()
+                .get().satisfies(s -> assertThat(s.capacity()).isEqualTo(10));
+        assertThat(adapter.getReviewDetail(vendorId, entityId)).isPresent()
+                .get().satisfies(r -> assertThat(r.vendorReply()).isEqualTo("Cảm ơn"));
+    }
+
+    @Test
+    void adminJdbcLookupsReturnEmptyWhenJdbcNullAndMapVerifiedRowsWhenPresent() throws Exception {
+        UUID entityId = UUID.randomUUID();
+        UUID masterId = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.parse("2026-11-25T09:00:00+07:00");
+
+        assertThat(adminAdapter.getOrderDetail(entityId)).isEmpty();
+        assertThat(adminAdapter.getServiceDetail(entityId)).isEmpty();
+        assertThat(adminAdapter.getVendorDetail(entityId)).isEmpty();
+
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        var adapter = new JpaAdminAiDataAdapter(dashboards, revenues, bookings, vendorReports,
+                disputes, subOrders, users, services, slots, checkins, riskCases, support, vendors, jdbc);
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getObject("sub_order_id", UUID.class)).thenReturn(entityId);
+        when(rs.getObject("master_order_id", UUID.class)).thenReturn(masterId);
+        when(rs.getObject("vendor_id", UUID.class)).thenReturn(vendorId);
+        when(rs.getObject("service_id", UUID.class)).thenReturn(serviceId);
+        when(rs.getObject("id", UUID.class)).thenReturn(entityId);
+        when(rs.getString("business_name")).thenReturn("Danabeach");
+        when(rs.getString("service_title")).thenReturn("Mô tô nước");
+        when(rs.getString("title")).thenReturn("Mô tô nước");
+        when(rs.getString("category_name")).thenReturn("Jetski");
+        when(rs.getString("customer_name")).thenReturn("Nguyễn Văn A");
+        when(rs.getObject("slot_date", LocalDate.class)).thenReturn(today);
+        when(rs.getObject("slot_start", LocalTime.class)).thenReturn(LocalTime.of(9, 0));
+        when(rs.getObject("slot_end", LocalTime.class)).thenReturn(LocalTime.of(10, 0));
+        when(rs.getObject("quantity")).thenReturn(1);
+        when(rs.getBigDecimal("final_amount")).thenReturn(BigDecimal.valueOf(650_000));
+        when(rs.getBigDecimal("commission_amount")).thenReturn(BigDecimal.valueOf(65_000));
+        when(rs.getBigDecimal("vendor_payout_amount")).thenReturn(BigDecimal.valueOf(585_000));
+        when(rs.getBigDecimal("price")).thenReturn(BigDecimal.valueOf(650_000));
+        when(rs.getObject("duration_minutes")).thenReturn(15);
+        when(rs.getObject("capacity_per_slot")).thenReturn(4);
+        when(rs.getBigDecimal("avg_rating")).thenReturn(BigDecimal.valueOf(4.8));
+        when(rs.getBigDecimal("rating_avg")).thenReturn(BigDecimal.valueOf(4.8));
+        when(rs.getObject("rating_count")).thenReturn(10);
+        when(rs.getLong("published_services_count")).thenReturn(3L);
+        when(rs.getString("status")).thenReturn("APPROVED");
+        when(rs.getString("badge_tier")).thenReturn("GOLD");
+        when(rs.getString("payment_status")).thenReturn("PAID");
+        when(rs.getString("cancellation_reason")).thenReturn(null);
+        when(rs.getObject("checked_in_at", OffsetDateTime.class)).thenReturn(now);
+        when(rs.getObject("created_at", OffsetDateTime.class)).thenReturn(now);
+
+        when(jdbc.query(any(String.class), any(RowMapper.class), any(Object[].class))).thenAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            RowMapper<Object> mapper = inv.getArgument(1);
+            return List.of(mapper.mapRow(rs, 0));
+        });
+
+        assertThat(adapter.getOrderDetail(entityId)).isPresent()
+                .get().satisfies(o -> assertThat(o.masterOrderId()).isEqualTo(masterId));
+        assertThat(adapter.getServiceDetail(serviceId)).isPresent()
+                .get().satisfies(s -> assertThat(s.title()).isEqualTo("Mô tô nước"));
+        assertThat(adapter.getVendorDetail(vendorId)).isPresent()
+                .get().satisfies(v -> assertThat(v.publishedServicesCount()).isEqualTo(3L));
     }
 
     private VendorPerformanceItem performance(String rating, VendorAlertSeverity severity) {

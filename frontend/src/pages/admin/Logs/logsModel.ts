@@ -556,7 +556,7 @@ export const FIELD_LABELS: Record<string, string> = {
   durationDays: 'Thời hạn áp dụng (ngày)',
   updatedBy: 'Người cập nhật',
   description: 'Mô tả chi tiết',
-  badgeTier: 'Hạng đối tác cấp',
+  badgeTier: 'Huy hiệu đối tác',
   licenseNo: 'Giấy phép kinh doanh',
   verifiedDocs: 'Chứng từ đã duyệt',
   penalty: 'Biện pháp chế tài',
@@ -578,10 +578,8 @@ export const FIELD_LABELS: Record<string, string> = {
 };
 
 export const VALUE_TRANSLATIONS: Record<string, string> = {
-  PLATINUM: 'Bạch kim (PLATINUM)',
-  GOLD: 'Vàng (GOLD)',
-  SILVER: 'Bạc (SILVER)',
-  STANDARD: 'Tiêu chuẩn (STANDARD)',
+  NONE: 'Chưa xếp hạng (NONE)',
+  TOP_RATED: 'Đối tác hàng đầu (TOP_RATED)',
   REFUND_200K: 'Hoàn tiền 200.000 ₫ (REFUND_200K)',
   WARNING_NOTE: 'Ghi nhận nhắc nhở cảnh cáo (WARNING_NOTE)',
   PAYPAL: 'Cổng thanh toán PayPal',

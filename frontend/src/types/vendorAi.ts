@@ -177,4 +177,17 @@ export interface UpdateConversationMetaRequest {
   archived?: boolean;
 }
 
+export interface VendorCopilotRefundDto {
+  id: string;
+  subOrderId: string;
+  serviceTitle?: string | null;
+  amount: number;
+  refundPercentage?: number | null;
+  reason?: string | null;
+  status: string;
+  provider?: string | null;
+  createdAt?: string | null;
+  processedAt?: string | null;
+}
+
 

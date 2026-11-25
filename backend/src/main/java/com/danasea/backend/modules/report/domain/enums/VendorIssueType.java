@@ -5,5 +5,6 @@ public enum VendorIssueType {
     HIGH_CANCELLATION,
     LOW_RATING,
     OVERLOADED,
-    UNDERPERFORMING
+    UNDERPERFORMING,
+    BADGE_AT_RISK
 }

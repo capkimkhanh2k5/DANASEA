@@ -2,6 +2,7 @@ package com.danasea.backend.modules.report.domain.models;
 
 import com.danasea.backend.modules.report.domain.enums.VendorAlertSeverity;
 import com.danasea.backend.modules.report.domain.enums.VendorIssueType;
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -14,8 +15,11 @@ import java.util.UUID;
 /** Chỉ số hiệu suất và chẩn đoán hoạt động của một Vendor trong khoảng thời gian phân tích. */
 public final class VendorPerformanceItem {
 
+    private static final BigDecimal TOP_RATED_AT_RISK_THRESHOLD = new BigDecimal("4.65");
+
     private final UUID vendorId;
     private final String businessName;
+    private final BadgeTier badgeTier;
     private final BigDecimal revenue;
     private final BigDecimal netPayout;
     private final long totalOrders;
@@ -42,8 +46,41 @@ public final class VendorPerformanceItem {
             int ratingCount,
             VendorAlertSeverity severity,
             List<VendorIssueType> issues) {
+        this(
+                vendorId,
+                businessName,
+                BadgeTier.NONE,
+                revenue,
+                netPayout,
+                totalOrders,
+                completedOrders,
+                cancelledOrders,
+                cancellationRate,
+                slotOccupancyRate,
+                rating,
+                ratingCount,
+                severity,
+                issues);
+    }
+
+    public VendorPerformanceItem(
+            UUID vendorId,
+            String businessName,
+            BadgeTier badgeTier,
+            BigDecimal revenue,
+            BigDecimal netPayout,
+            long totalOrders,
+            long completedOrders,
+            long cancelledOrders,
+            double cancellationRate,
+            double slotOccupancyRate,
+            BigDecimal rating,
+            int ratingCount,
+            VendorAlertSeverity severity,
+            List<VendorIssueType> issues) {
         this.vendorId = Objects.requireNonNull(vendorId, "vendorId cannot be null");
         this.businessName = businessName != null ? businessName : "";
+        this.badgeTier = badgeTier != null ? badgeTier : BadgeTier.NONE;
         this.revenue = revenue != null ? revenue : BigDecimal.ZERO;
         this.netPayout = netPayout != null ? netPayout : BigDecimal.ZERO;
         this.totalOrders = totalOrders;
@@ -88,6 +125,35 @@ public final class VendorPerformanceItem {
             int totalCapacity,
             BigDecimal rating,
             int ratingCount) {
+        return evaluate(
+                vendorId,
+                businessName,
+                BadgeTier.NONE,
+                revenue,
+                netPayout,
+                totalOrders,
+                completedOrders,
+                cancelledOrders,
+                totalBooked,
+                totalCapacity,
+                rating,
+                ratingCount);
+    }
+
+    public static VendorPerformanceItem evaluate(
+            UUID vendorId,
+            String businessName,
+            BadgeTier badgeTier,
+            BigDecimal revenue,
+            BigDecimal netPayout,
+            long totalOrders,
+            long completedOrders,
+            long cancelledOrders,
+            int totalBooked,
+            int totalCapacity,
+            BigDecimal rating,
+            int ratingCount) {
+        BadgeTier effectiveTier = badgeTier != null ? badgeTier : BadgeTier.NONE;
         double cancellationRate = 0.0;
         if (totalOrders > 0) {
             cancellationRate =
@@ -117,6 +183,13 @@ public final class VendorPerformanceItem {
         if (slotOccupancyRate < 20.0 && totalOrders < 5) {
             detectedIssues.add(VendorIssueType.UNDERPERFORMING);
         }
+        if (effectiveTier == BadgeTier.TOP_RATED
+                && ((rating != null
+                                && ratingCount >= 5
+                                && rating.compareTo(TOP_RATED_AT_RISK_THRESHOLD) < 0)
+                        || cancellationRate > 15.0)) {
+            detectedIssues.add(VendorIssueType.BADGE_AT_RISK);
+        }
 
         VendorAlertSeverity severity;
         if (cancellationRate > 40.0
@@ -133,6 +206,7 @@ public final class VendorPerformanceItem {
         return new VendorPerformanceItem(
                 vendorId,
                 businessName,
+                effectiveTier,
                 revenue,
                 netPayout,
                 totalOrders,
@@ -152,6 +226,10 @@ public final class VendorPerformanceItem {
 
     public String getBusinessName() {
         return businessName;
+    }
+
+    public BadgeTier getBadgeTier() {
+        return badgeTier;
     }
 
     public BigDecimal getRevenue() {

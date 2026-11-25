@@ -4,6 +4,7 @@ import com.danasea.backend.modules.operation.infrastructure.persistence.entities
 import com.danasea.backend.modules.settlement.application.dtos.PayoutRequestDetailResponse;
 import com.danasea.backend.modules.settlement.application.dtos.PayoutRequestResponse;
 import com.danasea.backend.modules.settlement.infrastructure.persistence.entities.SettlementJpaEntity;
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,10 @@ import org.springframework.stereotype.Component;
 public class PayoutRequestMapper {
 
     public PayoutRequestResponse toResponse(PayoutRequestJpaEntity entity) {
+        return toResponse(entity, null);
+    }
+
+    public PayoutRequestResponse toResponse(PayoutRequestJpaEntity entity, BadgeTier vendorBadgeTier) {
         if (entity == null) return null;
         return PayoutRequestResponse.builder()
                 .id(entity.getId())
@@ -27,6 +32,7 @@ public class PayoutRequestMapper {
                 .vendorNote(entity.getVendorNote())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
+                .vendorBadgeTier(vendorBadgeTier)
                 .build();
     }
 

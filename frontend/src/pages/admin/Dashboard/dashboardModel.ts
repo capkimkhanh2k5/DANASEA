@@ -69,6 +69,7 @@ export interface TopServingVendorItem {
 export interface TopVendorItem {
   vendorId: string;
   vendorName: string;
+  badgeTier?: 'NONE' | 'VERIFIED' | 'TOP_RATED';
   revenue: number;
   completedOrders: number;
   sharePercent: number;
@@ -81,6 +82,19 @@ export interface RecentOrder {
   totalAmount: number;
   createdAt: string;
 }
+export interface VendorBadgeDistribution {
+  TOP_RATED: number;
+  VERIFIED: number;
+  NONE: number;
+}
+export interface BadgeRiskAlert {
+  vendorId: string;
+  businessName: string;
+  issueType: string;
+  severity: string;
+  message: string;
+  metricValue: number;
+}
 export interface DashboardData {
   bookings: BookingMetric[] | null;
   revenue: RevenueMetric[] | null;
@@ -88,6 +102,8 @@ export interface DashboardData {
   hotServices?: HotServiceItem[] | null;
   topServingVendors?: TopServingVendorItem[] | null;
   topVendors?: TopVendorItem[] | null;
+  vendorBadgeDistribution?: VendorBadgeDistribution | null;
+  badgeRiskAlerts?: BadgeRiskAlert[];
   recentOrders: RecentOrder[] | null;
   errors: string[];
 }

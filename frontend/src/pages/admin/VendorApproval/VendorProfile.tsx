@@ -1,7 +1,8 @@
 import { FileText, History, Info } from 'lucide-react';
-import type { BadgeTier, VerificationStatus } from '../../../types';
+import type { VerificationStatus } from '../../../types';
 import { AdminBadge } from '../../../components/admin/AdminUI';
 import { AdminButton, AdminDisclosure } from '../../../components/admin/AdminWorkspace';
+import { getBadgeTierLabel, getBadgeTierTone } from '../../../utils/badgeTier';
 import { formatDisplayCode } from '../../../utils/displayCode';
 import { formatTaxCode, type VendorRecord, type VendorReviewEvent } from './vendorApprovalModel';
 
@@ -17,9 +18,9 @@ export function VendorStatus({ status }: { status: VerificationStatus }) {
   </AdminBadge>;
 }
 
-export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview, onApproveDoc, onRejectDoc, isSubmitting, demo }: {
-  vendor: VendorRecord; timeline: VendorReviewEvent[]; tier: BadgeTier;
-  onTierChange: (tier: BadgeTier) => void; onPreview: (urlOrName: string, name?: string) => void;
+export function VendorProfile({ vendor, timeline, onPreview, onApproveDoc, onRejectDoc, isSubmitting, demo }: {
+  vendor: VendorRecord; timeline: VendorReviewEvent[];
+  onPreview: (urlOrName: string, name?: string) => void;
   onApproveDoc?: (docId: string) => Promise<void>;
   onRejectDoc?: (docId: string, reason: string) => Promise<void>;
   isSubmitting?: boolean;
@@ -28,7 +29,7 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
   return <div className="admin-vendors-profile">
     <section className="admin-detail-section admin-vendors-profile-summary" aria-label="Thông tin chính">
       <div className="admin-vendors-profile-heading"><img src={vendor.avatarUrl} alt="" width="56" height="56" /><div><span className="admin-vendors-mono" title={vendor.id}>#{formatDisplayCode(vendor.id, 'VND')}</span>
-        <div className="admin-vendors-profile-badges"><VendorStatus status={vendor.verificationStatus} /><AdminBadge tone="neutral">{vendor.badgeTier}</AdminBadge></div></div></div>
+        <div className="admin-vendors-profile-badges"><VendorStatus status={vendor.verificationStatus} /><AdminBadge tone={getBadgeTierTone(vendor.badgeTier)}>{getBadgeTierLabel(vendor.badgeTier)}</AdminBadge></div></div></div>
       <p>{vendor.address}</p>
       {vendor.verificationStatus === 'REJECTED' && vendor.rejectionReason && (
         <div style={{ margin: '12px 0', padding: '10px 14px', borderRadius: '8px', background: '#fff1f2', border: '1px solid #fecdd3', color: '#9f1239', fontSize: '12.5px' }}>
@@ -135,8 +136,15 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
     </AdminDisclosure>
 
     <section className="admin-detail-section" aria-labelledby="vendor-review-heading"><h3 id="vendor-review-heading">Quyết định & huy hiệu</h3>
-      <label className="admin-field"><span>Hạng huy hiệu khi phê duyệt</span><select disabled={!demo} value={tier} onChange={event => onTierChange(event.target.value as BadgeTier)}>
-        {['BRONZE', 'SILVER', 'GOLD', 'PLATINUM'].map(value => <option key={value}>{value}</option>)}</select></label>
+      <div className="admin-field">
+        <span>Huy hiệu hiện tại</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <AdminBadge tone={getBadgeTierTone(vendor.badgeTier)}>{getBadgeTierLabel(vendor.badgeTier)}</AdminBadge>
+        </div>
+        <p className="admin-detail-note" style={{ marginTop: '6px' }}>
+          Huy hiệu được hệ thống tự động tính từ đánh giá hiển thị của khách hàng: Chưa xếp hạng (0 đánh giá hoặc &lt; 3.5★), Đã xác minh (≥ 1 đánh giá và ≥ 3.5★), Đối tác hàng đầu (≥ 5 đánh giá và điểm trung bình ≥ 4.5★).
+        </p>
+      </div>
       <div className="admin-vendors-supplement"><AdminButton disabled aria-describedby="vendor-supplement-note">Yêu cầu bổ sung</AdminButton>
         <p id="vendor-supplement-note"><Info size={15} aria-hidden="true" />Chưa có chức năng gửi yêu cầu bổ sung. Bạn có thể ghi chú khi thử quyết định; không gửi đến đối tác.</p></div>
     </section>
@@ -144,7 +152,7 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
     <section className="admin-detail-section" aria-labelledby="vendor-timeline-heading"><div className="admin-vendors-section-heading"><h3 id="vendor-timeline-heading"><History size={18} aria-hidden="true" />Lịch sử thao tác cục bộ</h3></div>
       <p className="admin-detail-note">Chỉ ghi lại thao tác demo trong phiên này. Không phải nhật ký thẩm định của hệ thống.</p>
       {timeline.length === 0 ? <p className="admin-vendors-timeline-empty">Chưa có thao tác trong phiên. Thông tin người duyệt ban đầu nằm trong phần dữ liệu gốc.</p>
-        : <ol className="admin-timeline">{[...timeline].reverse().map((event, index) => <li key={`${event.at}-${index}`}><div><strong>{event.kind === 'approve' ? `Phê duyệt demo · ${event.tier}` : 'Từ chối demo'}</strong>
+        : <ol className="admin-timeline">{[...timeline].reverse().map((event, index) => <li key={`${event.at}-${index}`}><div><strong>{event.kind === 'approve' ? 'Phê duyệt demo' : 'Từ chối demo'}</strong>
           <time dateTime={event.at}>{date(event.at)}</time></div><span>Admin xem thử · Trạng thái trước: {event.previousStatus}</span>
           <p>{event.note || 'Không có ghi chú.'}</p></li>)}</ol>}
     </section>

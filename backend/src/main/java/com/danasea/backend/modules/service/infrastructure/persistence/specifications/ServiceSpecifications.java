@@ -17,6 +17,9 @@ import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
+import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -24,6 +27,41 @@ import jakarta.persistence.criteria.Subquery;
 public final class ServiceSpecifications {
 
     private ServiceSpecifications() {
+    }
+
+    public static Specification<ServiceJpaEntity> orderByRecommended() {
+        return (root, query, cb) -> {
+            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                Subquery<Integer> badgeWeight = query.subquery(Integer.class);
+                Root<VendorJpaEntity> vendor = badgeWeight.from(VendorJpaEntity.class);
+                Expression<Integer> weightExpr = cb.<Integer>selectCase()
+                        .when(cb.equal(vendor.get("badgeTier"), BadgeTier.TOP_RATED), 2)
+                        .when(cb.equal(vendor.get("badgeTier"), BadgeTier.VERIFIED), 1)
+                        .otherwise(0);
+                badgeWeight.select(cb.max(weightExpr)).where(cb.equal(vendor.get("id"), root.get("vendorId")));
+                query.orderBy(
+                        cb.desc(cb.coalesce(badgeWeight, 0)),
+                        cb.desc(cb.coalesce(root.get("avgRating"), BigDecimal.ZERO)),
+                        cb.desc(cb.coalesce(root.get("ratingCount"), 0)),
+                        cb.desc(root.get("createdAt")),
+                        cb.asc(root.get("id"))
+                );
+            }
+            return cb.conjunction();
+        };
+    }
+
+    public static Specification<ServiceJpaEntity> hasVendorBadgeTier(BadgeTier badgeTier) {
+        return (root, query, cb) -> {
+            if (badgeTier == null) {
+                return cb.conjunction();
+            }
+            Subquery<UUID> vendorSubquery = query.subquery(UUID.class);
+            Root<VendorJpaEntity> vendorRoot = vendorSubquery.from(VendorJpaEntity.class);
+            vendorSubquery.select(vendorRoot.get("id"))
+                    .where(cb.equal(vendorRoot.get("badgeTier"), badgeTier));
+            return root.get("vendorId").in(vendorSubquery);
+        };
     }
 
     public static Specification<ServiceJpaEntity> orderByBookings() {
@@ -171,7 +209,7 @@ public final class ServiceSpecifications {
         if (criteria == null) {
             return isPublished();
         }
-        return filter(
+        Specification<ServiceJpaEntity> base = filter(
                 criteria.getCategoryId(),
                 criteria.getKeyword(),
                 criteria.getMinPrice(),
@@ -185,6 +223,7 @@ public final class ServiceSpecifications {
                 criteria.getVendorId(),
                 criteria.getMinRating()
         );
+        return criteria.getBadgeTier() == null ? base : base.and(hasVendorBadgeTier(criteria.getBadgeTier()));
     }
 
     public static Specification<ServiceJpaEntity> filter(

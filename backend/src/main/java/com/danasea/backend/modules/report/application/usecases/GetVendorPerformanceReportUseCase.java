@@ -158,6 +158,7 @@ public class GetVendorPerformanceReportUseCase {
                     VendorPerformanceItem.evaluate(
                             currentVendorId,
                             vendor.businessName(),
+                            vendor.badgeTier(),
                             revenue,
                             netPayout,
                             totalOrders,

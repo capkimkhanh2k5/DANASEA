@@ -25,6 +25,7 @@ import { useLanguageStore } from '../../../store/useLanguageStore';
 import { serviceCatalogService } from '../../../services/serviceCatalogService';
 import { reviewService, type ReviewResponse } from '../../../services/reviewService';
 import { SEOHead } from '../../../components/common/SEOHead';
+import { getBadgeTierLabel, isPublicBadgeVisible, normalizeBadgeTier } from '../../../utils/badgeTier';
 import { getSiteOrigin } from '../../../utils/seo';
 import type { ServiceDetailDto, ServiceOptionDto, StructuredSlotDto } from '../../../types/service';
 
@@ -871,9 +872,15 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                       <div className="flex items-baseline gap-2 text-slate-700 sm:col-span-2 min-w-0">
                         <span className="text-slate-500 whitespace-nowrap shrink-0">Đơn vị tổ chức:</span>
                         <span className="font-semibold text-slate-900 truncate">{service.businessName}</span>
-                        {service.badgeTier && (
-                          <span className="text-[13px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md whitespace-nowrap shrink-0">
-                            {service.badgeTier === 'VERIFIED' ? 'Đã xác minh' : service.badgeTier}
+                        {isPublicBadgeVisible(service.badgeTier) && (
+                          <span
+                            className={`text-[13px] font-semibold px-2 py-0.5 rounded-md whitespace-nowrap shrink-0 border ${
+                              normalizeBadgeTier(service.badgeTier) === 'TOP_RATED'
+                                ? 'text-amber-800 bg-amber-50 border-amber-200'
+                                : 'text-emerald-800 bg-emerald-50 border-emerald-200'
+                            }`}
+                          >
+                            {getBadgeTierLabel(service.badgeTier)}
                           </span>
                         )}
                       </div>

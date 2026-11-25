@@ -484,3 +484,29 @@
   font-size: 13px;
   user-select: none;
 }
+
+/* DANASEA Admin Copilot - Full Available Height Container */
+.admin-workspace--copilot {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+.admin-content--copilot {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-main-header--copilot {
+  padding: 14px 24px 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .admin-main-header--copilot {
+    padding: 10px 14px 4px;
+  }
+}

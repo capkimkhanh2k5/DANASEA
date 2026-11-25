@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import com.danasea.backend.modules.vendor.domain.models.DocStatus;
 import com.danasea.backend.modules.vendor.domain.models.DocType;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
@@ -63,6 +64,20 @@ public class VendorInternalService implements VendorInternalApi {
         }
         return vendorRepository.findById(vendorId)
                 .map(vendorMapper::toDomain);
+    }
+
+    @Override
+    public Map<UUID, BadgeTier> findBadgeTiersByVendorIds(Set<UUID> vendorIds) {
+        if (vendorIds == null || vendorIds.isEmpty()) {
+            return Map.of();
+        }
+        return vendorRepository.findAllById(vendorIds).stream()
+                .filter(v -> v.getId() != null)
+                .collect(Collectors.toMap(
+                        VendorJpaEntity::getId,
+                        v -> v.getBadgeTier() != null ? v.getBadgeTier() : BadgeTier.NONE,
+                        (first, second) -> first
+                ));
     }
 
     @Override
