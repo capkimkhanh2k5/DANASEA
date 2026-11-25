@@ -18,6 +18,9 @@ import {
   TrendingUp,
   Building2,
   ShieldAlert,
+  ShoppingBag,
+  Scale,
+  Copy,
 } from 'lucide-react';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import { AdminButton } from '../../../components/admin/AdminWorkspace';
@@ -32,6 +35,13 @@ import type {
 import { parseArtifactsJson } from './copilotArtifactHelpers';
 import { CopilotArtifactRenderer } from './CopilotArtifactRenderer';
 import { MarkdownText } from '../../../components/common/MarkdownText';
+import { AdminCopilotContextPicker, type ContextSummary } from './AdminCopilotContextPicker';
+import { useAuthStore } from '../../../store/useAuthStore';
+import {
+  getStoredPinnedSession,
+  savePinnedSession,
+  clearPinnedSessionStorage,
+} from './adminCopilotSession';
 import './AdminCopilot.css';
 
 let localMessageSequence = 0;
@@ -67,23 +77,96 @@ export const AdminCopilot: React.FC = () => {
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editingTitleValue, setEditingTitleValue] = useState('');
   const [conversationToDelete, setConversationToDelete] = useState<CopilotConversation | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
 
-  // Active session state
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  // Active work session pinning (sessionStorage)
+  const [isSessionPinned, setIsSessionPinned] = useState<boolean>(() => {
+    return !!getStoredPinnedSession()?.isPinned;
+  });
+
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const savedScrollTopRef = useRef<number | null>(
+    getStoredPinnedSession()?.scrollTop ?? null
+  );
+  const scrollTopRef = useRef<number>(0);
+
+  // Active session state initialized with pinned session if available
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(() => {
+    return getStoredPinnedSession()?.conversationId ?? null;
+  });
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [sending, setSending] = useState(false);
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState<string>(() => {
+    return getStoredPinnedSession()?.inputText ?? '';
+  });
 
-  // Context attachment state
-  const [contextType, setContextType] = useState<CopilotContextType | null>(null);
-  const [contextId, setContextId] = useState<string | null>(null);
-  const [showAttachModal, setShowAttachModal] = useState(false);
-  const [manualAttachType, setManualAttachType] = useState<CopilotContextType>('DISPUTE');
-  const [manualAttachId, setManualAttachId] = useState('');
+  // Context attachment state initialized with pinned session if available
+  const [contextType, setContextType] = useState<CopilotContextType | null>(() => {
+    return getStoredPinnedSession()?.contextType ?? null;
+  });
+  const [contextId, setContextId] = useState<string | null>(() => {
+    return getStoredPinnedSession()?.contextId ?? null;
+  });
+  const [pinnedSummary, setPinnedSummary] = useState<ContextSummary | null>(() => {
+    return getStoredPinnedSession()?.pinnedSummary ?? null;
+  });
+  const [showAttachPicker, setShowAttachPicker] = useState(false);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Helpers to manage pinned work session
+  const clearPinnedSession = useCallback(() => {
+    setIsSessionPinned(false);
+    savedScrollTopRef.current = null;
+    clearPinnedSessionStorage();
+  }, []);
+
+
+
+
+
+  // Keep pinned session updated in sessionStorage whenever relevant state changes
+  useEffect(() => {
+    if (!isSessionPinned) return;
+    savePinnedSession({
+      isPinned: true,
+      conversationId: currentConversationId,
+      inputText,
+      contextType,
+      contextId,
+      pinnedSummary,
+      scrollTop: scrollTopRef.current,
+    });
+  }, [isSessionPinned, currentConversationId, inputText, contextType, contextId, pinnedSummary]);
+
+  // Clear session if logged out
+  useEffect(() => {
+    if (!isAuthenticated) {
+      clearPinnedSession();
+    }
+  }, [isAuthenticated, clearPinnedSession]);
+
+  // Auto-resize textarea when text is updated
+  useEffect(() => {
+    if (textareaRef.current && inputText) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
+    }
+  }, [inputText]);
+
+
 
   // Initialize context from query params if provided
   useEffect(() => {
@@ -92,6 +175,13 @@ export const AdminCopilot: React.FC = () => {
     if (qType && qId) {
       setContextType(qType);
       setContextId(qId);
+      const disp = formatDisplayCode(qId, qType === 'DISPUTE' ? 'DISP' : 'ORD');
+      setPinnedSummary({
+        type: qType === 'DISPUTE' ? 'DISPUTE' : 'ORDER',
+        id: qId,
+        displayCode: disp,
+        title: `${qType === 'DISPUTE' ? 'Khiếu nại' : 'Đơn hàng'} #${disp}`,
+      });
     }
   }, [searchParams]);
 
@@ -107,7 +197,6 @@ export const AdminCopilot: React.FC = () => {
       });
       setConversations(sorted);
     } catch {
-      // In case of error (e.g. backend down), list remains empty
       setConversations([]);
     } finally {
       setLoadingList(false);
@@ -141,6 +230,16 @@ export const AdminCopilot: React.FC = () => {
           createdAt: m.createdAt,
         }));
         setMessages(mapped);
+
+        // Restore scroll position if previously saved for pinned session
+        if (savedScrollTopRef.current !== null && savedScrollTopRef.current > 0) {
+          requestAnimationFrame(() => {
+            if (messagesContainerRef.current && savedScrollTopRef.current !== null) {
+              messagesContainerRef.current.scrollTop = savedScrollTopRef.current;
+              savedScrollTopRef.current = null;
+            }
+          });
+        }
       } catch (err) {
         if (!isMounted) return;
         setMessages([
@@ -164,18 +263,27 @@ export const AdminCopilot: React.FC = () => {
 
   // Auto scroll to bottom of messages
   useEffect(() => {
+    if (savedScrollTopRef.current !== null && savedScrollTopRef.current > 0) {
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
 
   // Start new chat
   const handleStartNewChat = () => {
+    clearPinnedSession();
     setCurrentConversationId(null);
     setMessages([]);
     setInputText('');
     setSearchParams({});
     setContextType(null);
     setContextId(null);
-    textareaRef.current?.focus();
+    setPinnedSummary(null);
+    setMobileSidebarOpen(false);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.focus();
+    }
   };
 
   // Toggle pin
@@ -203,7 +311,7 @@ export const AdminCopilot: React.FC = () => {
     }
   };
 
-  // Delete conversation - trigger modal
+  // Delete conversation
   const handleDeleteConversation = (c: CopilotConversation, e: React.MouseEvent) => {
     e.stopPropagation();
     setConversationToDelete(c);
@@ -223,14 +331,13 @@ export const AdminCopilot: React.FC = () => {
     }
   };
 
-  // Start rename
+  // Rename conversation
   const handleStartRename = (c: CopilotConversation, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingTitleId(c.id);
     setEditingTitleValue(c.title);
   };
 
-  // Submit rename
   const handleSaveRename = async (id: string) => {
     if (!editingTitleValue.trim()) return;
     try {
@@ -239,6 +346,15 @@ export const AdminCopilot: React.FC = () => {
       loadConversations();
     } catch (err) {
       alert(getAdminAiError(err));
+    }
+  };
+
+  // Auto-grow textarea handler
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputText(e.target.value);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
     }
   };
 
@@ -256,6 +372,9 @@ export const AdminCopilot: React.FC = () => {
 
     setMessages((prev) => [...prev, userMsg]);
     setInputText('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     setSending(true);
 
     const payload = {
@@ -301,31 +420,61 @@ export const AdminCopilot: React.FC = () => {
     }
   };
 
-  // Manual retry handler (strictly user-triggered, NO auto-retry)
+  // Manual retry handler
   const handleManualRetry = (failedMsg: LocalMessage) => {
     if (!failedMsg.originalPayload) return;
     handleSendMessage(failedMsg.originalPayload.message);
   };
 
-  // Handle manual context attachment
-  const handleApplyAttachment = () => {
-    if (manualAttachId.trim()) {
-      setContextType(manualAttachType);
-      setContextId(manualAttachId.trim());
-      setShowAttachModal(false);
-      setManualAttachId('');
-    }
+  // Context attachment selection handler
+  const handleSelectContext = (type: 'ORDER' | 'DISPUTE', id: string, summary?: ContextSummary) => {
+    setContextType(type);
+    setContextId(id);
+    const disp = formatDisplayCode(id, type === 'DISPUTE' ? 'DISP' : 'ORD');
+    setPinnedSummary(
+      summary || {
+        type,
+        id,
+        displayCode: disp,
+        title: `${type === 'DISPUTE' ? 'Khiếu nại' : 'Đơn hàng'} #${disp}`,
+      }
+    );
+    textareaRef.current?.focus();
   };
 
   const handleRemoveAttachment = () => {
     setContextType(null);
     setContextId(null);
+    setPinnedSummary(null);
+  };
+
+  const handleCopyCode = (code: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const clean = code.replace(/^#/, '');
+    navigator.clipboard.writeText(clean);
+    setCopiedCode(clean);
+    setTimeout(() => {
+      setCopiedCode((prev) => (prev === clean ? null : prev));
+    }, 2000);
   };
 
   return (
     <div className="admin-copilot">
+      {/* Mobile Sidebar Overlay Backdrop */}
+      {mobileSidebarOpen && (
+        <div
+          className="admin-copilot__mobile-backdrop md:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* ==================== LEFT SIDEBAR: SESSIONS ==================== */}
-      <aside className="admin-copilot__sidebar" aria-label="Danh sách hội thoại DaNaBot">
+      <aside
+        className={`admin-copilot__sidebar ${
+          mobileSidebarOpen ? 'admin-copilot__sidebar--mobile-open' : ''
+        }`}
+        aria-label="Danh sách hội thoại DaNaBot"
+      >
         <div className="admin-copilot__sidebar-header">
           <button
             type="button"
@@ -373,7 +522,17 @@ export const AdminCopilot: React.FC = () => {
                   key={c.id}
                   role="listitem"
                   className={`admin-copilot__session-item ${isActive ? 'admin-copilot__session-item--active' : ''}`}
-                  onClick={() => setCurrentConversationId(c.id)}
+                  onClick={() => {
+                    if (c.id !== currentConversationId) {
+                      clearPinnedSession();
+                      setCurrentConversationId(c.id);
+                      setInputText('');
+                      setPinnedSummary(null);
+                      setContextType(null);
+                      setContextId(null);
+                    }
+                    setMobileSidebarOpen(false);
+                  }}
                 >
                   <div className="admin-copilot__session-main">
                     {isEditing ? (
@@ -466,37 +625,24 @@ export const AdminCopilot: React.FC = () => {
       <main className="admin-copilot__main">
         {/* Top Header */}
         <header className="admin-copilot__topbar">
-          <div className="admin-copilot__topbar-title">
+          <div className="admin-copilot__topbar-left">
             <div className="admin-copilot__topbar-icon">
               <Sparkles size={15} />
             </div>
-            <span>
+            <span className="admin-copilot__topbar-title">
               {formatTextWithDisplayCodes(conversations.find((c) => c.id === currentConversationId)?.title || 'Admin DaNaBot')}
             </span>
           </div>
 
-          <div className="admin-copilot__topbar-meta">
-            {contextType && contextId && (
-              <div className="admin-copilot__context-badge">
-                <Paperclip size={12} />
-                <span>
-                  {contextType === 'DISPUTE' ? 'Khiếu nại' : 'Đơn hàng'}: #{formatDisplayCode(contextId, contextType === 'DISPUTE' ? 'DISP' : 'ORD')}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleRemoveAttachment}
-                  className="admin-copilot__chip-close"
-                  title="Gỡ đính kèm"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            )}
-          </div>
         </header>
 
         {/* Message Stream */}
-        <div className="admin-copilot__messages" role="log" aria-live="polite">
+        <div
+          ref={messagesContainerRef}
+          className="admin-copilot__messages"
+          role="log"
+          aria-live="polite"
+        >
           {loadingHistory ? (
             <div className="admin-copilot__history-loading">
               <Clock size={16} className="animate-spin" />
@@ -624,63 +770,128 @@ export const AdminCopilot: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Footer */}
+        {/* ==================== REDESIGNED MESSENGER-STYLE FOOTER COMPOSER ==================== */}
         <footer className="admin-copilot__footer">
-          {/* Attachment row */}
-          <div className="admin-copilot__chip-row">
-            {contextType && contextId ? (
-              <div className="admin-copilot__attachment-chip">
-                <Paperclip size={12} />
-                <span>
-                  Đính kèm: {contextType === 'DISPUTE' ? 'Hồ sơ khiếu nại' : 'Đơn hàng'} #{formatDisplayCode(contextId, contextType === 'DISPUTE' ? 'DISP' : 'ORD')}
-                </span>
+          {/* Pinned Context Deck (Chip above textarea) */}
+          {contextType && contextId && (
+            <div className="admin-copilot__context-deck">
+              <div className="admin-copilot__context-deck-main">
+                <div className="admin-copilot__context-deck-icon">
+                  {contextType === 'DISPUTE' ? <Scale size={13} /> : <ShoppingBag size={13} />}
+                </div>
+                <div className="admin-copilot__context-deck-info">
+                  <span className="admin-copilot__context-deck-title">
+                    {contextType === 'DISPUTE' ? 'Khiếu nại' : 'Đơn hàng'}:{' '}
+                    <strong>#{pinnedSummary?.displayCode || formatDisplayCode(contextId, contextType === 'DISPUTE' ? 'DISP' : 'ORD')}</strong>
+                  </span>
+                  {pinnedSummary?.subtitle && (
+                    <span className="admin-copilot__context-deck-sub">{pinnedSummary.subtitle}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="admin-copilot__context-deck-actions">
                 <button
                   type="button"
-                  onClick={handleRemoveAttachment}
-                  className="admin-copilot__chip-close"
-                  title="Gỡ đính kèm"
+                  className="admin-copilot__context-action-btn"
+                  onClick={(e) =>
+                    handleCopyCode(
+                      pinnedSummary?.displayCode || formatDisplayCode(contextId, contextType === 'DISPUTE' ? 'DISP' : 'ORD'),
+                      e
+                    )
+                  }
+                  title="Sao chép mã nghiệp vụ"
                 >
-                  <X size={12} />
+                  {copiedCode ===
+                  (pinnedSummary?.displayCode || formatDisplayCode(contextId, contextType === 'DISPUTE' ? 'DISP' : 'ORD')) ? (
+                    <>
+                      <Check size={11} className="text-emerald-600" />
+                      <span>Đã chép</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={11} />
+                      <span>Chép mã</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="admin-copilot__context-action-btn"
+                  onClick={() => setShowAttachPicker(true)}
+                  title="Thay đổi đối tượng"
+                >
+                  <Paperclip size={11} />
+                  <span>Đổi</span>
+                </button>
+                <button
+                  type="button"
+                  className="admin-copilot__context-close-btn"
+                  onClick={handleRemoveAttachment}
+                  title="Gỡ ngữ cảnh"
+                >
+                  <X size={13} />
                 </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowAttachModal(true)}
-                className="admin-copilot__attach-btn"
-              >
-                <Paperclip size={12} />
-                <span>Đính kèm ngữ cảnh</span>
-              </button>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Textarea + Send */}
-          <div className="admin-copilot__input-container">
+          {/* Composer Input Bar */}
+          <div className="admin-copilot__composer-bar">
+            {/* Attachment Button */}
+            <button
+              type="button"
+              className={`admin-copilot__composer-attach-btn ${
+                contextType && contextId ? 'admin-copilot__composer-attach-btn--active' : ''
+              }`}
+              onClick={() => setShowAttachPicker(true)}
+              title={
+                contextType && contextId
+                  ? 'Ngữ cảnh đã ghim (Bấm để thay đổi)'
+                  : 'Ghim ngữ cảnh đối tượng (Đơn hàng / Khiếu nại)'
+              }
+              aria-label="Đính kèm ngữ cảnh đối tượng"
+            >
+              <Paperclip size={17} />
+            </button>
+
+            {/* Input Textarea */}
             <textarea
               ref={textareaRef}
               rows={1}
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleSendMessage();
                 }
               }}
-              placeholder="Hỏi DaNaBot về doanh thu, khiếu nại, đối tác hoặc số liệu sàn... (Enter để gửi, Shift+Enter xuống dòng)"
-              className="admin-copilot__textarea"
+              placeholder={
+                isMobile
+                  ? 'Nhập câu hỏi cho DaNaBot...'
+                  : 'Hỏi DaNaBot về doanh thu, khiếu nại, đối tác hoặc số liệu sàn... (Enter để gửi, Shift+Enter xuống dòng)'
+              }
+              className="admin-copilot__composer-textarea"
               disabled={sending}
             />
 
+            {/* Send Button */}
             <button
               type="button"
-              className="admin-copilot__send-btn"
+              className="admin-copilot__composer-send-btn"
               onClick={() => handleSendMessage()}
               disabled={!inputText.trim() || sending}
+              aria-label="Gửi tin nhắn"
             >
-              <Send size={13} />
-              <span>Gửi</span>
+              {sending ? (
+                <div className="admin-copilot__send-spinner" />
+              ) : (
+                <>
+                  <Send size={14} />
+                  <span className="hidden sm:inline">Gửi</span>
+                </>
+              )}
             </button>
           </div>
         </footer>
@@ -710,68 +921,14 @@ export const AdminCopilot: React.FC = () => {
         </p>
       </AdminDialog>
 
-      {/* Context Attachment Modal */}
-      <AdminDialog
-        open={showAttachModal}
-        onClose={() => setShowAttachModal(false)}
-        variant="modal"
-        title="Đính kèm đối tượng phân tích"
-        description="Gắn ngữ cảnh hồ sơ khiếu nại hoặc đơn hàng để DaNaBot hỗ trợ tra cứu chính xác."
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, width: '100%' }}>
-            <AdminButton onClick={() => setShowAttachModal(false)}>Hủy</AdminButton>
-            <AdminButton
-              variant="primary"
-              onClick={handleApplyAttachment}
-              disabled={!manualAttachId.trim()}
-            >
-              Đính kèm
-            </AdminButton>
-          </div>
-        }
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--admin-ink, #1e293b)' }}>
-              Loại ngữ cảnh:
-            </label>
-            <select
-              value={manualAttachType}
-              onChange={(e) => setManualAttachType(e.target.value as CopilotContextType)}
-              className="admin-select"
-              style={{
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                fontSize: 13,
-                backgroundColor: '#ffffff',
-              }}
-            >
-              <option value="DISPUTE">Hồ sơ khiếu nại (Dispute)</option>
-              <option value="ORDER">Đơn hàng (Order)</option>
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--admin-ink, #1e293b)' }}>
-              Mã định danh (UUID):
-            </label>
-            <input
-              type="text"
-              value={manualAttachId}
-              onChange={(e) => setManualAttachId(e.target.value)}
-              placeholder="Nhập UUID hồ sơ hoặc đơn hàng..."
-              className="admin-input"
-              style={{
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                fontSize: 13,
-              }}
-            />
-          </div>
-        </div>
-      </AdminDialog>
+      {/* Context Attachment Window / Popover */}
+      <AdminCopilotContextPicker
+        open={showAttachPicker}
+        onClose={() => setShowAttachPicker(false)}
+        onSelectContext={handleSelectContext}
+        currentContextType={contextType === 'DISPUTE' ? 'DISPUTE' : 'ORDER'}
+        currentContextId={contextId}
+      />
     </div>
   );
 };
