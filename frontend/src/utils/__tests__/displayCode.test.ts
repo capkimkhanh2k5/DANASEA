@@ -60,6 +60,25 @@ describe('displayCode — formatDisplayCode standardizer', () => {
     );
   });
 
+  test('formatTextWithDisplayCodes infers entity prefix from Vietnamese/English context for random UUIDs', () => {
+    assert.equal(
+      formatTextWithDisplayCodes('Thông tin chi tiết về ca này (ID: 85e6bffc-1234-4abc-9def-0123456789ab)'),
+      'Thông tin chi tiết về ca này (ID: #SLOT-85E6BFFC)'
+    );
+    assert.equal(
+      formatTextWithDisplayCodes('Mã đơn phụ: ec938b9f-1234-4abc-9def-0123456789ab'),
+      'Mã đơn phụ: #SUB-EC938B9F'
+    );
+    assert.equal(
+      formatTextWithDisplayCodes('Dịch vụ 088d874c-a61e-5b58-a7a9-497f32a56901 đang mở bán'),
+      'Dịch vụ #SRV-088D874C đang mở bán'
+    );
+    assert.equal(
+      formatTextWithDisplayCodes('Hồ sơ khiếu nại 9f12a3b4-1234-4abc-9def-0123456789ab'),
+      'Hồ sơ khiếu nại #DISP-9F12A3B4'
+    );
+  });
+
   test('formats random standard UUID v4 cleanly', () => {
     assert.equal(
       formatDisplayCode('1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0', 'DISP'),
