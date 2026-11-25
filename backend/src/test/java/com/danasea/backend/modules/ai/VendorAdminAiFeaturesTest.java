@@ -177,7 +177,7 @@ class VendorAdminAiFeaturesTest {
     @Test
     @DisplayName("Vendor Review Coaching phân tích 4 trụ cột và đề xuất lộ trình thăng hạng huy hiệu")
     void testVendorReviewCoaching_AnalyzesFourPillarsAndBadges() {
-        var profile = new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 25, "SILVER");
+        var profile = new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 25, "TOP_RATED");
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(profile));
 
         var rev1 = new VendorReviewItem(UUID.randomUUID(), UUID.randomUUID(), "SUP Sơn Trà",
@@ -198,7 +198,7 @@ class VendorAdminAiFeaturesTest {
         assertThat(result.pillars()).containsKeys("GUIDE", "SAFETY", "PUNCTUALITY", "VALUE");
         assertThat(result.pillars().get("GUIDE").positiveQuotes()).isNotEmpty();
         assertThat(result.badgeProgression()).isNotNull();
-        assertThat(result.badgeProgression().currentTier()).isEqualTo("SILVER");
+        assertThat(result.badgeProgression().currentTier()).isEqualTo("TOP_RATED");
 
         verify(insightStore).saveVendorInsight(eq(vendorId), any(), eq("REVIEW_COACHING"), anyString(), anyString(), anyString());
     }
@@ -206,7 +206,7 @@ class VendorAdminAiFeaturesTest {
     @Test
     @DisplayName("Vendor Smart Review Reply sinh bản nháp phản hồi thấu cảm cho khách")
     void testVendorSmartReviewReply_GeneratesEmpatheticReply() {
-        var profile = new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 25, "SILVER");
+        var profile = new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 25, "TOP_RATED");
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(profile));
 
         UUID reviewId = UUID.randomUUID();
@@ -252,7 +252,7 @@ class VendorAdminAiFeaturesTest {
     @Test
     @DisplayName("Vendor Listing Optimizer phát hiện thiếu quy định an toàn và chấm điểm bài đăng")
     void testVendorListingOptimizer_DetectsMissingSafetyAndDrafts() {
-        var profile = new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 25, "SILVER");
+        var profile = new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 25, "TOP_RATED");
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(profile));
 
         OptimizeRequest req = new OptimizeRequest(
@@ -283,7 +283,7 @@ class VendorAdminAiFeaturesTest {
     @Test
     @DisplayName("Vendor Slot Advisor kiểm tra thời tiết trước khi đề xuất tăng công suất")
     void testVendorSlotAdvisor_RequiresForecastBeforeRecommendingExpansion() {
-        var profile = new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 25, "SILVER");
+        var profile = new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 25, "TOP_RATED");
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(profile));
 
         UUID slotId = UUID.randomUUID();
@@ -1116,7 +1116,7 @@ class VendorAdminAiFeaturesTest {
         var copilot = extendedCopilot(realAssess, mock(TransactionRiskReadPort.class), caseStore, mock(AnalyzeTransactionRiskUseCase.class));
 
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
-                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "SILVER")));
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "TOP_RATED")));
         org.mockito.Mockito.doReturn(new DecisionResult(
                 true, DecisionTask.MODERATION.wireName(), "quyet", "rev1", "v1", 5.0,
                 Map.of("external_payment", new DecisionResult.Answer("noul", null, null, 0.85, null, Map.of())),
@@ -1169,7 +1169,7 @@ class VendorAdminAiFeaturesTest {
         var copilot = extendedCopilot(new AssessTextUseCase(decisionModel, caseStore),
                 mock(TransactionRiskReadPort.class), caseStore, mock(AnalyzeTransactionRiskUseCase.class));
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
-                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "SILVER")));
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "TOP_RATED")));
 
         UUID ownServiceId = UUID.randomUUID();
         UUID foreignServiceId = UUID.randomUUID();
@@ -1224,7 +1224,7 @@ class VendorAdminAiFeaturesTest {
     void v18AndV22CiteVerifiedReviewsSeparateHypothesesAndRefuseZeroReviewFabrication() {
         var vConv = vendorConversation();
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
-                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.8), 30, "GOLD")));
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.8), 30, "TOP_RATED")));
 
         UUID revWaitId = UUID.randomUUID();
         UUID revGoodId = UUID.randomUUID();
@@ -1270,7 +1270,7 @@ class VendorAdminAiFeaturesTest {
     void findMentionedServiceResolvesSingleKeywordMatchAndPromptsWhenAmbiguous() {
         var vConv = vendorConversation();
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
-                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.5), 10, "SILVER")));
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.5), 10, "TOP_RATED")));
         UUID supId = UUID.randomUUID();
         UUID kayakId = UUID.randomUUID();
         when(vendorAiData.listServices(vendorId)).thenReturn(List.of(
@@ -1502,10 +1502,10 @@ class VendorAdminAiFeaturesTest {
         // Vendor operational rules & safety checks
         var vConv = vendorConversation();
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
-                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "SILVER")));
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "TOP_RATED")));
         when(vendorAiData.getPerformanceMetrics(eq(vendorId), any(), any())).thenReturn(
                 new VendorAiDataPort.VendorPerformanceMetrics(BigDecimal.valueOf(10_000_000),
-                        BigDecimal.valueOf(8_500_000), 10, 2, 20.0, 0, 2, 75, BigDecimal.valueOf(4.7), 20, "SILVER", List.of()));
+                        BigDecimal.valueOf(8_500_000), 10, 2, 20.0, 0, 2, 75, BigDecimal.valueOf(4.7), 20, "TOP_RATED", List.of()));
         when(vendorAiData.listUpcomingSlots(eq(vendorId), isNull(), anyInt())).thenReturn(List.of());
 
         var v05 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),

@@ -532,7 +532,10 @@ def synchronize_review_metrics(base_rows):
             avg = (Decimal(sum(rates)) / Decimal(len(rates))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             v['rating_avg'] = str(avg)
             v['rating_count'] = len(rates)
-            v['badge_tier'] = 'TOP_RATED' if len(rates) >= 5 and avg >= Decimal('4.0') else ('VERIFIED' if len(rates) >= 1 else 'NONE')
+            v['badge_tier'] = (
+                'TOP_RATED' if len(rates) >= 5 and avg >= Decimal('4.5')
+                else ('VERIFIED' if len(rates) >= 1 and avg >= Decimal('3.5') else 'NONE')
+            )
         else:
             v['rating_avg'] = '0.00'
             v['rating_count'] = 0
@@ -1132,8 +1135,8 @@ def seed_extended_simulation_fixtures(session, base_rows=None, trans_rows=None):
             SET rating_avg = COALESCE(sub.avg_r, 0.00),
                 rating_count = COALESCE(sub.cnt_r, 0),
                 badge_tier = CASE
-                    WHEN COALESCE(sub.cnt_r, 0) >= 5 AND COALESCE(sub.avg_r, 0) >= 4.0 THEN 'TOP_RATED'
-                    WHEN COALESCE(sub.cnt_r, 0) >= 1 THEN 'VERIFIED'
+                    WHEN COALESCE(sub.cnt_r, 0) >= 5 AND COALESCE(sub.avg_r, 0) >= 4.5 THEN 'TOP_RATED'
+                    WHEN COALESCE(sub.cnt_r, 0) >= 1 AND COALESCE(sub.avg_r, 0) >= 3.5 THEN 'VERIFIED'
                     ELSE 'NONE'
                 END
             FROM {vnd_exp} dv

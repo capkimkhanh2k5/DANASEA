@@ -1,5 +1,5 @@
 import type { MOCK_ADMIN_VENDORS } from '../../../data/adminMockData';
-import type { BadgeTier, VerificationStatus } from '../../../types';
+import type { VerificationStatus } from '../../../types';
 import type { VendorDocumentResponse } from '../../../types/adminVendor';
 
 export type VendorRecord = typeof MOCK_ADMIN_VENDORS[number] & {
@@ -10,7 +10,6 @@ export type VendorRecord = typeof MOCK_ADMIN_VENDORS[number] & {
 export type VendorDecision = {
   vendorId: string;
   kind: 'approve' | 'reject';
-  tier: BadgeTier;
   note: string;
   at: string;
 };
@@ -51,7 +50,6 @@ export function applyVendorDecision(state: VendorReviewState, decision: VendorDe
     vendors: state.vendors.map(item => item.id !== vendor.id ? item : {
       ...item,
       verificationStatus: decision.kind === 'approve' ? 'VERIFIED' : 'REJECTED',
-      badgeTier: decision.kind === 'approve' ? decision.tier : item.badgeTier,
       verifiedBy: 'Admin xem thử (cục bộ)',
       verifiedAt: decision.at,
     }),

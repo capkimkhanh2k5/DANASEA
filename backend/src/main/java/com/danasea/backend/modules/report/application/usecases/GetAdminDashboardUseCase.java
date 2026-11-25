@@ -11,6 +11,7 @@ import com.danasea.backend.modules.report.domain.enums.VendorIssueType;
 import com.danasea.backend.modules.report.domain.models.DashboardMetrics;
 import com.danasea.backend.modules.report.domain.models.TimeRange;
 import com.danasea.backend.modules.report.domain.models.VendorDiagnosisAlert;
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -201,8 +203,47 @@ public class GetAdminDashboardUseCase {
             }
         }
 
+        // Phân bổ hạng huy hiệu đối tác & cảnh báo đối tác TOP_RATED có nguy cơ rớt hạng
+        Map<String, Long> badgeDistribution = new LinkedHashMap<>();
+        badgeDistribution.put(BadgeTier.TOP_RATED.name(), 0L);
+        badgeDistribution.put(BadgeTier.VERIFIED.name(), 0L);
+        badgeDistribution.put(BadgeTier.NONE.name(), 0L);
+
+        BigDecimal atRiskThreshold = new BigDecimal("4.65");
+        for (VendorRecord vRec : vendors) {
+            if (vendorId != null && !vendorId.equals(vRec.id())) {
+                continue;
+            }
+            BadgeTier tier = vRec.badgeTier() != null ? vRec.badgeTier() : BadgeTier.NONE;
+            badgeDistribution.merge(tier.name(), 1L, Long::sum);
+
+            if (tier == BadgeTier.TOP_RATED
+                    && vRec.ratingAvg() != null
+                    && vRec.ratingCount() != null
+                    && vRec.ratingCount() >= 5
+                    && vRec.ratingAvg().compareTo(atRiskThreshold) < 0) {
+                String name = vRec.businessName() != null ? vRec.businessName() : "Đối tác " + vRec.id();
+                alerts.add(
+                        new VendorDiagnosisAlert(
+                                vRec.id(),
+                                name,
+                                VendorIssueType.BADGE_AT_RISK,
+                                VendorAlertSeverity.WARNING,
+                                String.format(
+                                        "Đối tác TOP_RATED '%s' có nguy cơ rớt hạng (điểm TB: %.2f/5.0)",
+                                        name, vRec.ratingAvg().doubleValue()),
+                                vRec.ratingAvg().doubleValue()));
+            }
+        }
+
         return DashboardMetrics.of(
-                totalRevenue, netRevenue, newOrders, completedOrders, cancelledOrders, alerts);
+                totalRevenue,
+                netRevenue,
+                newOrders,
+                completedOrders,
+                cancelledOrders,
+                alerts,
+                badgeDistribution);
     }
 
     public DashboardMetrics execute(TimeRange timeRange) {

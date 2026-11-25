@@ -86,9 +86,14 @@ function parseTopVendors(value: unknown): TopVendorItem[] {
   const items = list(record(value).items);
   const parsed: TopVendorItem[] = items.map(item => {
     const row = record(item);
+    const rawBadge = typeof row.badgeTier === 'string' ? row.badgeTier.toUpperCase() : '';
+    const badgeTier = rawBadge === 'TOP_RATED' || rawBadge === 'VERIFIED' || rawBadge === 'NONE'
+      ? rawBadge
+      : undefined;
     return {
       vendorId: String(row.vendorId ?? ''),
       vendorName: String(row.businessName || 'Đối tác'),
+      badgeTier,
       revenue: numeric(row.revenue),
       completedOrders: orderCount(row.completedOrders),
       sharePercent: 0,

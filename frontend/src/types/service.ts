@@ -1,5 +1,9 @@
+import type { BadgeTier } from './index';
+
 export interface ServiceSummaryDto {
   id: string;
+  vendorId?: string;
+  vendorBadgeTier?: BadgeTier;
   name: string;
   nameEn?: string;
   slug?: string;

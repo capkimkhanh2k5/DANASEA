@@ -762,7 +762,7 @@ class ReviewUseCaseTest {
         }
 
         @Test
-        @DisplayName("Badge should become TOP_RATED when count >= 5 and ratingAvg >= 4.0")
+        @DisplayName("Badge should become TOP_RATED when count >= 5 and ratingAvg >= 4.5")
         void shouldDeriveTopRatedBadge() {
             VendorJpaEntity vendor = new VendorJpaEntity();
             vendor.setId(vendorId);
@@ -781,20 +781,37 @@ class ReviewUseCaseTest {
         }
 
         @Test
-        @DisplayName("Badge should become VERIFIED when count >= 1 and not TOP_RATED")
+        @DisplayName("Badge should become VERIFIED when count >= 1 and ratingAvg >= 3.5 but below TOP_RATED threshold")
         void shouldDeriveVerifiedBadge() {
             VendorJpaEntity vendor = new VendorJpaEntity();
             vendor.setId(vendorId);
             when(vendorRepository.findByIdForUpdate(vendorId)).thenReturn(Optional.of(vendor));
 
-            when(reviewRepository.countByVendorIdAndIsVisibleTrue(vendorId)).thenReturn(2L);
-            when(reviewRepository.getAvgRatingByVendorId(vendorId)).thenReturn(3.5);
+            when(reviewRepository.countByVendorIdAndIsVisibleTrue(vendorId)).thenReturn(5L);
+            when(reviewRepository.getAvgRatingByVendorId(vendorId)).thenReturn(4.4);
 
             reviewRatingService.recalculateRatings(null, vendorId);
 
             ArgumentCaptor<VendorJpaEntity> captor = ArgumentCaptor.forClass(VendorJpaEntity.class);
             verify(vendorRepository).save(captor.capture());
             assertThat(captor.getValue().getBadgeTier()).isEqualTo(BadgeTier.VERIFIED);
+        }
+
+        @Test
+        @DisplayName("Badge should remain NONE when ratingAvg is below 3.5 despite having visible reviews")
+        void shouldKeepNoneBadgeWhenRatingBelowVerifiedThreshold() {
+            VendorJpaEntity vendor = new VendorJpaEntity();
+            vendor.setId(vendorId);
+            when(vendorRepository.findByIdForUpdate(vendorId)).thenReturn(Optional.of(vendor));
+
+            when(reviewRepository.countByVendorIdAndIsVisibleTrue(vendorId)).thenReturn(2L);
+            when(reviewRepository.getAvgRatingByVendorId(vendorId)).thenReturn(2.0);
+
+            reviewRatingService.recalculateRatings(null, vendorId);
+
+            ArgumentCaptor<VendorJpaEntity> captor = ArgumentCaptor.forClass(VendorJpaEntity.class);
+            verify(vendorRepository).save(captor.capture());
+            assertThat(captor.getValue().getBadgeTier()).isEqualTo(BadgeTier.NONE);
         }
     }
 }

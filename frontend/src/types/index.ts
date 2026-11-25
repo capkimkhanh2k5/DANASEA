@@ -540,9 +540,5 @@ export const BadgeTier = {
   NONE: 'NONE',
   VERIFIED: 'VERIFIED',
   TOP_RATED: 'TOP_RATED',
-  BRONZE: 'BRONZE',
-  SILVER: 'SILVER',
-  GOLD: 'GOLD',
-  PLATINUM: 'PLATINUM'
 } as const;
-export type BadgeTier = 'NONE' | 'VERIFIED' | 'TOP_RATED' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
+export type BadgeTier = 'NONE' | 'VERIFIED' | 'TOP_RATED';

@@ -4,7 +4,7 @@ import { Eye, Search, SlidersHorizontal } from 'lucide-react';
 import { MOCK_ADMIN_VENDORS } from '../../../data/adminMockData';
 import { adminVendorService, getAdminVendorError } from '../../../services/adminVendorService';
 import type { AdminVendorResponse } from '../../../types/adminVendor';
-import type { BadgeTier } from '../../../types';
+import { BADGE_TIER_VALUES, getBadgeTierLabel, getBadgeTierTone, normalizeBadgeTier } from '../../../utils/badgeTier';
 import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
 import { AdminButton, AdminFilterTabs, AdminNotice, AdminPagination } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
@@ -12,8 +12,6 @@ import { AdminDocumentPreviewModal } from '../../../components/admin/AdminDocume
 import { applyVendorDecision, filterVendors, formatTaxCode, type VendorRecord, type VendorReviewState } from './vendorApprovalModel';
 import { VendorProfile, VendorStatus } from './VendorProfile';
 import './VendorApproval.css';
-
-const tiers: BadgeTier[] = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM'];
 
 function mapVendorResponseToRecord(v: AdminVendorResponse): VendorRecord {
   return {
@@ -28,7 +26,7 @@ function mapVendorResponseToRecord(v: AdminVendorResponse): VendorRecord {
     ratingAvg: v.ratingAvg || 5.0,
     ratingCount: v.ratingCount || 0,
     verificationStatus: (v.verificationStatus === 'APPROVED' ? 'VERIFIED' : v.verificationStatus) as unknown as VendorRecord['verificationStatus'],
-    badgeTier: (v.badgeTier === 'NONE' || !v.badgeTier ? 'BRONZE' : v.badgeTier) as BadgeTier,
+    badgeTier: normalizeBadgeTier(v.badgeTier),
     bankName: v.bankName || '',
     bankAccountNumber: v.bankAccountNumber || '',
     bankAccountHolder: v.bankAccountHolder || '',
@@ -52,7 +50,6 @@ export function VendorApproval() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [tierFilter, setTierFilter] = useState('all');
-  const [tier, setTier] = useState<BadgeTier>('PLATINUM');
   const [decision, setDecision] = useState<'approve' | 'reject'>('approve');
   const [decisionOpen, setDecisionOpen] = useState(false);
   const [note, setNote] = useState('');
@@ -108,7 +105,6 @@ export function VendorApproval() {
   }, [filtered, activePage]);
   const openProfile = async (vendor: VendorRecord) => {
     setSelectedId(vendor.id);
-    setTier(vendor.badgeTier);
     setNote('');
     setNotice(null);
     setDrawerOpen(true);
@@ -181,21 +177,25 @@ export function VendorApproval() {
       return;
     }
     if (demo) {
-      const action = { vendorId: selected.id, kind: decision, tier, note, at: new Date().toISOString() };
+      const action = { vendorId: selected.id, kind: decision, note, at: new Date().toISOString() };
       setReview(previous => applyVendorDecision(previous, action, demo));
       setDecisionOpen(false);
       setNote('');
-      setNotice(`Đã ${decision === 'approve' ? `cập nhật phê duyệt và hạng ${tier}` : 'ghi nhận từ chối'} cho ${selected.businessName} trong bản demo.`);
+      setNotice(`Đã ${decision === 'approve' ? 'cập nhật phê duyệt' : 'ghi nhận từ chối'} cho ${selected.businessName} trong bản demo.`);
       return;
     }
 
     try {
       setIsSubmitting(true);
       if (decision === 'approve') {
-        await adminVendorService.approveVendor(selected.id);
+        const approved = await adminVendorService.approveVendor(selected.id);
         setReview(prev => ({
           ...prev,
-          vendors: prev.vendors.map(v => v.id === selected.id ? { ...v, verificationStatus: 'VERIFIED' as unknown as VendorRecord['verificationStatus'], badgeTier: tier } : v)
+          vendors: prev.vendors.map(v => v.id === selected.id ? {
+            ...v,
+            verificationStatus: 'VERIFIED' as unknown as VendorRecord['verificationStatus'],
+            badgeTier: approved?.badgeTier ? normalizeBadgeTier(approved.badgeTier) : v.badgeTier,
+          } : v)
         }));
         setNotice(`Đã phê duyệt đối tác "${selected.businessName}".`);
       } else {
@@ -277,7 +277,9 @@ export function VendorApproval() {
             <span>Huy hiệu</span>
             <select value={tierFilter} onChange={event => { setTierFilter(event.target.value); setCurrentPage(1); }}>
               <option value="all">Tất cả hạng</option>
-              {tiers.map(value => <option key={value}>{value}</option>)}
+              {BADGE_TIER_VALUES.map(value => (
+                <option key={value} value={value}>{getBadgeTierLabel(value)}</option>
+              ))}
             </select>
           </label>
           {(search || status !== 'all' || tierFilter !== 'all') && <AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>}
@@ -311,7 +313,7 @@ export function VendorApproval() {
             </small>
           </td>
           <td className="admin-vendors-area"><span>{vendor.address}</span><small>{vendor.ratingAvg} / 5 · {vendor.ratingCount} đánh giá</small></td>
-          <td><VendorStatus status={vendor.verificationStatus} /></td><td><AdminBadge tone="neutral">{vendor.badgeTier}</AdminBadge></td>
+          <td><VendorStatus status={vendor.verificationStatus} /></td><td><AdminBadge tone={getBadgeTierTone(vendor.badgeTier)}>{getBadgeTierLabel(vendor.badgeTier)}</AdminBadge></td>
           <td>
             <button
               type="button"
@@ -367,7 +369,7 @@ export function VendorApproval() {
       footer={selected && <div className="admin-drawer-actions admin-vendors-actions"><p>{demo ? 'Thao tác demo chỉ lưu trong phiên này. Tải lại trang sẽ khôi phục dữ liệu mẫu.' : 'Quyết định phê duyệt sẽ cập nhật trạng thái hoạt động thực của đối tác.'}</p>
         <div><AdminButton disabled={isSubmitting} variant="danger" onClick={() => { setNote(''); setDecision('reject'); setDecisionOpen(true); }}>Từ chối</AdminButton>
           <AdminButton disabled={isSubmitting} variant="primary" onClick={() => { setNote(''); setDecision('approve'); setDecisionOpen(true); }}>{selected.verificationStatus === 'VERIFIED' ? 'Cập nhật phê duyệt' : 'Phê duyệt đối tác'}</AdminButton></div></div>}>
-      {selected && <><VendorProfile key={selected.id} vendor={selected} timeline={demo ? review.timeline.filter(event => event.vendorId === selected.id) : []} tier={tier} onTierChange={setTier} demo={demo}
+      {selected && <><VendorProfile key={selected.id} vendor={selected} timeline={demo ? review.timeline.filter(event => event.vendorId === selected.id) : []} demo={demo}
         onPreview={(urlOrName, name) => {
           setIsRetrying(false);
           if (urlOrName.startsWith('http')) {
@@ -390,7 +392,7 @@ export function VendorApproval() {
       footer={<><AdminButton onClick={() => setDecisionOpen(false)}>Quay lại hồ sơ</AdminButton><AdminButton variant={decision === 'reject' ? 'danger' : 'primary'} disabled={isSubmitting || !selected} onClick={confirmDecision}>
         {isSubmitting ? 'Đang xử lý...' : decision === 'reject' ? 'Xác nhận từ chối' : 'Xác nhận phê duyệt'}</AdminButton></>}>
       <div className="admin-vendors-confirm"><p><strong>{selected?.businessName}</strong></p>
-        <p>{decision === 'reject' ? 'Trạng thái sẽ chuyển thành Từ chối; huy hiệu hiện tại được giữ nguyên.' : `Trạng thái sẽ chuyển thành Đã duyệt, huy hiệu ${tier}.`}</p>
+        <p>{decision === 'reject' ? 'Trạng thái sẽ chuyển thành Từ chối; huy hiệu hiện tại được giữ nguyên.' : `Trạng thái sẽ chuyển thành Đã duyệt; huy hiệu hiện tại (${getBadgeTierLabel(selected?.badgeTier)}) được giữ nguyên và tự động cập nhật theo đánh giá.`}</p>
         <label className="admin-field"><span>{decision === 'reject' ? 'Lý do từ chối (bắt buộc) *' : 'Ghi chú quyết định (tùy chọn)'}</span>
           <textarea value={note} onChange={event => setNote(event.target.value)} rows={4} placeholder={decision === 'reject' ? 'Nhập chi tiết lý do từ chối để thông báo cho đối tác…' : 'Ghi chú thẩm định…'} required={decision === 'reject'} /></label>
         <p className="admin-detail-note">Xác minh đầy đủ giấy phép kinh doanh và chứng nhận an toàn trước khi duyệt.</p></div>

@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,6 +26,7 @@ public class SearchServicesCriteria {
     private LocalTime timeSlot;
     private Integer guests;
     private UUID vendorId;
+    private BadgeTier badgeTier;
     private BigDecimal minRating;
     private String sortBy;
     private int page;

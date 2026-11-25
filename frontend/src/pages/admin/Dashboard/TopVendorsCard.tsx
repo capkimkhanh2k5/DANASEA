@@ -1,5 +1,6 @@
 import { Building2 } from 'lucide-react';
-import { AdminState } from '../../../components/admin/AdminUI';
+import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
+import { getBadgeTierLabel, getBadgeTierTone, isPublicBadgeVisible } from '../../../utils/badgeTier';
 import { formatNumber, formatVND, type TopVendorItem } from './dashboardModel';
 
 interface TopVendorsCardProps {
@@ -50,9 +51,16 @@ export function TopVendorsCard({ vendors, loading, rangeLabel }: TopVendorsCardP
                       #{rank}
                     </span>
                     <div className="admin-ranking-names">
-                      <strong className="admin-ranking-title" title={item.vendorName}>
-                        {item.vendorName}
-                      </strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <strong className="admin-ranking-title" title={item.vendorName}>
+                          {item.vendorName}
+                        </strong>
+                        {isPublicBadgeVisible(item.badgeTier) && (
+                          <AdminBadge tone={getBadgeTierTone(item.badgeTier)}>
+                            {getBadgeTierLabel(item.badgeTier)}
+                          </AdminBadge>
+                        )}
+                      </div>
                       <span className="admin-ranking-sub">
                         {formatNumber(item.completedOrders)} đơn hoàn thành
                       </span>

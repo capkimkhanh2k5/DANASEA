@@ -51,6 +51,7 @@ import com.danasea.backend.modules.settlement.infrastructure.persistence.reposit
 import com.danasea.backend.modules.settlement.infrastructure.persistence.repositories.JpaSettlementRepository;
 import com.danasea.backend.modules.systemconfig.infrastructure.persistence.repositories.JpaSystemConfigRepository;
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 
 @Service
 public class GenerateSettlementUseCase {
@@ -358,24 +359,27 @@ public class GenerateSettlementUseCase {
             }
 
             boolean highRating = false;
+            boolean isTopRated = false;
             var vendorOpt = vendorInternalApi.findById(vendorId);
             if (vendorOpt.isPresent()) {
                 var vendor = vendorOpt.get();
+                isTopRated = vendor.getBadgeTier() == BadgeTier.TOP_RATED;
                 if (vendor.getRatingAvg() != null && vendor.getRatingCount() != null && vendor.getRatingCount() >= 5) {
                     highRating = vendor.getRatingAvg().compareTo(new BigDecimal("4.80")) >= 0;
                 }
             }
 
-            if (hasNoActiveDisputes && hasNoVendorFault && highRating) {
+            if (hasNoActiveDisputes && hasNoVendorFault && isTopRated && highRating) {
                 rebateQualified = true;
                 rebateRate = configRate;
                 rebateAmount = totalGross.multiply(rebateRate).setScale(SettlementCalculationEngine.SCALE, SettlementCalculationEngine.ROUNDING);
                 totalNetPayout = totalNetPayout.add(rebateAmount);
-                rebateNote = "Đủ điều kiện nhận Quỹ thưởng An toàn Biển & Vận hành xuất sắc (+" + rebateRate.multiply(new BigDecimal("100")).stripTrailingZeros().toPlainString() + "%)";
+                rebateNote = "Đủ điều kiện nhận Quỹ thưởng An toàn Biển & Đối tác hàng đầu (+" + rebateRate.multiply(new BigDecimal("100")).stripTrailingZeros().toPlainString() + "%)";
             } else {
                 List<String> reasons = new ArrayList<>();
                 if (!hasNoActiveDisputes) reasons.add("Có khiếu nại chưa đóng");
                 if (!hasNoVendorFault) reasons.add("Có lỗi phạt hủy chuyến");
+                if (!isTopRated) reasons.add("Chưa đạt huy hiệu Đối tác hàng đầu (TOP_RATED)");
                 if (!highRating) reasons.add("Điểm đánh giá chưa đạt 4.8*");
                 rebateNote = "Không đủ điều kiện thưởng An toàn: " + String.join(", ", reasons);
             }

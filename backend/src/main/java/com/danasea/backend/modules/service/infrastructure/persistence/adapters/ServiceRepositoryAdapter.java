@@ -235,22 +235,29 @@ public class ServiceRepositoryAdapter implements ServiceRepositoryPort {
     private Specification<ServiceJpaEntity> specification(SearchServicesCriteria criteria) {
         Specification<ServiceJpaEntity> spec = ServiceSpecifications.filter(criteria);
         String sort = criteria.getSortBy();
-        return sort != null && (sort.equalsIgnoreCase("bookings") || sort.equalsIgnoreCase("bookings_desc"))
-                ? spec.and(ServiceSpecifications.orderByBookings()) : spec;
+        if (sort == null || sort.isBlank() || sort.trim().equalsIgnoreCase("recommended")) {
+            return spec.and(ServiceSpecifications.orderByRecommended());
+        }
+        if (sort.trim().equalsIgnoreCase("bookings") || sort.trim().equalsIgnoreCase("bookings_desc")) {
+            return spec.and(ServiceSpecifications.orderByBookings());
+        }
+        return spec;
     }
 
     private Sort resolveSort(String sortBy) {
         if (sortBy == null || sortBy.isBlank()) {
-            return Sort.by(Sort.Direction.DESC, "createdAt");
+            return Sort.unsorted();
         }
         String normalized = sortBy.trim().toLowerCase();
         return switch (normalized) {
+            case "recommended" -> Sort.unsorted();
             case "price_asc" -> Sort.by(Sort.Direction.ASC, "price");
             case "price_desc" -> Sort.by(Sort.Direction.DESC, "price");
             case "rating_desc", "rating" -> Sort.by(Sort.Direction.DESC, "avgRating");
             case "views_desc", "views", "popularity" -> Sort.by(Sort.Direction.DESC, "viewCount");
             case "bookings_desc", "bookings" -> Sort.unsorted();
             case "createdat_asc", "created_asc" -> Sort.by(Sort.Direction.ASC, "createdAt");
+            case "newest", "createdat_desc", "created_desc" -> Sort.by(Sort.Direction.DESC, "createdAt");
             default -> Sort.by(Sort.Direction.DESC, "createdAt");
         };
     }

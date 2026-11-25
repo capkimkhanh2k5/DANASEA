@@ -69,6 +69,7 @@ export interface TopServingVendorItem {
 export interface TopVendorItem {
   vendorId: string;
   vendorName: string;
+  badgeTier?: 'NONE' | 'VERIFIED' | 'TOP_RATED';
   revenue: number;
   completedOrders: number;
   sharePercent: number;

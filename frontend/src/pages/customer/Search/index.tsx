@@ -26,7 +26,9 @@ import { TRANSLATIONS } from '../../../i18n/translations';
 
 import { serviceCatalogService, type ServiceQueryParams } from '../../../services/serviceCatalogService';
 import { categoryService } from '../../../services/categoryService';
+import type { BadgeTier } from '../../../types';
 import type { CategoryDto } from '../../../types/category';
+import { getBadgeTierLabel, isPublicBadgeVisible, normalizeBadgeTier } from '../../../utils/badgeTier';
 import { getCardThumbnailUrl, FALLBACK_CARD_IMAGE } from '../../../utils/imageOptimizer';
 import { SEOHead } from '../../../components/common/SEOHead';
 import { getTourUrl } from '../../../utils/seo';
@@ -47,6 +49,7 @@ interface DisplayExperience {
   imageUrl: string;
   duration?: string;
   badge?: string;
+  vendorBadgeTier?: BadgeTier;
   categoryId?: string;
   categoryName?: string;
   hasPhotos?: boolean;
@@ -66,6 +69,7 @@ export function Search() {
 
   const categoryParam = searchParams.get('category');
   const keywordParam = searchParams.get('q') || '';
+  const badgeTierParam = searchParams.get('badgeTier');
 
   // Data states
   const [categories, setCategories] = useState<CategoryDto[]>([]);
@@ -79,6 +83,9 @@ export function Search() {
   // 1. Popular Filters (Bộ lọc phổ biến)
   const [popFreeCancel, setPopFreeCancel] = useState<boolean>(false);
   const [popTopRated, setPopTopRated] = useState<boolean>(false);
+  const [onlyTopRatedVendors, setOnlyTopRatedVendors] = useState<boolean>(
+    badgeTierParam?.toUpperCase() === 'TOP_RATED'
+  );
   const [popUnder500k, setPopUnder500k] = useState<boolean>(false);
   const [popHasCoach, setPopHasCoach] = useState<boolean>(false);
   const [popHasPhotos, setPopHasPhotos] = useState<boolean>(false);
@@ -98,7 +105,7 @@ export function Search() {
   const [minRating, setMinRating] = useState<number>(0);
 
   // 6. Sort by
-  const [sortBy, setSortBy] = useState<'popular' | 'rating_desc' | 'price_asc' | 'price_desc'>('popular');
+  const [sortBy, setSortBy] = useState<'popular' | 'newest' | 'rating_desc' | 'price_asc' | 'price_desc'>('popular');
 
   // Accordion toggle states for sidebar
   const [collapsePop, setCollapsePop] = useState(false);
@@ -126,6 +133,7 @@ export function Search() {
     sortBy,
     popFreeCancel,
     popTopRated,
+    onlyTopRatedVendors,
     popUnder500k,
     popHasCoach,
     popHasPhotos,
@@ -165,7 +173,8 @@ export function Search() {
       try {
         const queryParams: ServiceQueryParams = {
           size: 40,
-          ...(sortBy === 'price_asc' || sortBy === 'price_desc' || sortBy === 'rating_desc' ? { sortBy } : {}),
+          ...(onlyTopRatedVendors ? { badgeTier: 'TOP_RATED' } : {}),
+          ...(sortBy === 'newest' || sortBy === 'price_asc' || sortBy === 'price_desc' || sortBy === 'rating_desc' ? { sortBy } : {}),
         };
 
         const response = await serviceCatalogService.getServices(queryParams);
@@ -194,6 +203,7 @@ export function Search() {
                 area: determinedArea,
                 imageUrl: getCardThumbnailUrl(item.primaryImageUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80'),
                 duration: ('duration' in item && typeof item.duration === 'number' && item.duration > 0 ? `${item.duration} phút` : undefined) || (item.name.toLowerCase().includes('phao chuối') ? '20 phút' : '60 phút'),
+                vendorBadgeTier: item.vendorBadgeTier ? normalizeBadgeTier(item.vendorBadgeTier) : undefined,
                 categoryId: ('categoryId' in item && typeof item.categoryId === 'string' ? item.categoryId : undefined) || (item.name.toLowerCase().includes('sup') ? 'cheo-sup-kayak' : item.name.toLowerCase().includes('lặn') || item.name.toLowerCase().includes('san hô') ? 'lan-ngam-san-ho' : item.name.toLowerCase().includes('cano') || item.name.toLowerCase().includes('dù') ? 'cano-du-bay' : 'mo-to-nuoc-jetski'),
                 hasPhotos: true,
                 freeCancel: true,
@@ -218,7 +228,7 @@ export function Search() {
 
     fetchServices();
     return () => { isMounted = false; };
-  }, [sortBy, language]);
+  }, [sortBy, onlyTopRatedVendors, language]);
 
   // Toggle helpers for Traveloka Multi-Checkboxes
   const toggleArea = (area: string) => {
@@ -334,6 +344,7 @@ export function Search() {
   const handleResetFilters = () => {
     setPopFreeCancel(false);
     setPopTopRated(false);
+    setOnlyTopRatedVendors(false);
     setPopUnder500k(false);
     setPopHasCoach(false);
     setPopHasPhotos(false);
@@ -349,6 +360,7 @@ export function Search() {
   const hasActiveFilters = Boolean(
     popFreeCancel ||
     popTopRated ||
+    onlyTopRatedVendors ||
     popUnder500k ||
     popHasCoach ||
     popHasPhotos ||
@@ -742,11 +754,23 @@ export function Search() {
                 </p>
               </div>
 
-              {/* Sort Pills (Traveloka Tabs - Wrap on narrow viewports without triggering horizontal scroll) */}
+              {/* Sort Pills & Top-Rated Partner Filter */}
               <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                <span className="text-[13px] text-slate-600 font-medium shrink-0 mr-1 hidden sm:inline">{t.sortBy}</span>
+                <button
+                  type="button"
+                  onClick={() => setOnlyTopRatedVendors((prev) => !prev)}
+                  className={`px-3 py-1.5 rounded-xl text-[13px] font-bold transition-all shrink-0 cursor-pointer border ${
+                    onlyTopRatedVendors
+                      ? 'bg-amber-50 border-amber-300 text-amber-900'
+                      : 'bg-white border-slate-200 hover:border-amber-300 text-slate-700'
+                  }`}
+                >
+                  {isEn ? 'Top Partner' : 'Đối tác hàng đầu'}
+                </button>
+                <span className="text-[13px] text-slate-600 font-medium shrink-0 mx-1 hidden sm:inline">{t.sortBy}</span>
                 {([
-                  { id: 'popular', label: t.sortPopular },
+                  { id: 'popular', label: isEn ? 'Recommended' : 'Đề xuất' },
+                  { id: 'newest', label: isEn ? 'Newest' : 'Mới nhất' },
                   { id: 'rating_desc', label: t.sortRating },
                   { id: 'price_asc', label: t.sortPriceAsc },
                   { id: 'price_desc', label: t.sortPriceDesc },
@@ -836,13 +860,26 @@ export function Search() {
                           </h2>
 
                           {/* Rating & Review Count (Traveloka Score Pill Style) */}
-                          <div className="flex items-center gap-2 mt-2">
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
                             <div className="inline-flex items-center gap-1 bg-sky-50 text-sky-800 px-2 py-0.5 rounded-md font-bold text-[13px] tabular-nums">
                               <Star className="w-3.5 h-3.5 fill-sky-700 text-sky-700" />
                               <span>{service.rating.toFixed(1)} / 5</span>
                             </div>
                             <span className="text-[13px] font-semibold text-slate-700">{t.ratingExcellent}</span>
                             <span className="text-[13px] text-slate-600 tabular-nums font-medium">({service.reviewCount} {t.reviewsCount})</span>
+                            {isPublicBadgeVisible(service.vendorBadgeTier) && (
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-md text-[12px] font-semibold border ${
+                                  normalizeBadgeTier(service.vendorBadgeTier) === 'TOP_RATED'
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                }`}
+                              >
+                                {isEn
+                                  ? (normalizeBadgeTier(service.vendorBadgeTier) === 'TOP_RATED' ? 'Top Partner' : 'Verified')
+                                  : getBadgeTierLabel(service.vendorBadgeTier)}
+                              </span>
+                            )}
                           </div>
 
                           {/* Location & Duration & Distance */}
