@@ -74,6 +74,89 @@ public interface VendorAiDataPort {
             OffsetDateTime createdAt
     ) {}
 
+    record VendorReviewDetail(
+            UUID id,
+            UUID serviceId,
+            String serviceTitle,
+            int rating,
+            String comment,
+            String vendorReply,
+            OffsetDateTime createdAt
+    ) {}
+
+    record VendorOrderDetail(
+            UUID id,
+            UUID masterOrderId,
+            UUID serviceId,
+            String serviceTitle,
+            LocalDate slotDate,
+            LocalTime slotStartTime,
+            LocalTime slotEndTime,
+            Integer quantity,
+            BigDecimal unitPrice,
+            BigDecimal subtotalAmount,
+            BigDecimal discountAmount,
+            BigDecimal finalAmount,
+            BigDecimal commissionAmount,
+            BigDecimal vendorPayoutAmount,
+            String status,
+            String paymentStatus,
+            String cancellationReason,
+            OffsetDateTime checkedInAt,
+            OffsetDateTime createdAt
+    ) {}
+
+    record VendorDisputeDetail(
+            UUID id,
+            UUID subOrderId,
+            UUID orderId,
+            String serviceTitle,
+            String reason,
+            String description,
+            String status,
+            BigDecimal refundPercentage,
+            BigDecimal orderFinalAmount,
+            String vendorResponse,
+            String adminNote,
+            OffsetDateTime createdAt,
+            OffsetDateTime resolvedAt
+    ) {}
+
+    record VendorRefundDetail(
+            UUID id,
+            UUID subOrderId,
+            String serviceTitle,
+            BigDecimal amount,
+            BigDecimal refundPercentage,
+            String reason,
+            String status,
+            String provider,
+            OffsetDateTime createdAt,
+            OffsetDateTime processedAt
+    ) {}
+
+    record VendorEquipmentDetail(
+            UUID id,
+            String name,
+            String compatibilityGroup,
+            int capacity,
+            int upcomingMaintenanceCount,
+            String nextMaintenanceSummary
+    ) {}
+
+    record VendorPayoutDetail(
+            UUID id,
+            UUID settlementId,
+            BigDecimal amount,
+            String status,
+            String bankReference,
+            String vendorNote,
+            String adminNote,
+            String rejectionReason,
+            OffsetDateTime createdAt,
+            OffsetDateTime processedAt
+    ) {}
+
     record VendorPerformanceMetrics(
             BigDecimal gmv,
             BigDecimal netPayout,
@@ -106,4 +189,36 @@ public interface VendorAiDataPort {
     List<VendorSlotItem> listUpcomingSlots(UUID vendorId, UUID serviceId, int horizonDays);
     List<VendorReviewItem> listReviews(UUID vendorId, UUID serviceId, int limit);
     VendorPerformanceMetrics getPerformanceMetrics(UUID vendorId, LocalDate from, LocalDate to);
+
+    default Optional<VendorOrderDetail> getOrderDetail(UUID vendorId, UUID orderOrSubOrderId) {
+        return Optional.empty();
+    }
+
+    default Optional<VendorDisputeDetail> getDisputeDetail(UUID vendorId, UUID disputeId) {
+        return Optional.empty();
+    }
+
+    default Optional<VendorRefundDetail> getRefundDetail(UUID vendorId, UUID refundId) {
+        return Optional.empty();
+    }
+
+    default List<VendorRefundDetail> listRefunds(UUID vendorId, int limit) {
+        return List.of();
+    }
+
+    default Optional<VendorEquipmentDetail> getEquipmentDetail(UUID vendorId, UUID equipmentId) {
+        return Optional.empty();
+    }
+
+    default Optional<VendorPayoutDetail> getPayoutDetail(UUID vendorId, UUID payoutId) {
+        return Optional.empty();
+    }
+
+    default Optional<VendorSlotItem> getSlotDetail(UUID vendorId, UUID slotId) {
+        return Optional.empty();
+    }
+
+    default Optional<VendorReviewDetail> getReviewDetail(UUID vendorId, UUID reviewId) {
+        return Optional.empty();
+    }
 }

@@ -26,6 +26,7 @@ import { reviewService } from '../../../services/reviewService';
 import { disputeService } from '../../../services/disputeService';
 import { vendorEquipmentService } from '../../../services/vendorEquipmentService';
 import { vendorPayoutService } from '../../../services/vendorPayoutService';
+import { vendorAiService } from '../../../services/vendorAiService';
 import { DEMO_EQUIPMENT_DATA } from '../../../data/demoEquipmentMap';
 import { formatDisplayCode } from '../../../utils/displayCode';
 
@@ -421,6 +422,56 @@ export const VendorContextPinModal: React.FC<Props> = ({
                 { label: 'Sức tải', value: `${e.capacity} người` },
               ],
             }));
+            break;
+          }
+          case 'SLOT': {
+            const services = await vendorService.getMyServices().catch(() => []);
+            const slotGroups = await Promise.all(
+              services.slice(0, 8).map(async (svc) => {
+                const slots = await vendorService.getSlots(svc.id).catch(() => []);
+                return slots.map((sl) => ({ svc, sl }));
+              })
+            );
+            const allSlots = slotGroups
+              .flat()
+              .sort((a, b) => `${b.sl.date} ${b.sl.startTime}`.localeCompare(`${a.sl.date} ${a.sl.startTime}`))
+              .slice(0, 50);
+            if (allSlots.length > 0) {
+              loaded = allSlots.map(({ svc, sl }) => ({
+                id: sl.id,
+                type: 'SLOT',
+                title: `Ca ${sl.startTime?.slice(0, 5)} – ${sl.endTime?.slice(0, 5)} • ${svc.name}`,
+                subtitle: `Ngày ${sl.date} • Đã đặt ${sl.bookedCount}/${sl.capacity} chỗ`,
+                badge: sl.status,
+                badgeVariant: sl.status === 'OPEN' ? 'success' : sl.status === 'BLOCKED' ? 'warning' : 'neutral',
+                detailSpecs: [
+                  { label: 'Mã ca', value: `#${formatDisplayCode(sl.id, 'SLOT')}` },
+                  { label: 'Ngày khởi hành', value: sl.date },
+                  { label: 'Khung giờ', value: `${sl.startTime?.slice(0, 5)} - ${sl.endTime?.slice(0, 5)}` },
+                  { label: 'Sức chứa', value: `${sl.bookedCount}/${sl.capacity} chỗ` },
+                ],
+              }));
+            }
+            break;
+          }
+          case 'REFUND': {
+            const res = await vendorAiService.getCopilotRefunds(50).catch(() => []);
+            if (res && res.length > 0) {
+              loaded = res.map((rf) => ({
+                id: rf.id,
+                type: 'REFUND',
+                title: `Hoàn tiền ${(rf.amount || 0).toLocaleString()} đ${rf.serviceTitle ? ` – ${rf.serviceTitle}` : ''}`,
+                subtitle: `${rf.reason || 'Hoàn tiền'}${rf.provider ? ` • ${rf.provider}` : ''}`,
+                badge: rf.status,
+                badgeVariant: rf.status === 'PROCESSED' ? 'success' : 'warning',
+                detailSpecs: [
+                  { label: 'Mã hoàn tiền', value: `#${formatDisplayCode(rf.id, 'REF')}` },
+                  { label: 'Số tiền hoàn', value: `${(rf.amount || 0).toLocaleString()} đ${rf.refundPercentage != null ? ` (${rf.refundPercentage}%)` : ''}` },
+                  { label: 'Lý do', value: rf.reason || 'N/A' },
+                  { label: 'Trạng thái', value: rf.status },
+                ],
+              }));
+            }
             break;
           }
           case 'PAYOUT': {

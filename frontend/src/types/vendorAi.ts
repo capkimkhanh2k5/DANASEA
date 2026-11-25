@@ -121,6 +121,7 @@ export interface CopilotChatRequest {
   message: string;
   contextType?: string;
   contextId?: string;
+  contextLabel?: string;
 }
 
 export interface CopilotArtifact {
@@ -165,12 +166,28 @@ export interface CopilotMessage {
   toolsUsed?: string | null;
   verified: boolean;
   createdAt: string;
+  contextType?: string | null;
+  contextId?: string | null;
+  contextLabel?: string | null;
 }
 
 export interface UpdateConversationMetaRequest {
   title?: string;
   pinned?: boolean;
   archived?: boolean;
+}
+
+export interface VendorCopilotRefundDto {
+  id: string;
+  subOrderId: string;
+  serviceTitle?: string | null;
+  amount: number;
+  refundPercentage?: number | null;
+  reason?: string | null;
+  status: string;
+  provider?: string | null;
+  createdAt?: string | null;
+  processedAt?: string | null;
 }
 
 

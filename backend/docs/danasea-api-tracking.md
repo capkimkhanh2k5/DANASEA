@@ -571,6 +571,7 @@ Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi 
 - [x] GET /api/vendor/ai/copilot/conversations/{id}/history (lịch sử tin nhắn trong phiên hội thoại của vendor)
 - [x] PATCH /api/vendor/ai/copilot/conversations/{id} (đổi tên, ghim, lưu trữ phiên hội thoại vendor)
 - [x] DELETE /api/vendor/ai/copilot/conversations/{id} (xóa mềm phiên hội thoại vendor)
+- [x] GET /api/vendor/ai/copilot/refunds (danh sách yêu cầu hoàn tiền thuộc gian hàng vendor để đính kèm ngữ cảnh Copilot)
 
 ### Quản trị viên: Đánh giá rủi ro, Hòa giải tranh chấp, BI Digest & Admin Copilot — API
 - [x] GET /api/admin/ai/assessment-cases

@@ -22,6 +22,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import com.danasea.backend.modules.ai.application.ports.AdminAiDataPort;
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort;
@@ -31,11 +32,18 @@ import com.danasea.backend.modules.ai.application.ports.LlmClientPort;
 import com.danasea.backend.modules.ai.application.ports.ModerationPort;
 import com.danasea.backend.modules.ai.application.ports.TravelWeatherPort;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort;
+import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorDisputeDetail;
+import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorEquipmentDetail;
+import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorOrderDetail;
+import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorPayoutDetail;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorProfile;
+import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorRefundDetail;
+import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorReviewDetail;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorServiceDetail;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorServiceItem;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorServicePriceOption;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorSlotItem;
+import com.danasea.backend.modules.ai.domain.models.LlmResponse;
 import com.danasea.backend.modules.ai.application.usecases.AdminDisputeSummaryUseCase;
 import com.danasea.backend.modules.ai.application.usecases.AssessTextUseCase;
 import com.danasea.backend.modules.ai.application.usecases.MarineSlotWeather;
@@ -58,7 +66,9 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 class VendorCopilotServiceIntentTest {
 
     private VendorAiDataPort vendorAiData;
+    private AdminAiDataPort adminAiData;
     private AiExtendedInsightStorePort insightStore;
+    private LlmClientPort llmClient;
     private RoleCopilotUseCase copilot;
 
     private final UUID userId = UUID.randomUUID();
@@ -69,10 +79,10 @@ class VendorCopilotServiceIntentTest {
     @BeforeEach
     void setUp() {
         vendorAiData = mock(VendorAiDataPort.class);
-        var adminAiData = mock(AdminAiDataPort.class);
+        adminAiData = mock(AdminAiDataPort.class);
         insightStore = mock(AiExtendedInsightStorePort.class);
         var decisionModel = mock(DecisionModelPort.class);
-        var llmClient = mock(LlmClientPort.class);
+        llmClient = mock(LlmClientPort.class);
         var moderationPort = mock(ModerationPort.class);
         var assessTextUseCase = mock(AssessTextUseCase.class);
         var mapper = new ObjectMapper()
@@ -217,5 +227,188 @@ class VendorCopilotServiceIntentTest {
             var reply = copilot.processMessage(userId, "VENDOR", vendorId, convId, q, null, null, SupportedLanguage.VI);
             assertThat(reply.toolsUsed()).as(q).containsExactly("vendor_service_count");
         }
+    }
+
+    @Test
+    @DisplayName("Nạp dữ liệu thật vào prompt LLM cho ORDER, DISPUTE, REFUND, EQUIPMENT, PAYOUT, SLOT, REVIEW và lưu context theo tin nhắn")
+    void groundsAllPinnedEntityTypesAndPersistsMessageContext() {
+        var llmAnswer = new LlmResponse();
+        llmAnswer.setResponseStatus("ANSWERED");
+        llmAnswer.setContent("Đã kiểm tra dữ liệu thực tế.");
+        when(llmClient.generateText(any(), any(), anyString())).thenReturn(llmAnswer);
+        when(insightStore.listCopilotMessages(any())).thenReturn(List.of());
+
+        UUID orderId = UUID.randomUUID();
+        UUID disputeId = UUID.randomUUID();
+        UUID refundId = UUID.randomUUID();
+        UUID equipmentId = UUID.randomUUID();
+        UUID payoutId = UUID.randomUUID();
+        UUID slotId = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+
+        when(vendorAiData.getOrderDetail(vendorId, orderId)).thenReturn(Optional.of(new VendorOrderDetail(
+                orderId, UUID.randomUUID(), serviceId, "Tour cano Sơn Trà",
+                LocalDate.of(2026, 11, 25), LocalTime.of(9, 0), LocalTime.of(10, 30),
+                2, BigDecimal.valueOf(325_000), BigDecimal.valueOf(650_000), BigDecimal.ZERO,
+                BigDecimal.valueOf(650_000), BigDecimal.valueOf(65_000), BigDecimal.valueOf(585_000),
+                "COMPLETED", "PAID", null, OffsetDateTime.now(), OffsetDateTime.now()
+        )));
+        when(vendorAiData.getDisputeDetail(vendorId, disputeId)).thenReturn(Optional.of(new VendorDisputeDetail(
+                disputeId, orderId, UUID.randomUUID(), "Tour cano Sơn Trà",
+                "SERVICE_NOT_AS_DESCRIBED", "Khách báo thiếu áo phao", "OPEN",
+                BigDecimal.valueOf(50), BigDecimal.valueOf(650_000), "Đã cấp đủ", null,
+                OffsetDateTime.now(), null
+        )));
+        when(vendorAiData.getRefundDetail(vendorId, refundId)).thenReturn(Optional.of(new VendorRefundDetail(
+                refundId, orderId, "Tour cano Sơn Trà",
+                BigDecimal.valueOf(325_000), BigDecimal.valueOf(50), "DISPUTE", "PROCESSED", "VNPAY",
+                OffsetDateTime.now(), OffsetDateTime.now()
+        )));
+        when(vendorAiData.getEquipmentDetail(vendorId, equipmentId)).thenReturn(Optional.of(new VendorEquipmentDetail(
+                equipmentId, "Cano Composite #01", "SPEEDBOAT", 12, 1, "2026-11-28T08:00..12:00 (Thay dầu)"
+        )));
+        when(vendorAiData.getPayoutDetail(vendorId, payoutId)).thenReturn(Optional.of(new VendorPayoutDetail(
+                payoutId, UUID.randomUUID(), BigDecimal.valueOf(845_000), "APPROVED",
+                "VCB-REF-001", "Rút kỳ tháng 11", null, null, OffsetDateTime.now(), null
+        )));
+        when(vendorAiData.getSlotDetail(vendorId, slotId)).thenReturn(Optional.of(new VendorSlotItem(
+                slotId, serviceId, "Tour cano Sơn Trà",
+                LocalDate.of(2026, 11, 22), LocalTime.of(14, 0), LocalTime.of(15, 30),
+                8, 3, "OPEN"
+        )));
+        when(vendorAiData.getReviewDetail(vendorId, reviewId)).thenReturn(Optional.of(new VendorReviewDetail(
+                reviewId, serviceId, "Tour cano Sơn Trà", 4, "Cano chạy êm, đợi hơi lâu", null, OffsetDateTime.now()
+        )));
+
+        record Case(String type, UUID id, String label, String question, String expectedSnippet) {}
+        var cases = List.of(
+                new Case("ORDER", orderId, "Đơn #01", "Nói sơ về đơn hàng này", "vendorPayoutVnd=585000"),
+                new Case("DISPUTE", disputeId, "Khiếu nại #01", "Nói sơ về tranh chấp này", "SERVICE_NOT_AS_DESCRIBED"),
+                new Case("REFUND", refundId, "Hoàn tiền #01", "Yêu cầu hoàn tiền này hoàn bao nhiêu?", "amountVnd=325000"),
+                new Case("EQUIPMENT", equipmentId, "Cano #01", "Nói sơ về thiết bị này", "Cano Composite #01"),
+                new Case("PAYOUT", payoutId, "Rút tiền #01", "Khoản chi trả này trạng thái gì?", "amountVnd=845000"),
+                new Case("SLOT", slotId, "Ca 14:00", "Nói sơ về ca này", "remainingSeats=5"),
+                new Case("REVIEW", reviewId, "Đánh giá 4 sao", "Nói sơ về đánh giá này", "Cano chạy êm")
+        );
+
+        for (var c : cases) {
+            var reply = copilot.processMessage(
+                    userId, "VENDOR", vendorId, convId, c.question(), c.type(), c.id(), c.label(), SupportedLanguage.VI);
+            assertThat(reply.toolsUsed()).as(c.type()).isEmpty();
+            verify(insightStore).appendCopilotMessage(
+                    eq(convId), eq("USER"), eq(c.question()), eq(null), eq(null), eq(true),
+                    eq(c.type()), eq(c.id()), eq(c.label()));
+        }
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(llmClient, org.mockito.Mockito.times(cases.size())).generateText(any(), any(), promptCaptor.capture());
+        var prompts = promptCaptor.getAllValues();
+        for (int i = 0; i < cases.size(); i++) {
+            assertThat(prompts.get(i))
+                    .as("System prompt for " + cases.get(i).type())
+                    .contains(cases.get(i).type() + " (verified, owned by this vendor)")
+                    .contains(cases.get(i).expectedSnippet());
+        }
+    }
+
+    @Test
+    @DisplayName("Từ chối rò rỉ dữ liệu hoặc nhãn giả mạo khi entity đính kèm không thuộc gian hàng vendor")
+    void deniesUnownedPinnedEntityWithoutEchoingSpoofedLabel() {
+        var llmAnswer = new LlmResponse();
+        llmAnswer.setResponseStatus("ANSWERED");
+        llmAnswer.setContent("Không tìm thấy đơn hàng thuộc gian hàng của bạn.");
+        when(llmClient.generateText(any(), any(), anyString())).thenReturn(llmAnswer);
+        when(insightStore.listCopilotMessages(any())).thenReturn(List.of());
+
+        UUID otherVendorOrderId = UUID.randomUUID();
+        when(vendorAiData.getOrderDetail(vendorId, otherVendorOrderId)).thenReturn(Optional.empty());
+
+        copilot.processMessage(userId, "VENDOR", vendorId, convId,
+                "Nói sơ về đơn hàng này", "ORDER", otherVendorOrderId, "SPOOFED_SECRET_LABEL", SupportedLanguage.VI);
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(llmClient).generateText(any(), any(), promptCaptor.capture());
+        assertThat(promptCaptor.getValue())
+                .contains("ORDER " + otherVendorOrderId + " is NOT found in this vendor's shop")
+                .doesNotContain("SPOOFED_SECRET_LABEL");
+    }
+
+    @Test
+    @DisplayName("Admin Copilot nạp dữ liệu thật cho ORDER, VENDOR, SERVICE khi đính kèm ngữ cảnh")
+    void adminCopilotGroundsPinnedOrderVendorService() {
+        var llmAnswer = new LlmResponse();
+        llmAnswer.setResponseStatus("ANSWERED");
+        llmAnswer.setContent("Dữ liệu sàn đã xác minh.");
+        when(llmClient.generateText(any(), any(), anyString())).thenReturn(llmAnswer);
+        when(insightStore.listCopilotMessages(any())).thenReturn(List.of());
+
+        UUID adminId = UUID.randomUUID();
+        UUID adminConvId = UUID.randomUUID();
+        var adminConv = new CopilotConversation(adminConvId, adminId, "ADMIN", null, "vi", null,
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(adminConvId)).thenReturn(Optional.of(adminConv));
+
+        UUID subOrderId = UUID.randomUUID();
+        UUID masterOrderId = UUID.randomUUID();
+        UUID targetVendorId = UUID.randomUUID();
+        UUID targetServiceId = UUID.randomUUID();
+
+        when(adminAiData.getOrderDetail(subOrderId)).thenReturn(Optional.of(new AdminAiDataPort.AdminOrderDetail(
+                subOrderId, masterOrderId, targetVendorId, "Danabeach", targetServiceId, "Mô tô nước – Danabeach",
+                "Nguyễn Văn A", LocalDate.of(2026, 10, 25), LocalTime.of(9, 0), LocalTime.of(10, 0),
+                1, BigDecimal.valueOf(650_000), BigDecimal.valueOf(65_000), BigDecimal.valueOf(585_000),
+                "COMPLETED", "PAID", null, OffsetDateTime.now(), OffsetDateTime.now()
+        )));
+        when(adminAiData.getVendorDetail(targetVendorId)).thenReturn(Optional.of(new AdminAiDataPort.AdminVendorDetail(
+                targetVendorId, "Danabeach", "APPROVED", "GOLD", BigDecimal.valueOf(4.8), 20, 4L
+        )));
+        when(adminAiData.getServiceDetail(targetServiceId)).thenReturn(Optional.of(new AdminAiDataPort.AdminServiceDetail(
+                targetServiceId, targetVendorId, "Danabeach", "Mô tô nước – Danabeach", "Jetski",
+                "PUBLISHED", BigDecimal.valueOf(650_000), 15, 2, BigDecimal.valueOf(4.8), 10
+        )));
+
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId,
+                "Nói sơ về đơn hàng này", "ORDER", subOrderId, "Đơn hàng #0002", SupportedLanguage.VI);
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId,
+                "Trạng thái hiện tại là gì?", "VENDOR", targetVendorId, "Danabeach", SupportedLanguage.VI);
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId,
+                "Nói sơ về dịch vụ này", "SERVICE", targetServiceId, "Mô tô nước", SupportedLanguage.VI);
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(llmClient, org.mockito.Mockito.times(3)).generateText(any(), any(), promptCaptor.capture());
+        var prompts = promptCaptor.getAllValues();
+        assertThat(prompts.get(0)).contains("ORDER (verified platform record)").contains("finalAmountVnd=650000");
+        assertThat(prompts.get(1)).contains("VENDOR (verified platform record)").contains("businessName=Danabeach");
+        assertThat(prompts.get(2)).contains("SERVICE (verified platform record)").contains("basePriceVnd=650000");
+
+        // Also cover missing platform records & vendor service fallback/missing branches
+        UUID missingId = UUID.randomUUID();
+        when(adminAiData.getOrderDetail(missingId)).thenReturn(Optional.empty());
+        when(adminAiData.getVendorDetail(missingId)).thenReturn(Optional.empty());
+        when(adminAiData.getServiceDetail(missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getServiceDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getService(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getDisputeDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getRefundDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getEquipmentDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getPayoutDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getSlotDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getReviewDetail(vendorId, missingId)).thenReturn(Optional.empty());
+
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId, "Chi tiết đơn này?", "ORDER", missingId, SupportedLanguage.VI);
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId, "Trạng thái hiện tại?", "VENDOR", missingId, SupportedLanguage.VI);
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId, "Chi tiết dịch vụ này?", "SERVICE", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về dịch vụ này", "SERVICE", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về tranh chấp này", "DISPUTE", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về hoàn tiền này", "REFUND", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về thiết bị này", "EQUIPMENT", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về chi trả này", "PAYOUT", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về ca này", "SLOT", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về đánh giá này", "REVIEW", missingId, SupportedLanguage.VI);
+
+        ArgumentCaptor<String> allPrompts = ArgumentCaptor.forClass(String.class);
+        verify(llmClient, org.mockito.Mockito.times(13)).generateText(any(), any(), allPrompts.capture());
+        assertThat(allPrompts.getAllValues().get(3)).contains("ORDER " + missingId + " is NOT found in the platform database");
+        assertThat(allPrompts.getAllValues().get(6)).contains("SERVICE " + missingId + " is NOT found in this vendor's shop");
     }
 }

@@ -52,12 +52,36 @@ const AUTHORITATIVE_SERVICE_MAP: Record<string, {
   },
 };
 
+const CONTEXT_TYPE_LABELS: Record<string, string> = {
+  SERVICE: 'Dịch vụ',
+  ORDER: 'Đơn hàng',
+  REVIEW: 'Đánh giá',
+  DISPUTE: 'Khiếu nại',
+  SLOT: 'Ca khởi hành',
+  EQUIPMENT: 'Thiết bị',
+  REFUND: 'Hoàn tiền',
+  PAYOUT: 'Quyết toán ví',
+};
+
+const CONTEXT_CODE_PREFIX: Record<string, string> = {
+  SERVICE: 'SRV',
+  ORDER: 'SUB',
+  REVIEW: 'REV',
+  DISPUTE: 'DISP',
+  SLOT: 'SLOT',
+  EQUIPMENT: 'EQP',
+  REFUND: 'REF',
+  PAYOUT: 'PAY',
+};
+
 export const ContextPreviewCard: React.FC<ContextPreviewCardProps> = ({ context, className = '' }) => {
   // Extract or hydrate real business data
-  const cachedDbInfo = AUTHORITATIVE_SERVICE_MAP[context.id];
+  const cachedDbInfo = context.type === 'SERVICE' ? AUTHORITATIVE_SERVICE_MAP[context.id] : undefined;
   const title = (context.meta?.title as string) || cachedDbInfo?.name || context.label;
   const subtitle = (context.meta?.subtitle as string) || undefined;
-  const badge = (context.meta?.badge as string) || cachedDbInfo?.status || 'Đang mở bán';
+  const badge = (context.meta?.badge as string) || cachedDbInfo?.status || undefined;
+  const typeLabel = CONTEXT_TYPE_LABELS[context.type] || context.type;
+  const codePrefix = CONTEXT_CODE_PREFIX[context.type] || 'CTX';
 
   // Build full, honest technical specs list without truncation
   let specs: Array<{ label: string; value: string }> = [];
@@ -84,16 +108,18 @@ export const ContextPreviewCard: React.FC<ContextPreviewCardProps> = ({ context,
       <div className="flex items-start justify-between gap-3 pb-2.5 border-b border-slate-100">
         <div className="min-w-0 flex-1">
           <span className="text-[10px] font-semibold tracking-wider uppercase text-sky-700 block mb-0.5">
-            Ngữ cảnh đính kèm • {context.type === 'SERVICE' ? 'Dịch vụ' : context.type === 'ORDER' ? 'Đơn hàng' : 'Đối tượng'}
+            Ngữ cảnh đính kèm • {typeLabel}
           </span>
           <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug break-words">
             {title}
           </h4>
         </div>
 
-        <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md shrink-0">
-          {badge}
-        </span>
+        {badge && (
+          <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md shrink-0">
+            {badge}
+          </span>
+        )}
       </div>
 
       {/* Full Specifications Grid (All fields displayed, zero truncation) */}
@@ -114,7 +140,7 @@ export const ContextPreviewCard: React.FC<ContextPreviewCardProps> = ({ context,
       <div className="pt-2 flex items-center justify-between text-[10px] text-slate-400 font-mono tabular-nums">
         <span>Mã hệ thống</span>
         <span className="text-slate-600 font-medium">
-          #{formatDisplayCode(context.id, context.type === 'ORDER' ? 'ORD' : context.type === 'SERVICE' ? 'SRV' : 'CTX')}
+          #{formatDisplayCode(context.id, codePrefix)}
         </span>
       </div>
     </div>

@@ -50,10 +50,26 @@ function generateLocalId(prefix: string): string {
   return `${prefix}-${localMessageSequence}`;
 }
 
+const ADMIN_CONTEXT_META: Record<string, { label: string; prefix: string }> = {
+  DISPUTE: { label: 'Hồ sơ khiếu nại', prefix: 'DISP' },
+  ORDER: { label: 'Đơn hàng', prefix: 'ORD' },
+  VENDOR: { label: 'Đối tác', prefix: 'VND' },
+  SERVICE: { label: 'Dịch vụ', prefix: 'SRV' },
+};
+
+function formatAdminContextLabel(type: string, id: string, customLabel?: string | null): string {
+  if (customLabel && customLabel.trim()) return customLabel.trim();
+  const meta = ADMIN_CONTEXT_META[type.toUpperCase()] || { label: type, prefix: 'CTX' };
+  return `${meta.label} #${formatDisplayCode(id, meta.prefix)}`;
+}
+
 interface LocalMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  contextType?: string | null;
+  contextId?: string | null;
+  contextLabel?: string | null;
   artifacts?: CopilotArtifact[];
   toolsUsed?: string[];
   verified?: boolean;
@@ -64,6 +80,7 @@ interface LocalMessage {
     message: string;
     contextType?: string | null;
     contextId?: string | null;
+    contextLabel?: string | null;
   };
 }
 
@@ -224,6 +241,9 @@ export const AdminCopilot: React.FC = () => {
           id: m.id,
           role: (m.role || '').toLowerCase() === 'assistant' ? 'assistant' : 'user',
           content: m.content,
+          contextType: m.contextType ?? null,
+          contextId: m.contextId ?? null,
+          contextLabel: m.contextLabel ?? null,
           artifacts: parseArtifactsJson(m.artifactsJson),
           toolsUsed: m.toolsUsed ? m.toolsUsed.split(',').map((t: string) => t.trim()).filter(Boolean) : undefined,
           verified: m.verified,
@@ -363,10 +383,25 @@ export const AdminCopilot: React.FC = () => {
     const text = (textToSend || inputText).trim();
     if (!text || sending) return;
 
+    const effectiveLabel = contextType && contextId
+      ? formatAdminContextLabel(
+          contextType,
+          contextId,
+          pinnedSummary?.title
+            ? `${pinnedSummary.title} (#${pinnedSummary.displayCode})`
+            : pinnedSummary?.displayCode
+              ? `${(ADMIN_CONTEXT_META[contextType]?.label || contextType)} #${pinnedSummary.displayCode}`
+              : null
+        )
+      : undefined;
+
     const userMsg: LocalMessage = {
       id: generateLocalId('usr'),
       role: 'user',
       content: text,
+      contextType: contextType || null,
+      contextId: contextId || null,
+      contextLabel: effectiveLabel || null,
       createdAt: new Date().toISOString(),
     };
 
@@ -382,6 +417,7 @@ export const AdminCopilot: React.FC = () => {
       message: text,
       contextType: contextType || undefined,
       contextId: contextId || undefined,
+      contextLabel: effectiveLabel,
     };
 
     try {
@@ -697,6 +733,13 @@ export const AdminCopilot: React.FC = () => {
                 </div>
 
                 <div className="admin-copilot__msg-body">
+                  {m.role === 'user' && m.contextType && m.contextId && (
+                    <div className="admin-copilot__msg-context">
+                      <Paperclip size={11} />
+                      <span>{formatAdminContextLabel(m.contextType, m.contextId, m.contextLabel)}</span>
+                    </div>
+                  )}
+
                   <div
                     className={`admin-copilot__msg-content ${
                       m.isError ? 'admin-copilot__msg-content--error' : ''

@@ -2,6 +2,7 @@ package com.danasea.backend.modules.ai.infrastructure.adapters;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -10,6 +11,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,10 +49,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 
-import lombok.RequiredArgsConstructor;
-
 @Component
-@RequiredArgsConstructor
 public class JpaAdminAiDataAdapter implements AdminAiDataPort {
 
     private final GetAdminDashboardUseCase adminDashboardUseCase;
@@ -66,6 +66,60 @@ public class JpaAdminAiDataAdapter implements AdminAiDataPort {
     private final JpaAiAssessmentCaseRepository assessmentCaseRepo;
     private final JpaAiCustomerSupportRequestRepository supportRequestRepo;
     private final VendorInternalApi vendorInternalApi;
+    private final JdbcTemplate jdbc;
+
+    public JpaAdminAiDataAdapter(
+            GetAdminDashboardUseCase adminDashboardUseCase,
+            GetRevenueReportUseCase revenueReportUseCase,
+            GetBookingReportUseCase bookingReportUseCase,
+            GetVendorPerformanceReportUseCase vendorPerformanceReportUseCase,
+            JpaDisputeRepository disputeRepo,
+            JpaSubOrderRepository subOrderRepo,
+            JpaUserRepository userRepo,
+            JpaServiceRepository serviceRepo,
+            JpaServiceSlotRepository slotRepo,
+            JpaCheckinTokenRepository checkinRepo,
+            JpaAiAssessmentCaseRepository assessmentCaseRepo,
+            JpaAiCustomerSupportRequestRepository supportRequestRepo,
+            VendorInternalApi vendorInternalApi
+    ) {
+        this(adminDashboardUseCase, revenueReportUseCase, bookingReportUseCase, vendorPerformanceReportUseCase,
+                disputeRepo, subOrderRepo, userRepo, serviceRepo, slotRepo, checkinRepo,
+                assessmentCaseRepo, supportRequestRepo, vendorInternalApi, null);
+    }
+
+    @Autowired
+    public JpaAdminAiDataAdapter(
+            GetAdminDashboardUseCase adminDashboardUseCase,
+            GetRevenueReportUseCase revenueReportUseCase,
+            GetBookingReportUseCase bookingReportUseCase,
+            GetVendorPerformanceReportUseCase vendorPerformanceReportUseCase,
+            JpaDisputeRepository disputeRepo,
+            JpaSubOrderRepository subOrderRepo,
+            JpaUserRepository userRepo,
+            JpaServiceRepository serviceRepo,
+            JpaServiceSlotRepository slotRepo,
+            JpaCheckinTokenRepository checkinRepo,
+            JpaAiAssessmentCaseRepository assessmentCaseRepo,
+            JpaAiCustomerSupportRequestRepository supportRequestRepo,
+            VendorInternalApi vendorInternalApi,
+            @Autowired(required = false) JdbcTemplate jdbc
+    ) {
+        this.adminDashboardUseCase = adminDashboardUseCase;
+        this.revenueReportUseCase = revenueReportUseCase;
+        this.bookingReportUseCase = bookingReportUseCase;
+        this.vendorPerformanceReportUseCase = vendorPerformanceReportUseCase;
+        this.disputeRepo = disputeRepo;
+        this.subOrderRepo = subOrderRepo;
+        this.userRepo = userRepo;
+        this.serviceRepo = serviceRepo;
+        this.slotRepo = slotRepo;
+        this.checkinRepo = checkinRepo;
+        this.assessmentCaseRepo = assessmentCaseRepo;
+        this.supportRequestRepo = supportRequestRepo;
+        this.vendorInternalApi = vendorInternalApi;
+        this.jdbc = jdbc;
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -243,5 +297,95 @@ public class JpaAdminAiDataAdapter implements AdminAiDataPort {
         long openDisputes = disputeRepo.countByStatus(DisputeStatus.OPEN) + disputeRepo.countByStatus(DisputeStatus.UNDER_REVIEW);
 
         return new QueueOverview(pendingRisk, pendingSupport, openDisputes);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<AdminOrderDetail> getOrderDetail(UUID orderOrSubOrderId) {
+        if (jdbc == null || orderOrSubOrderId == null) return Optional.empty();
+        return jdbc.query("""
+                SELECT so.id AS sub_order_id, so.master_order_id, so.vendor_id, v.business_name,
+                       so.service_id, s.name AS service_title, u.full_name AS customer_name,
+                       sl.date AS slot_date, sl.start_time AS slot_start, sl.end_time AS slot_end,
+                       so.quantity,
+                       COALESCE(so.final_amount, GREATEST(COALESCE(so.subtotal_amount, 0) - COALESCE(so.discount_amount, 0), 0)) AS final_amount,
+                       so.commission_amount, so.vendor_payout_amount,
+                       so.status, mo.payment_status, so.cancellation_reason, so.checked_in_at, so.created_at
+                FROM sub_orders so
+                LEFT JOIN vendors v ON v.id = so.vendor_id
+                LEFT JOIN services s ON s.id = so.service_id
+                LEFT JOIN master_orders mo ON mo.id = so.master_order_id
+                LEFT JOIN users u ON u.id = mo.customer_id
+                LEFT JOIN service_slots sl ON sl.id = COALESCE(so.actual_slot_id, so.slot_id)
+                WHERE so.id = ? OR so.master_order_id = ?
+                ORDER BY CASE WHEN so.id = ? THEN 0 ELSE 1 END, so.created_at DESC
+                LIMIT 1
+                """, (rs, i) -> new AdminOrderDetail(
+                rs.getObject("sub_order_id", UUID.class),
+                rs.getObject("master_order_id", UUID.class),
+                rs.getObject("vendor_id", UUID.class),
+                rs.getString("business_name"),
+                rs.getObject("service_id", UUID.class),
+                rs.getString("service_title"),
+                rs.getString("customer_name"),
+                rs.getObject("slot_date", LocalDate.class),
+                rs.getObject("slot_start", LocalTime.class),
+                rs.getObject("slot_end", LocalTime.class),
+                (Integer) rs.getObject("quantity"),
+                rs.getBigDecimal("final_amount"),
+                rs.getBigDecimal("commission_amount"),
+                rs.getBigDecimal("vendor_payout_amount"),
+                rs.getString("status"),
+                rs.getString("payment_status"),
+                rs.getString("cancellation_reason"),
+                rs.getObject("checked_in_at", OffsetDateTime.class),
+                rs.getObject("created_at", OffsetDateTime.class)
+        ), orderOrSubOrderId, orderOrSubOrderId, orderOrSubOrderId).stream().findFirst();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<AdminServiceDetail> getServiceDetail(UUID serviceId) {
+        if (jdbc == null || serviceId == null) return Optional.empty();
+        return jdbc.query("""
+                SELECT s.id, s.vendor_id, v.business_name, s.name AS title, c.name AS category_name,
+                       s.status, s.price, s.duration_minutes, s.capacity_per_slot, s.avg_rating, s.rating_count
+                FROM services s
+                LEFT JOIN vendors v ON v.id = s.vendor_id
+                LEFT JOIN categories c ON c.id = s.category_id
+                WHERE s.id = ?
+                """, (rs, i) -> new AdminServiceDetail(
+                rs.getObject("id", UUID.class),
+                rs.getObject("vendor_id", UUID.class),
+                rs.getString("business_name"),
+                rs.getString("title"),
+                rs.getString("category_name"),
+                rs.getString("status"),
+                rs.getBigDecimal("price"),
+                (Integer) rs.getObject("duration_minutes"),
+                (Integer) rs.getObject("capacity_per_slot"),
+                rs.getBigDecimal("avg_rating"),
+                (Integer) rs.getObject("rating_count")
+        ), serviceId).stream().findFirst();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<AdminVendorDetail> getVendorDetail(UUID vendorId) {
+        if (jdbc == null || vendorId == null) return Optional.empty();
+        return jdbc.query("""
+                SELECT v.id, v.business_name, v.verification_status AS status, v.badge_tier, v.rating_avg, v.rating_count,
+                       (SELECT COUNT(*) FROM services s WHERE s.vendor_id = v.id AND s.status = 'PUBLISHED') AS published_services_count
+                FROM vendors v
+                WHERE v.id = ?
+                """, (rs, i) -> new AdminVendorDetail(
+                rs.getObject("id", UUID.class),
+                rs.getString("business_name"),
+                rs.getString("status"),
+                rs.getString("badge_tier"),
+                rs.getBigDecimal("rating_avg"),
+                (Integer) rs.getObject("rating_count"),
+                rs.getLong("published_services_count")
+        ), vendorId).stream().findFirst();
     }
 }
