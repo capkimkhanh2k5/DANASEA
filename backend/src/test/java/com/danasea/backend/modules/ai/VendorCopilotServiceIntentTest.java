@@ -380,5 +380,35 @@ class VendorCopilotServiceIntentTest {
         assertThat(prompts.get(0)).contains("ORDER (verified platform record)").contains("finalAmountVnd=650000");
         assertThat(prompts.get(1)).contains("VENDOR (verified platform record)").contains("businessName=Danabeach");
         assertThat(prompts.get(2)).contains("SERVICE (verified platform record)").contains("basePriceVnd=650000");
+
+        // Also cover missing platform records & vendor service fallback/missing branches
+        UUID missingId = UUID.randomUUID();
+        when(adminAiData.getOrderDetail(missingId)).thenReturn(Optional.empty());
+        when(adminAiData.getVendorDetail(missingId)).thenReturn(Optional.empty());
+        when(adminAiData.getServiceDetail(missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getServiceDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getService(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getDisputeDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getRefundDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getEquipmentDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getPayoutDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getSlotDetail(vendorId, missingId)).thenReturn(Optional.empty());
+        when(vendorAiData.getReviewDetail(vendorId, missingId)).thenReturn(Optional.empty());
+
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId, "Chi tiết đơn này?", "ORDER", missingId, SupportedLanguage.VI);
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId, "Trạng thái hiện tại?", "VENDOR", missingId, SupportedLanguage.VI);
+        copilot.processMessage(adminId, "ADMIN", null, adminConvId, "Chi tiết dịch vụ này?", "SERVICE", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về dịch vụ này", "SERVICE", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về tranh chấp này", "DISPUTE", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về hoàn tiền này", "REFUND", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về thiết bị này", "EQUIPMENT", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về chi trả này", "PAYOUT", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về ca này", "SLOT", missingId, SupportedLanguage.VI);
+        copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về đánh giá này", "REVIEW", missingId, SupportedLanguage.VI);
+
+        ArgumentCaptor<String> allPrompts = ArgumentCaptor.forClass(String.class);
+        verify(llmClient, org.mockito.Mockito.times(13)).generateText(any(), any(), allPrompts.capture());
+        assertThat(allPrompts.getAllValues().get(3)).contains("ORDER " + missingId + " is NOT found in the platform database");
+        assertThat(allPrompts.getAllValues().get(6)).contains("SERVICE " + missingId + " is NOT found in this vendor's shop");
     }
 }
