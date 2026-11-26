@@ -4,6 +4,7 @@ import com.danasea.backend.modules.booking.domain.models.Booking;
 import com.danasea.backend.shared.presentation.ApiConflictException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
 import com.danasea.backend.modules.service.infrastructure.persistence.adapters.OperatingScheduleStore;
+import com.danasea.backend.modules.service.infrastructure.persistence.repositories.EquipmentStore;
 import com.danasea.backend.modules.service.presentation.dtos.CreateSlotUnitRequest;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotOptionSummaryResponse;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotResponse;
@@ -48,6 +50,7 @@ public class UpdateServiceSlotUseCase {
     private final VendorPort vendorPort;
     private final OperatingScheduleStore scheduleStore;
     private final ServiceOptionRepositoryPort serviceOptionRepository;
+    private final EquipmentAssignmentService equipmentAssignmentService;
 
     @Autowired
     public UpdateServiceSlotUseCase(
@@ -55,12 +58,23 @@ public class UpdateServiceSlotUseCase {
             ServiceSlotRepositoryPort serviceSlotRepository,
             VendorPort vendorPort,
             OperatingScheduleStore scheduleStore,
-            ServiceOptionRepositoryPort serviceOptionRepository) {
+            ServiceOptionRepositoryPort serviceOptionRepository,
+            EquipmentAssignmentService equipmentAssignmentService) {
         this.serviceRepository = serviceRepository;
         this.serviceSlotRepository = serviceSlotRepository;
         this.vendorPort = vendorPort;
         this.scheduleStore = scheduleStore;
         this.serviceOptionRepository = serviceOptionRepository;
+        this.equipmentAssignmentService = equipmentAssignmentService;
+    }
+
+    public UpdateServiceSlotUseCase(
+            ServiceRepositoryPort serviceRepository,
+            ServiceSlotRepositoryPort serviceSlotRepository,
+            VendorPort vendorPort,
+            OperatingScheduleStore scheduleStore,
+            ServiceOptionRepositoryPort serviceOptionRepository) {
+        this(serviceRepository, serviceSlotRepository, vendorPort, scheduleStore, serviceOptionRepository, null);
     }
 
     public UpdateServiceSlotUseCase(
@@ -68,7 +82,7 @@ public class UpdateServiceSlotUseCase {
             ServiceSlotRepositoryPort serviceSlotRepository,
             VendorPort vendorPort,
             OperatingScheduleStore scheduleStore) {
-        this(serviceRepository, serviceSlotRepository, vendorPort, scheduleStore, null);
+        this(serviceRepository, serviceSlotRepository, vendorPort, scheduleStore, null, null);
     }
 
     @Transactional
@@ -114,92 +128,6 @@ public class UpdateServiceSlotUseCase {
             slot.setStatus(request.status());
         }
 
-        List<ServiceSlotUnit> currentUnits = serviceSlotRepository.findUnitsBySlotId(slotId);
-        List<ServiceSlotUnit> updatedUnits = new ArrayList<>(currentUnits);
-
-        if (InventoryType.SHARED_CAPACITY_UNITS.equals(slot.getInventoryType())) {
-            if (request.units() != null && !request.units().isEmpty()) {
-                Map<Integer, ServiceSlotUnit> currentUnitMap = currentUnits.stream()
-                        .collect(Collectors.toMap(ServiceSlotUnit::getUnitNumber, Function.identity()));
-
-                Set<Integer> newUnitNumbers = new HashSet<>();
-                List<ServiceSlotUnit> nextUnits = new ArrayList<>();
-                int sumCapacity = 0;
-
-                for (CreateSlotUnitRequest uReq : request.units()) {
-                    if (uReq.unitNumber() == null || uReq.unitNumber() <= 0) {
-                        throw new IllegalArgumentException("Unit number must be greater than 0");
-                    }
-                    if (!newUnitNumbers.add(uReq.unitNumber())) {
-                        throw new IllegalArgumentException("Duplicate unit number: " + uReq.unitNumber());
-                    }
-                    if (uReq.capacity() == null || uReq.capacity() <= 0) {
-                        throw new IllegalArgumentException("Each unit capacity must be greater than 0");
-                    }
-
-                    ServiceSlotUnit existing = currentUnitMap.get(uReq.unitNumber());
-                    if (existing != null && existing.getEquipmentId() != null
-                            && !uReq.capacity().equals(existing.getCapacity())) {
-                        throw new IllegalArgumentException("Cannot resize a unit linked to physical equipment");
-                    }
-                    if (existing != null && !uReq.capacity().equals(existing.getCapacity())
-                            && serviceSlotRepository.hasPrivateCommitmentForUnit(slotId, uReq.unitNumber())) {
-                        throw new IllegalArgumentException("Cannot resize a unit reserved for a private package");
-                    }
-                    int committed = serviceSlotRepository.getCommittedCountForUnit(slotId, uReq.unitNumber());
-                    int booked = (existing != null && existing.getBookedCount() != null) ? existing.getBookedCount() : 0;
-                    int occupied = Math.max(booked, committed);
-
-                    if (uReq.capacity() < occupied) {
-                        throw new IllegalArgumentException("Cannot reduce unit " + uReq.unitNumber() + " capacity below committed capacity (" + booked + ")");
-                    }
-
-                    nextUnits.add(ServiceSlotUnit.builder()
-                            .id(existing != null ? existing.getId() : UUID.randomUUID())
-                            .slotId(slotId)
-                            .unitNumber(uReq.unitNumber())
-                            .capacity(uReq.capacity())
-                            .bookedCount(booked)
-                            .equipmentId(existing == null ? null : existing.getEquipmentId())
-                            .equipmentBlocked(existing != null && existing.isEquipmentBlocked())
-                            .build());
-                    sumCapacity = Math.addExact(sumCapacity, uReq.capacity());
-                }
-
-                // Check removed units: if any removed unit has booked > 0 or has active hold -> reject!
-                for (ServiceSlotUnit oldU : currentUnits) {
-                    if (!newUnitNumbers.contains(oldU.getUnitNumber())) {
-                        if (oldU.getEquipmentId() != null) {
-                            throw new IllegalArgumentException("A unit linked to physical equipment must be managed by equipment maintenance");
-                        }
-                        int committed = serviceSlotRepository.getCommittedCountForUnit(slotId, oldU.getUnitNumber());
-                        int booked = Math.max(oldU.getBookedCount() != null ? oldU.getBookedCount() : 0, committed);
-                        if (booked > 0) {
-                            throw new IllegalArgumentException("Only completely empty units can be removed; unit " + oldU.getUnitNumber() + " has active bookings or holds");
-                        }
-                    }
-                }
-
-                for (ServiceSlotUnit oldUnit : currentUnits) {
-                    if (!newUnitNumbers.contains(oldUnit.getUnitNumber())) {
-                        serviceSlotRepository.deleteUnit(slotId, oldUnit.getUnitNumber());
-                    }
-                }
-                serviceSlotRepository.saveUnits(slotId, nextUnits);
-                slot.setCapacity(sumCapacity);
-                updatedUnits = nextUnits;
-            }
-        } else {
-            // PERSON_LIMIT
-            if (request.capacity() != null) {
-                int booked = slot.getBookedCount() != null ? slot.getBookedCount() : 0;
-                if (request.capacity() <= 0 || request.capacity() < booked + serviceSlotRepository.getActiveHeldCount(slotId)) {
-                    throw new IllegalArgumentException("Cannot reduce capacity below committed guests (" + booked + ")");
-                }
-                slot.setCapacity(request.capacity());
-            }
-        }
-
         if (request.optionIds() != null) {
             if (request.optionIds().isEmpty()) {
                 throw new IllegalArgumentException("Slot must have at least one option assigned");
@@ -243,8 +171,147 @@ public class UpdateServiceSlotUseCase {
             slot.setOptionId(singleOptionId);
         }
 
+        List<ServiceSlotUnit> currentUnits = serviceSlotRepository.findUnitsBySlotId(slotId);
+        List<ServiceSlotUnit> updatedUnits = new ArrayList<>(currentUnits);
+
+        if (InventoryType.SHARED_CAPACITY_UNITS.equals(slot.getInventoryType())) {
+            if (request.units() != null && !request.units().isEmpty()) {
+                Map<Integer, ServiceSlotUnit> currentUnitMap = currentUnits.stream()
+                        .collect(Collectors.toMap(ServiceSlotUnit::getUnitNumber, Function.identity()));
+
+                Set<Integer> newUnitNumbers = new HashSet<>();
+                List<ServiceSlotUnit> nextUnits = new ArrayList<>();
+                List<Integer> unitsToDetach = new ArrayList<>();
+                Map<Integer, UUID> equipmentToAssign = new HashMap<>();
+                int sumCapacity = 0;
+
+                for (CreateSlotUnitRequest uReq : request.units()) {
+                    if (uReq.unitNumber() == null || uReq.unitNumber() <= 0) {
+                        throw new IllegalArgumentException("Unit number must be greater than 0");
+                    }
+                    if (!newUnitNumbers.add(uReq.unitNumber())) {
+                        throw new IllegalArgumentException("Duplicate unit number: " + uReq.unitNumber());
+                    }
+                    if (uReq.capacity() == null || uReq.capacity() <= 0) {
+                        throw new IllegalArgumentException("Each unit capacity must be greater than 0");
+                    }
+                    boolean explicitDetach = Boolean.TRUE.equals(uReq.detachEquipment());
+                    UUID requestedEq = uReq.equipmentId();
+                    if (explicitDetach && requestedEq != null) {
+                        throw new IllegalArgumentException("Cannot both specify and detach equipment for unit " + uReq.unitNumber());
+                    }
+
+                    ServiceSlotUnit existing = currentUnitMap.get(uReq.unitNumber());
+                    UUID existingEq = existing != null ? existing.getEquipmentId() : null;
+                    boolean keepingExistingLink = existing != null && existingEq != null
+                            && !explicitDetach && (requestedEq == null || requestedEq.equals(existingEq));
+                    if (keepingExistingLink && !uReq.capacity().equals(existing.getCapacity())) {
+                        throw new IllegalArgumentException("Cannot resize a unit linked to physical equipment");
+                    }
+                    if (existing != null && !uReq.capacity().equals(existing.getCapacity())
+                            && serviceSlotRepository.hasPrivateCommitmentForUnit(slotId, uReq.unitNumber())) {
+                        throw new IllegalArgumentException("Cannot resize a unit reserved for a private package");
+                    }
+                    int committed = serviceSlotRepository.getCommittedCountForUnit(slotId, uReq.unitNumber());
+                    int booked = (existing != null && existing.getBookedCount() != null) ? existing.getBookedCount() : 0;
+                    int occupied = Math.max(booked, committed);
+
+                    if (uReq.capacity() < occupied) {
+                        throw new IllegalArgumentException("Cannot reduce unit " + uReq.unitNumber() + " capacity below committed capacity (" + booked + ")");
+                    }
+
+                    if (explicitDetach && existingEq != null) {
+                        unitsToDetach.add(uReq.unitNumber());
+                    } else if (requestedEq != null && !requestedEq.equals(existingEq)) {
+                        equipmentToAssign.put(uReq.unitNumber(), requestedEq);
+                    }
+
+                    // Keep existing equipment & capacity until EquipmentAssignmentService executes atomic replace
+                    boolean replacingExisting = existing != null && existingEq != null
+                            && requestedEq != null && !requestedEq.equals(existingEq);
+                    UUID persistedEq = (explicitDetach || existing == null) ? null : existingEq;
+                    boolean persistedBlocked = (!explicitDetach && existing != null) && existing.isEquipmentBlocked();
+                    int persistedCap = replacingExisting ? existing.getCapacity() : uReq.capacity();
+
+                    nextUnits.add(ServiceSlotUnit.builder()
+                            .id(existing != null ? existing.getId() : UUID.randomUUID())
+                            .slotId(slotId)
+                            .unitNumber(uReq.unitNumber())
+                            .capacity(persistedCap)
+                            .bookedCount(booked)
+                            .equipmentId(persistedEq)
+                            .equipmentBlocked(persistedBlocked)
+                            .build());
+                    sumCapacity = Math.addExact(sumCapacity, persistedCap);
+                }
+
+                // Check removed units: if any removed unit has booked > 0 or has active hold -> reject!
+                for (ServiceSlotUnit oldU : currentUnits) {
+                    if (!newUnitNumbers.contains(oldU.getUnitNumber())) {
+                        if (oldU.getEquipmentId() != null) {
+                            throw new IllegalArgumentException("A unit linked to physical equipment must be managed by equipment maintenance");
+                        }
+                        int committed = serviceSlotRepository.getCommittedCountForUnit(slotId, oldU.getUnitNumber());
+                        int booked = Math.max(oldU.getBookedCount() != null ? oldU.getBookedCount() : 0, committed);
+                        if (booked > 0) {
+                            throw new IllegalArgumentException("Only completely empty units can be removed; unit " + oldU.getUnitNumber() + " has active bookings or holds");
+                        }
+                    }
+                }
+
+                for (ServiceSlotUnit oldUnit : currentUnits) {
+                    if (!newUnitNumbers.contains(oldUnit.getUnitNumber())) {
+                        serviceSlotRepository.deleteUnit(slotId, oldUnit.getUnitNumber());
+                    }
+                }
+                if (!unitsToDetach.isEmpty()) {
+                    requireEquipmentService().detachUnitsInTransaction(vendor.getId(), slotId, unitsToDetach);
+                }
+                serviceSlotRepository.saveUnits(slotId, nextUnits);
+                if (!equipmentToAssign.isEmpty()) {
+                    List<EquipmentStore.Unit> latestUnits = requireEquipmentService()
+                            .attachOrReplaceInTransaction(vendor.getId(), slotId, equipmentToAssign);
+                    updatedUnits = latestUnits.stream()
+                            .map(u -> toDomainUnit(slotId, u))
+                            .toList();
+                    slot.setCapacity(updatedUnits.stream().mapToInt(ServiceSlotUnit::getCapacity).sum());
+                } else {
+                    slot.setCapacity(sumCapacity);
+                    updatedUnits = nextUnits;
+                }
+            }
+        } else {
+            // PERSON_LIMIT
+            if (request.capacity() != null) {
+                int booked = slot.getBookedCount() != null ? slot.getBookedCount() : 0;
+                if (request.capacity() <= 0 || request.capacity() < booked + serviceSlotRepository.getActiveHeldCount(slotId)) {
+                    throw new IllegalArgumentException("Cannot reduce capacity below committed guests (" + booked + ")");
+                }
+                slot.setCapacity(request.capacity());
+            }
+        }
+
         ServiceSlot saved = serviceSlotRepository.save(slot);
         return toResponse(saved, updatedUnits);
+    }
+
+    private ServiceSlotUnit toDomainUnit(UUID slotId, EquipmentStore.Unit u) {
+        return ServiceSlotUnit.builder()
+                .id(u.id())
+                .slotId(slotId)
+                .unitNumber(u.number())
+                .capacity(u.capacity())
+                .bookedCount(u.booked())
+                .equipmentId(u.equipmentId())
+                .equipmentBlocked(u.blocked())
+                .build();
+    }
+
+    private EquipmentAssignmentService requireEquipmentService() {
+        if (equipmentAssignmentService == null) {
+            throw new IllegalStateException("EquipmentAssignmentService is required for atomic unit equipment updates");
+        }
+        return equipmentAssignmentService;
     }
 
     private ServiceSlotResponse toResponse(ServiceSlot s, List<ServiceSlotUnit> units) {

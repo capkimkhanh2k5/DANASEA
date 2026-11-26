@@ -14,9 +14,15 @@ public record CreateSlotUnitRequest(
         @Min(value = 1, message = "{validation.service.unit.capacity.min}")
         Integer capacity,
 
-        UUID equipmentId
+        UUID equipmentId,
+
+        Boolean detachEquipment
 ) {
     public CreateSlotUnitRequest(Integer unitNumber, Integer capacity) {
-        this(unitNumber, capacity, null);
+        this(unitNumber, capacity, null, null);
+    }
+
+    public CreateSlotUnitRequest(Integer unitNumber, Integer capacity, UUID equipmentId) {
+        this(unitNumber, capacity, equipmentId, null);
     }
 }

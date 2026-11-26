@@ -403,12 +403,30 @@ export function Schedule() {
     setIsUpdatingSlot(true);
     setCapacityError(null);
     try {
+      const existingUnitsMap = new Map(
+        (editingSlot.units || []).map((su) => [su.unitNumber, su])
+      );
+
       const payload: UpdateServiceSlotRequest = {
         status: inputStatus,
         optionIds: Array.from(new Set(editOptionIds)),
         ...(editingSlot.inventoryType === "SHARED_CAPACITY_UNITS"
           ? {
-              units: editUnits.map((u) => ({ unitNumber: u.unitNumber, capacity: u.capacity })),
+              units: editUnits.map((u) => {
+                const existingUnit = existingUnitsMap.get(u.unitNumber);
+                if (!u.equipmentId && existingUnit?.equipmentId) {
+                  return {
+                    unitNumber: u.unitNumber,
+                    capacity: u.capacity,
+                    detachEquipment: true,
+                  };
+                }
+                return {
+                  unitNumber: u.unitNumber,
+                  capacity: u.capacity,
+                  ...(u.equipmentId ? { equipmentId: u.equipmentId } : {}),
+                };
+              }),
             }
           : { capacity: inputCapacity }),
       };
@@ -1821,6 +1839,8 @@ export function Schedule() {
                   </div>
                   <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                     {editUnits.map((u, idx) => {
+                      const existingUnit = editingSlot.units?.find((su) => su.unitNumber === u.unitNumber);
+                      const unitBooked = existingUnit?.bookedCount || 0;
                       const isRegistered = Boolean(u.equipmentId);
                       const eqInfo = equipmentList.find((item) => item.id === u.equipmentId);
                       return (
@@ -1838,7 +1858,7 @@ export function Schedule() {
                                 </span>
                               )}
                             </div>
-                            {editUnits.length > 1 && !isRegistered && (
+                            {editUnits.length > 1 && !existingUnit?.equipmentId && !isRegistered && unitBooked === 0 && (
                               <button
                                 type="button"
                                 onClick={() =>
@@ -1863,7 +1883,7 @@ export function Schedule() {
                               </label>
                               <select
                                 value={u.equipmentId || ""}
-                                disabled={isRegistered}
+                                disabled={unitBooked > 0}
                                 onChange={(e) => {
                                   const eqId = e.target.value;
                                   setEditUnits((prev) =>
@@ -1904,7 +1924,7 @@ export function Schedule() {
                                   type="number"
                                   min={1}
                                   max={500}
-                                  disabled={isRegistered}
+                                  disabled={isRegistered || unitBooked > 0}
                                   value={u.capacity}
                                   onChange={(e) => {
                                     const val = Math.max(1, parseInt(e.target.value) || 1);

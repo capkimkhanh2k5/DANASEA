@@ -126,7 +126,7 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
                     return e;
                 })
                 .toList();
-        jpaServiceSlotUnitRepository.saveAll(entities);
+        jpaServiceSlotUnitRepository.saveAllAndFlush(entities);
     }
 
     @Override
@@ -139,7 +139,10 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
     @Transactional
     public void deleteUnit(UUID slotId, int unitNumber) {
         jpaServiceSlotUnitRepository.findBySlotIdAndUnitNumber(slotId, unitNumber)
-                .ifPresent(jpaServiceSlotUnitRepository::delete);
+                .ifPresent(unit -> {
+                    jpaServiceSlotUnitRepository.delete(unit);
+                    jpaServiceSlotUnitRepository.flush();
+                });
     }
 
     @Override

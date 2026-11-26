@@ -161,6 +161,7 @@ export interface CreateSlotUnitRequest {
   unitNumber: number;
   capacity: number;
   equipmentId?: string | null;
+  detachEquipment?: boolean;
 }
 
 export interface VendorServiceSlotDto {
