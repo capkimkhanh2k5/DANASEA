@@ -199,6 +199,7 @@
 - [x] GET /api/vendor/equipment (Danh mục thiết bị)
 - [x] POST /api/vendor/equipment (Đăng ký thiết bị)
 - [x] PUT /api/vendor/equipment/{equipmentId}/slots/{slotId}/units/{unitNumber} (Gán thiết bị vào ca)
+- [x] DELETE /api/vendor/equipment/{equipmentId}/slots/{slotId}/units/{unitNumber} (Gỡ liên kết thiết bị khỏi đơn vị ca)
 - [x] PUT /api/vendor/equipment/{equipmentId}/maintenance/{maintenanceId} (Ghi lịch bảo trì)
 - [x] GET /api/vendor/equipment/{equipmentId}/maintenance/{maintenanceId} (Đọc kết quả bảo trì)
 
