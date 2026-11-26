@@ -30,7 +30,9 @@ public class ServiceDiscoveryAvailability {
         return slots.findByServiceId(serviceId).stream().filter(SlotAvailabilityCalculator::isUpcoming)
                 .filter(slot -> criteria.getDate() == null || criteria.getDate().equals(slot.getDate()))
                 .filter(slot -> criteria.getTimeSlot() == null || criteria.getTimeSlot().equals(slot.getStartTime()))
-                .anyMatch(slot -> activeOptions.stream().anyMatch(option -> {
+                .anyMatch(slot -> activeOptions.stream()
+                        .filter(option -> SlotAvailabilityCalculator.supportsOption(slot, option))
+                        .anyMatch(option -> {
                     if (option.isPrivate()) {
                         int maxPax = option.getMaxPaxPerPackage() == null ? 0 : option.getMaxPaxPerPackage();
                         return maxPax > 0 && availability.canBook(slot, option, (guests - 1) / maxPax + 1, false);
@@ -48,6 +50,9 @@ public class ServiceDiscoveryAvailability {
                 continue;
             }
             for (var option : activeOptions) {
+                if (!SlotAvailabilityCalculator.supportsOption(slot, option)) {
+                    continue;
+                }
                 var snapshot = availability.evaluate(slot, option);
                 result.add(StructuredSlotResponse.builder().slotId(slot.getId()).date(slot.getDate())
                         .startTime(slot.getStartTime()).endTime(slot.getEndTime()).capacity(slot.getCapacity())

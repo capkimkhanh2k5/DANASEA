@@ -5,6 +5,7 @@ import static com.danasea.backend.modules.service.domain.exceptions.ServiceSlotC
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,9 @@ public class CreateServiceSlotUseCase {
     private final OperatingScheduleStore scheduleStore;
     private final ServiceOptionRepositoryPort serviceOptionRepository;
 
+    @Autowired(required = false)
+    private EquipmentAssignmentService equipmentAssignmentService;
+
     @Autowired
     public CreateServiceSlotUseCase(
             ServiceRepositoryPort serviceRepository,
@@ -72,50 +76,62 @@ public class CreateServiceSlotUseCase {
         this(serviceRepository, serviceSlotRepository, vendorPort, scheduleStore, null);
     }
 
+    public CreateServiceSlotUseCase(
+            ServiceRepositoryPort serviceRepository,
+            ServiceSlotRepositoryPort serviceSlotRepository,
+            VendorPort vendorPort,
+            OperatingScheduleStore scheduleStore,
+            ServiceOptionRepositoryPort serviceOptionRepository,
+            EquipmentAssignmentService equipmentAssignmentService) {
+        this(serviceRepository, serviceSlotRepository, vendorPort, scheduleStore, serviceOptionRepository);
+        this.equipmentAssignmentService = equipmentAssignmentService;
+    }
+
     @Transactional
     public ServiceSlotResponse execute(UUID userId, UUID serviceId, CreateServiceSlotRequest request) {
         if (request == null) {
             throw invalid("error.bad_request");
         }
 
-        lockOwnedService(userId, serviceId);
-        ServiceSlot slot = prepareSlot(serviceId, request);
-        checkAvailability(slot, LocalDateTime.now(Booking.VIETNAM_ZONE), false);
+        UUID vendorId = lockOwnedService(userId, serviceId);
+        PreparedSlot prepared = prepareSlot(serviceId, request);
+        checkAvailability(prepared.slot(), LocalDateTime.now(Booking.VIETNAM_ZONE), false);
 
         Map<UUID, ServiceOption> optionMap = serviceOptionRepository != null
                 ? serviceOptionRepository.findByServiceId(serviceId).stream()
                         .collect(Collectors.toMap(ServiceOption::getId, Function.identity(), (a, b) -> a))
                 : Map.of();
 
-        return persistSlot(slot, optionMap);
+        return persistSlot(vendorId, prepared, optionMap);
     }
 
     List<ServiceSlotResponse> createBatch(UUID userId, UUID serviceId, List<CreateServiceSlotRequest> requests) {
-        lockOwnedService(userId, serviceId);
+        UUID vendorId = lockOwnedService(userId, serviceId);
 
-        List<ServiceSlot> slots = requests.stream()
+        List<PreparedSlot> preparedSlots = requests.stream()
                 .map(request -> prepareSlot(serviceId, request))
                 .toList();
         LocalDateTime now = LocalDateTime.now(Booking.VIETNAM_ZONE);
-        slots.forEach(slot -> checkAvailability(slot, now, true));
+        preparedSlots.forEach(prepared -> checkAvailability(prepared.slot(), now, true));
 
         Map<UUID, ServiceOption> optionMap = serviceOptionRepository != null
                 ? serviceOptionRepository.findByServiceId(serviceId).stream()
                         .collect(Collectors.toMap(ServiceOption::getId, Function.identity(), (a, b) -> a))
                 : Map.of();
 
-        return slots.stream()
-                .map(slot -> persistSlot(slot, optionMap))
+        return preparedSlots.stream()
+                .map(prepared -> persistSlot(vendorId, prepared, optionMap))
                 .toList();
     }
 
-    private void lockOwnedService(UUID userId, UUID serviceId) {
+    private UUID lockOwnedService(UUID userId, UUID serviceId) {
         Vendor vendor = vendorPort.findByUserId(userId)
                 .orElseThrow(() -> new VendorNotApprovedException("Vendor not found for user: " + userId));
         Service service = serviceRepository.findByIdForUpdate(serviceId)
                 .orElseThrow(() -> new ServiceNotFoundException(serviceId));
         service.validateOwnership(vendor.getId());
         service.validateSlotCreatable();
+        return vendor.getId();
     }
 
     private void checkAvailability(ServiceSlot slot, LocalDateTime now, boolean batch) {
@@ -138,7 +154,7 @@ public class CreateServiceSlotUseCase {
         }
     }
 
-    private ServiceSlot prepareSlot(UUID serviceId, CreateServiceSlotRequest request) {
+    private PreparedSlot prepareSlot(UUID serviceId, CreateServiceSlotRequest request) {
         if (request.date() == null || request.startTime() == null || request.endTime() == null) {
             throw invalid("error.slot_date_time_required");
         }
@@ -192,6 +208,7 @@ public class CreateServiceSlotUseCase {
 
         int totalCapacity;
         List<ServiceSlotUnit> units = new ArrayList<>();
+        Map<Integer, UUID> equipmentAssignments = new HashMap<>();
         UUID slotId = UUID.randomUUID();
 
         if (InventoryType.SHARED_CAPACITY_UNITS.equals(request.inventoryType())) {
@@ -200,6 +217,7 @@ public class CreateServiceSlotUseCase {
             }
 
             Set<Integer> unitNumbers = new HashSet<>();
+            Set<UUID> equipmentIds = new HashSet<>();
             long sum = 0;
             for (CreateSlotUnitRequest unit : request.units()) {
                 if (unit == null || unit.unitNumber() == null || unit.unitNumber() <= 0) {
@@ -210,6 +228,12 @@ public class CreateServiceSlotUseCase {
                 }
                 if (unit.capacity() == null || unit.capacity() <= 0) {
                     throw invalid("error.slot_unit_capacity", unit.unitNumber());
+                }
+                if (unit.equipmentId() != null) {
+                    if (!equipmentIds.add(unit.equipmentId())) {
+                        throw new IllegalArgumentException("A piece of equipment can only appear once in a slot");
+                    }
+                    equipmentAssignments.put(unit.unitNumber(), unit.equipmentId());
                 }
                 sum += unit.capacity();
                 if (sum > Integer.MAX_VALUE) {
@@ -245,18 +269,25 @@ public class CreateServiceSlotUseCase {
                 .units(units)
                 .build();
         slot.setId(slotId);
-        return slot;
+        return new PreparedSlot(slot, equipmentAssignments);
     }
 
-    private ServiceSlotResponse persistSlot(ServiceSlot slot, Map<UUID, ServiceOption> optionMap) {
+    private ServiceSlotResponse persistSlot(UUID vendorId, PreparedSlot prepared, Map<UUID, ServiceOption> optionMap) {
+        ServiceSlot slot = prepared.slot();
         ServiceSlot saved = serviceSlotRepository.save(slot);
         List<ServiceSlotUnit> units = slot.getUnits();
         if (!units.isEmpty()) {
             serviceSlotRepository.saveUnits(slot.getId(), units);
         }
         serviceSlotRepository.saveSlotOptions(slot.getId(), slot.getOptionIds());
+        if (!prepared.equipmentAssignments().isEmpty() && equipmentAssignmentService != null) {
+            equipmentAssignmentService.attachGenerated(vendorId, saved.getId(), prepared.equipmentAssignments());
+            units.forEach(u -> u.setEquipmentId(prepared.equipmentAssignments().get(u.getUnitNumber())));
+        }
         return toResponse(saved, units, slot.getOptionIds(), optionMap);
     }
+
+    private record PreparedSlot(ServiceSlot slot, Map<Integer, UUID> equipmentAssignments) {}
 
     private ServiceSlotResponse toResponse(ServiceSlot s, List<ServiceSlotUnit> units, List<UUID> optionIds, Map<UUID, ServiceOption> optionMap) {
         List<ServiceSlotUnitResponse> unitResponses = units.stream().map(this::toUnitResponse).toList();
