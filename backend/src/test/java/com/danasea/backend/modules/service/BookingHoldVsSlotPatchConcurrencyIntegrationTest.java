@@ -23,6 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.danasea.backend.modules.account.domain.models.Role;
 import com.danasea.backend.modules.account.infrastructure.persistence.entities.UserJpaEntity;
@@ -30,10 +31,13 @@ import com.danasea.backend.modules.account.infrastructure.persistence.repositori
 import com.danasea.backend.modules.booking.application.dtos.BookingHoldItemDto;
 import com.danasea.backend.modules.booking.application.dtos.CreateBookingHoldCommand;
 import com.danasea.backend.modules.booking.application.usecases.CreateBookingHoldUseCase;
+import com.danasea.backend.modules.booking.domain.exceptions.InsufficientInventoryException;
+import com.danasea.backend.modules.booking.domain.exceptions.SlotNotAvailableException;
 import com.danasea.backend.modules.booking.domain.models.Booking;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingItemAllocationRepository;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingItemRepository;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
+import com.danasea.backend.modules.service.application.usecases.EquipmentAssignmentService;
 import com.danasea.backend.modules.service.application.usecases.UpdateServiceSlotUseCase;
 import com.danasea.backend.modules.service.domain.models.InventoryType;
 import com.danasea.backend.modules.service.domain.models.OptionStatus;
@@ -46,6 +50,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.entities.S
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceOptionJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotUnitJpaEntity;
+import com.danasea.backend.modules.service.infrastructure.persistence.repositories.EquipmentStore;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaCategoryRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceOptionRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
@@ -64,6 +69,8 @@ public class BookingHoldVsSlotPatchConcurrencyIntegrationTest extends BaseSecuri
 
     @Autowired private CreateBookingHoldUseCase createBookingHoldUseCase;
     @Autowired private UpdateServiceSlotUseCase updateServiceSlotUseCase;
+    @Autowired private EquipmentAssignmentService equipmentAssignmentService;
+    @Autowired private EquipmentStore equipmentStore;
 
     @Autowired private JpaUserRepository userRepository;
     @Autowired private JpaVendorRepository vendorRepository;
@@ -95,7 +102,7 @@ public class BookingHoldVsSlotPatchConcurrencyIntegrationTest extends BaseSecuri
             });
         }
 
-        jdbcTemplate.execute("TRUNCATE users, services, bookings CASCADE");
+        jdbcTemplate.execute("TRUNCATE users, services, vendor_equipment, bookings CASCADE");
 
         // 1. Vendor
         testVendorUser = new UserJpaEntity();
@@ -287,5 +294,258 @@ public class BookingHoldVsSlotPatchConcurrencyIntegrationTest extends BaseSecuri
             assertThat(slotOptionsAfter).doesNotContain(opt1.getId());
             assertThat(activeBookingCount).isEqualTo(0);
         }
+    }
+
+    @Test
+    @DisplayName("Khách HOLD 8 chỗ đồng thời Vendor DELETE detach thiết bị -> tuần tự hóa sạch qua SELECT FOR UPDATE + Redis, không deadlock")
+    void concurrentHoldAndEquipmentDetach_consistentPostgresAndRedis() throws Exception {
+        var eq10 = equipmentStore.create(testVendor.getId(), "Cano Race Detach", "cano", 10);
+        ServiceSlotJpaEntity raceSlot = createSingleEquipmentSlot(LocalTime.of(11, 0), LocalTime.of(13, 0), 10, eq10.id());
+
+        int threads = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        CountDownLatch readyLatch = new CountDownLatch(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        AtomicInteger holdSuccess = new AtomicInteger();
+        AtomicInteger detachSuccess = new AtomicInteger();
+        AtomicInteger detachRejected = new AtomicInteger();
+        List<Throwable> unexpectedErrors = Collections.synchronizedList(new ArrayList<>());
+
+        executor.submit(() -> {
+            readyLatch.countDown();
+            try {
+                startLatch.await();
+                createBookingHoldUseCase.execute(new CreateBookingHoldCommand(
+                        testCustomer.getId(),
+                        List.of(new BookingHoldItemDto(raceSlot.getId(), 8, opt1.getId(), null, false, null)),
+                        UUID.randomUUID().toString()
+                ));
+                holdSuccess.incrementAndGet();
+            } catch (Throwable t) {
+                unexpectedErrors.add(t);
+            }
+        });
+
+        executor.submit(() -> {
+            readyLatch.countDown();
+            try {
+                startLatch.await();
+                equipmentAssignmentService.detach(testVendorUser.getId(), raceSlot.getId(), 1, eq10.id());
+                detachSuccess.incrementAndGet();
+            } catch (ResponseStatusException ex) {
+                if (ex.getStatusCode().value() == 409) detachRejected.incrementAndGet();
+                else unexpectedErrors.add(ex);
+            } catch (Throwable t) {
+                unexpectedErrors.add(t);
+            }
+        });
+
+        readyLatch.await(5, TimeUnit.SECONDS);
+        startLatch.countDown();
+        executor.shutdown();
+        assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+        assertThat(unexpectedErrors).isEmpty();
+        assertThat(holdSuccess.get()).isEqualTo(1);
+        assertThat(detachSuccess.get() + detachRejected.get()).isEqualTo(1);
+
+        UUID eqAfter = jdbcTemplate.queryForObject(
+                "SELECT equipment_id FROM service_slot_units WHERE slot_id=? AND unit_number=1", UUID.class, raceSlot.getId());
+        if (detachRejected.get() == 1) {
+            // HOLD won the lock first -> detach was blocked 409 -> equipment link preserved
+            assertThat(eqAfter).isEqualTo(eq10.id());
+        } else {
+            // Detach won the lock first before any HOLD existed -> equipment detached, HOLD still cleanly locked capacity=10
+            assertThat(eqAfter).isNull();
+        }
+        assertThat(redisTemplate.opsForHash().entries("inventory:slot:" + raceSlot.getId() + ":holds")).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Khách HOLD 8 chỗ đồng thời Vendor PUT replace thiết bị (10 -> 6 chỗ) -> loại trừ lẫn nhau 100%, không deadlock")
+    void concurrentHoldAndPutReplace_mutuallyExclusive() throws Exception {
+        var eq10 = equipmentStore.create(testVendor.getId(), "Cano Race 10", "cano", 10);
+        var eq6 = equipmentStore.create(testVendor.getId(), "Cano Race 6", "cano", 6);
+        ServiceSlotJpaEntity raceSlot = createSingleEquipmentSlot(LocalTime.of(14, 0), LocalTime.of(16, 0), 10, eq10.id());
+
+        int threads = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        CountDownLatch readyLatch = new CountDownLatch(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        AtomicInteger holdSuccess = new AtomicInteger();
+        AtomicInteger holdRejected = new AtomicInteger();
+        AtomicInteger replaceSuccess = new AtomicInteger();
+        AtomicInteger replaceRejected = new AtomicInteger();
+        List<Throwable> unexpectedErrors = Collections.synchronizedList(new ArrayList<>());
+
+        executor.submit(() -> {
+            readyLatch.countDown();
+            try {
+                startLatch.await();
+                createBookingHoldUseCase.execute(new CreateBookingHoldCommand(
+                        testCustomer.getId(),
+                        List.of(new BookingHoldItemDto(raceSlot.getId(), 8, opt1.getId(), null, false, null)),
+                        UUID.randomUUID().toString()
+                ));
+                holdSuccess.incrementAndGet();
+            } catch (InsufficientInventoryException | SlotNotAvailableException | IllegalArgumentException ex) {
+                holdRejected.incrementAndGet();
+            } catch (Throwable t) {
+                unexpectedErrors.add(t);
+            }
+        });
+
+        executor.submit(() -> {
+            readyLatch.countDown();
+            try {
+                startLatch.await();
+                equipmentAssignmentService.attach(testVendorUser.getId(), raceSlot.getId(), 1, eq6.id());
+                replaceSuccess.incrementAndGet();
+            } catch (ResponseStatusException ex) {
+                if (ex.getStatusCode().value() == 409) replaceRejected.incrementAndGet();
+                else unexpectedErrors.add(ex);
+            } catch (Throwable t) {
+                unexpectedErrors.add(t);
+            }
+        });
+
+        readyLatch.await(5, TimeUnit.SECONDS);
+        startLatch.countDown();
+        executor.shutdown();
+        assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+        assertThat(unexpectedErrors).isEmpty();
+        assertThat(holdSuccess.get() + replaceSuccess.get()).isEqualTo(1);
+        assertThat(holdRejected.get() + replaceRejected.get()).isEqualTo(1);
+
+        UUID eqAfter = jdbcTemplate.queryForObject(
+                "SELECT equipment_id FROM service_slot_units WHERE slot_id=? AND unit_number=1", UUID.class, raceSlot.getId());
+        Integer capAfter = jdbcTemplate.queryForObject(
+                "SELECT capacity FROM service_slot_units WHERE slot_id=? AND unit_number=1", Integer.class, raceSlot.getId());
+        if (holdSuccess.get() == 1) {
+            assertThat(eqAfter).isEqualTo(eq10.id());
+            assertThat(capAfter).isEqualTo(10);
+            assertThat(redisTemplate.opsForHash().entries("inventory:slot:" + raceSlot.getId() + ":holds")).hasSize(1);
+        } else {
+            assertThat(eqAfter).isEqualTo(eq6.id());
+            assertThat(capAfter).isEqualTo(6);
+            assertThat(redisTemplate.opsForHash().entries("inventory:slot:" + raceSlot.getId() + ":holds")).isEmpty();
+        }
+    }
+
+    @Test
+    @DisplayName("Khách HOLD 8 chỗ đồng thời Vendor PATCH atomic (đổi thiết bị 10->6 + status + option) -> loại trừ lẫn nhau 100%, không dở dang")
+    void concurrentHoldAndAtomicPatch_mutuallyExclusive() throws Exception {
+        var eq10 = equipmentStore.create(testVendor.getId(), "Cano Atomic 10", "cano", 10);
+        var eq6 = equipmentStore.create(testVendor.getId(), "Cano Atomic 6", "cano", 6);
+        ServiceSlotJpaEntity raceSlot = createSingleEquipmentSlot(LocalTime.of(16, 30), LocalTime.of(18, 30), 10, eq10.id());
+
+        int threads = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        CountDownLatch readyLatch = new CountDownLatch(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        AtomicInteger holdSuccess = new AtomicInteger();
+        AtomicInteger holdRejected = new AtomicInteger();
+        AtomicInteger patchSuccess = new AtomicInteger();
+        AtomicInteger patchRejected = new AtomicInteger();
+        List<Throwable> unexpectedErrors = Collections.synchronizedList(new ArrayList<>());
+
+        executor.submit(() -> {
+            readyLatch.countDown();
+            try {
+                startLatch.await();
+                createBookingHoldUseCase.execute(new CreateBookingHoldCommand(
+                        testCustomer.getId(),
+                        List.of(new BookingHoldItemDto(raceSlot.getId(), 8, opt1.getId(), null, false, null)),
+                        UUID.randomUUID().toString()
+                ));
+                holdSuccess.incrementAndGet();
+            } catch (InsufficientInventoryException | SlotNotAvailableException | IllegalArgumentException ex) {
+                holdRejected.incrementAndGet();
+            } catch (Throwable t) {
+                unexpectedErrors.add(t);
+            }
+        });
+
+        executor.submit(() -> {
+            readyLatch.countDown();
+            try {
+                startLatch.await();
+                updateServiceSlotUseCase.execute(
+                        testVendorUser.getId(),
+                        testService.getId(),
+                        raceSlot.getId(),
+                        new UpdateServiceSlotRequest(
+                                SlotStatus.CLOSED,
+                                null,
+                                List.of(new CreateSlotUnitRequest(1, 6, eq6.id(), null)),
+                                List.of(opt2.getId())
+                        )
+                );
+                patchSuccess.incrementAndGet();
+            } catch (ResponseStatusException ex) {
+                if (ex.getStatusCode().value() == 409) patchRejected.incrementAndGet();
+                else unexpectedErrors.add(ex);
+            } catch (IllegalArgumentException ex) {
+                patchRejected.incrementAndGet();
+            } catch (Throwable t) {
+                unexpectedErrors.add(t);
+            }
+        });
+
+        readyLatch.await(5, TimeUnit.SECONDS);
+        startLatch.countDown();
+        executor.shutdown();
+        assertThat(executor.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+        assertThat(unexpectedErrors).isEmpty();
+        assertThat(holdSuccess.get() + patchSuccess.get()).isEqualTo(1);
+        assertThat(holdRejected.get() + patchRejected.get()).isEqualTo(1);
+
+        String statusAfter = jdbcTemplate.queryForObject("SELECT status FROM service_slots WHERE id=?", String.class, raceSlot.getId());
+        UUID eqAfter = jdbcTemplate.queryForObject(
+                "SELECT equipment_id FROM service_slot_units WHERE slot_id=? AND unit_number=1", UUID.class, raceSlot.getId());
+        Integer capAfter = jdbcTemplate.queryForObject("SELECT capacity FROM service_slots WHERE id=?", Integer.class, raceSlot.getId());
+        List<UUID> optsAfter = jdbcTemplate.queryForList(
+                "SELECT option_id FROM service_slot_options WHERE slot_id=?", UUID.class, raceSlot.getId());
+
+        if (holdSuccess.get() == 1) {
+            // HOLD won -> PATCH rolled back completely
+            assertThat(statusAfter).isEqualTo("OPEN");
+            assertThat(eqAfter).isEqualTo(eq10.id());
+            assertThat(capAfter).isEqualTo(10);
+            assertThat(optsAfter).containsExactlyInAnyOrder(opt1.getId(), opt2.getId());
+            assertThat(redisTemplate.opsForHash().entries("inventory:slot:" + raceSlot.getId() + ":holds")).hasSize(1);
+        } else {
+            // Atomic PATCH won -> HOLD rejected cleanly
+            assertThat(statusAfter).isEqualTo("CLOSED");
+            assertThat(eqAfter).isEqualTo(eq6.id());
+            assertThat(capAfter).isEqualTo(6);
+            assertThat(optsAfter).containsExactly(opt2.getId());
+            assertThat(redisTemplate.opsForHash().entries("inventory:slot:" + raceSlot.getId() + ":holds")).isEmpty();
+        }
+    }
+
+    private ServiceSlotJpaEntity createSingleEquipmentSlot(LocalTime start, LocalTime end, int cap, UUID equipmentId) {
+        LocalDate tomorrow = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(2);
+        ServiceSlotJpaEntity slot = new ServiceSlotJpaEntity();
+        slot.setServiceId(testService.getId());
+        slot.setDate(tomorrow);
+        slot.setStartTime(start);
+        slot.setEndTime(end);
+        slot.setCapacity(cap);
+        slot.setBookedCount(0);
+        slot.setInventoryType(InventoryType.SHARED_CAPACITY_UNITS);
+        slot.setStatus(SlotStatus.OPEN);
+        slot = serviceSlotRepository.save(slot);
+
+        ServiceSlotUnitJpaEntity unit = new ServiceSlotUnitJpaEntity();
+        unit.setSlotId(slot.getId());
+        unit.setUnitNumber(1);
+        unit.setCapacity(cap);
+        unit.setBookedCount(0);
+        unit.setEquipmentId(equipmentId);
+        serviceSlotUnitRepository.save(unit);
+
+        jdbcTemplate.update("INSERT INTO service_slot_options(slot_id, option_id) VALUES (?, ?), (?, ?)",
+                slot.getId(), opt1.getId(), slot.getId(), opt2.getId());
+        return slot;
     }
 }

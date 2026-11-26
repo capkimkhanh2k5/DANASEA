@@ -215,4 +215,70 @@ public class EquipmentConcurrencyIntegrationTest extends BaseSecurityIntegration
                 Integer.class, cano1.id());
         assertThat(assignedUnitsCount).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("Hai transaction đồng thời REPLACE cùng thiết bị mục tiêu cho 2 ca chồng giờ -> Đúng 1 thành công, ca thua giữ nguyên thiết bị cũ")
+    void concurrentReplace_sameTargetEquipment_overlappingSlots_preservesLoserLink() throws Exception {
+        EquipmentStore.Equipment eqInitial1 = equipmentStore.create(testVendor.getId(), "Cano Old 1", "cano-10", 10);
+        EquipmentStore.Equipment eqInitial2 = equipmentStore.create(testVendor.getId(), "Cano Old 2", "cano-10", 10);
+        equipmentService.attach(testVendorUser.getId(), slot1.getId(), 1, eqInitial1.id());
+        equipmentService.attach(testVendorUser.getId(), slot2.getId(), 1, eqInitial2.id());
+
+        int threads = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        CountDownLatch readyLatch = new CountDownLatch(threads);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        AtomicInteger successCount = new AtomicInteger();
+        AtomicInteger conflictCount = new AtomicInteger();
+        List<Throwable> unexpectedErrors = Collections.synchronizedList(new ArrayList<>());
+
+        executor.submit(() -> {
+            readyLatch.countDown();
+            try {
+                startLatch.await();
+                equipmentService.attach(testVendorUser.getId(), slot1.getId(), 1, cano1.id());
+                successCount.incrementAndGet();
+            } catch (ResponseStatusException ex) {
+                if (ex.getStatusCode().value() == 409) conflictCount.incrementAndGet();
+                else unexpectedErrors.add(ex);
+            } catch (Throwable t) {
+                unexpectedErrors.add(t);
+            }
+        });
+
+        executor.submit(() -> {
+            readyLatch.countDown();
+            try {
+                startLatch.await();
+                equipmentService.attach(testVendorUser.getId(), slot2.getId(), 1, cano1.id());
+                successCount.incrementAndGet();
+            } catch (ResponseStatusException ex) {
+                if (ex.getStatusCode().value() == 409) conflictCount.incrementAndGet();
+                else unexpectedErrors.add(ex);
+            } catch (Throwable t) {
+                unexpectedErrors.add(t);
+            }
+        });
+
+        readyLatch.await(5, TimeUnit.SECONDS);
+        startLatch.countDown();
+        executor.shutdown();
+        boolean finished = executor.awaitTermination(15, TimeUnit.SECONDS);
+
+        assertThat(finished).isTrue();
+        assertThat(unexpectedErrors).isEmpty();
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(conflictCount.get()).isEqualTo(1);
+
+        UUID eqSlot1 = jdbcTemplate.queryForObject(
+                "SELECT equipment_id FROM service_slot_units WHERE slot_id=? AND unit_number=1", UUID.class, slot1.getId());
+        UUID eqSlot2 = jdbcTemplate.queryForObject(
+                "SELECT equipment_id FROM service_slot_units WHERE slot_id=? AND unit_number=1", UUID.class, slot2.getId());
+        assertThat(List.of(eqSlot1, eqSlot2)).contains(cano1.id());
+        if (cano1.id().equals(eqSlot1)) {
+            assertThat(eqSlot2).isEqualTo(eqInitial2.id());
+        } else {
+            assertThat(eqSlot1).isEqualTo(eqInitial1.id());
+        }
+    }
 }
