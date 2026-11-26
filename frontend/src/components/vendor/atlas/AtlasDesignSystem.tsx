@@ -226,6 +226,7 @@ export function AtlasButton({
   title,
   className = '',
   type = 'button',
+  form,
 }: {
   children: React.ReactNode;
   variant?: 'primary' | 'secondary' | 'outline' | 'danger';
@@ -236,6 +237,7 @@ export function AtlasButton({
   title?: string;
   className?: string;
   type?: 'button' | 'submit' | 'reset';
+  form?: string;
 }) {
   const variantStyles = {
     primary: 'bg-slate-900 text-white hover:bg-black shadow-xs',
@@ -253,6 +255,7 @@ export function AtlasButton({
   return (
     <button
       type={type}
+      form={form}
       disabled={disabled}
       title={title}
       onClick={onClick}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { 
   Loader2, 
   ArrowLeft,
@@ -16,10 +16,10 @@ import {
   Plus,
   Upload,
   Trash2,
-  ArrowUp,
-  ArrowDown,
   X,
-  Hourglass
+  Hourglass,
+  Edit2,
+  ExternalLink
 } from 'lucide-react';
 import { 
   AtlasPageHeader, 
@@ -85,8 +85,22 @@ export function ServiceForm() {
 
 function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialTabParam = searchParams.get('tab');
+  const initialTab: FormTab =
+    initialTabParam === 'IMAGES' || initialTabParam === 'OPTIONS' || initialTabParam === 'SAFETY_DOCS'
+      ? initialTabParam
+      : 'CONTENT_SAFETY';
 
-  const [activeTab, setActiveTab] = useState<FormTab>('CONTENT_SAFETY');
+  const [activeTab, setActiveTab] = useState<FormTab>(initialTab);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: 'danger' | 'primary';
+    onConfirm: () => Promise<void> | void;
+  } | null>(null);
+  const [isConfirmingAction, setIsConfirmingAction] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(Boolean(serviceId));
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -126,13 +140,16 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
 
   // Tab 3: Options
   const [options, setOptions] = useState<VendorServiceOptionDto[]>([]);
-  const [isAddOptionModalOpen, setIsAddOptionModalOpen] = useState<boolean>(false);
+  const [isOptionModalOpen, setIsOptionModalOpen] = useState<boolean>(false);
+  const [editingOption, setEditingOption] = useState<VendorServiceOptionDto | null>(null);
+  const [isSavingOption, setIsSavingOption] = useState<boolean>(false);
   const [optName, setOptName] = useState('');
   const [optType, setOptType] = useState<OptionType>('SHARED');
   const [optPricingUnit, setOptPricingUnit] = useState<PricingUnit>('PER_PERSON');
   const [optPrice, setOptPrice] = useState<number>(300000);
   const [optMaxPax, setOptMaxPax] = useState<number | null>(null);
   const [optBenefits, setOptBenefits] = useState('');
+  const [optStatus, setOptStatus] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
 
   // Tab 4: Safety Documents
   const [safetyDocs, setSafetyDocs] = useState<SafetyDocumentDto[]>([]);
@@ -400,49 +417,57 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
     }
   };
 
-  // Tab 2: Delete Image
-  const handleDeleteImage = async (imageId: string) => {
+  // Tab 2: Delete Image (Atlas Modal)
+  const handleDeleteImage = (imageId: string) => {
     if (!currentServiceId) return;
-    if (!window.confirm('Bạn có chắc muốn xóa ảnh này?')) return;
-    try {
-      await vendorService.deleteImage(currentServiceId, imageId);
-      setImages(prev => prev.filter(img => img.id !== imageId));
-      showToast('Đã xóa ảnh thành công.');
-    } catch (err: unknown) {
-      console.error('[ServiceForm] Lỗi xóa ảnh:', err);
-      const msg = extractErrorMessage(err, 'Không thể xóa ảnh');
-      toast.error(msg);
-    }
+    setConfirmDialog({
+      title: 'Xóa ảnh dịch vụ',
+      description: 'Bạn có chắc chắn muốn xóa hình ảnh này khỏi dịch vụ? Thao tác này không thể hoàn tác.',
+      confirmText: 'Xóa ảnh',
+      variant: 'danger',
+      onConfirm: async () => {
+        setIsConfirmingAction(true);
+        try {
+          await vendorService.deleteImage(currentServiceId, imageId);
+          setImages(prev => prev.filter(img => img.id !== imageId));
+          showToast('Đã xóa ảnh thành công.');
+          setConfirmDialog(null);
+        } catch (err: unknown) {
+          console.error('[ServiceForm] Lỗi xóa ảnh:', err);
+          toast.error(extractErrorMessage(err, 'Không thể xóa ảnh'));
+        } finally {
+          setIsConfirmingAction(false);
+        }
+      },
+    });
   };
 
-  // Tab 2: Move Image
-  const handleMoveImage = async (index: number, direction: 'UP' | 'DOWN') => {
-    if (!currentServiceId) return;
-    const targetIndex = direction === 'UP' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= images.length) return;
-
-    const newArr = [...images];
-    const temp = newArr[index];
-    newArr[index] = newArr[targetIndex];
-    newArr[targetIndex] = temp;
-
-    setImages(newArr);
-    try {
-      const reordered = await vendorService.reorderImages(
-        currentServiceId,
-        newArr.map(img => img.id)
-      );
-      setImages(reordered || newArr);
-      showToast('Đã cập nhật thứ tự ảnh thành công.');
-    } catch (err: unknown) {
-      console.error('[ServiceForm] Lỗi sắp xếp ảnh:', err);
-      // Revert if API failed
-      setImages(images);
-    }
+  // Tab 3: Create / Edit Option
+  const handleOpenCreateOption = () => {
+    setEditingOption(null);
+    setOptName('');
+    setOptType('SHARED');
+    setOptPricingUnit('PER_PERSON');
+    setOptPrice(price > 0 ? price : 300000);
+    setOptMaxPax(null);
+    setOptBenefits('');
+    setOptStatus('ACTIVE');
+    setIsOptionModalOpen(true);
   };
 
-  // Tab 3: Create Option
-  const handleCreateOption = async () => {
+  const handleOpenEditOption = (opt: VendorServiceOptionDto) => {
+    setEditingOption(opt);
+    setOptName(opt.name);
+    setOptType(opt.optionType);
+    setOptPricingUnit(opt.pricingUnit);
+    setOptPrice(opt.price);
+    setOptMaxPax(opt.maxPaxPerPackage ?? null);
+    setOptBenefits(opt.benefits || '');
+    setOptStatus(opt.status);
+    setIsOptionModalOpen(true);
+  };
+
+  const handleSaveOption = async () => {
     if (!currentServiceId) {
       toast.warning('Vui lòng lưu dịch vụ trước khi tạo lựa chọn bán.');
       return;
@@ -451,7 +476,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
       toast.warning('Vui lòng nhập tên gói/lựa chọn.');
       return;
     }
-    if (optPrice <= 0) {
+    if (!optPrice || optPrice <= 0) {
       toast.warning('Đơn giá phải lớn hơn 0 đ.');
       return;
     }
@@ -460,27 +485,37 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
       return;
     }
 
+    setIsSavingOption(true);
     try {
-      const newOption = await vendorService.createOption(currentServiceId, {
-        name: optName.trim(),
-        optionType: optType,
-        pricingUnit: optPricingUnit,
-        price: optPrice,
-        maxPaxPerPackage: optType === 'PRIVATE' ? optMaxPax : null,
-        benefits: optBenefits.trim() || null,
-      });
-      setOptions(prev => [...prev, newOption]);
-      showToast(`Đã thêm lựa chọn bán "${newOption.name}" thành công.`);
-      setIsAddOptionModalOpen(false);
-      // Reset form
-      setOptName('');
-      setOptPrice(300000);
-      setOptMaxPax(null);
-      setOptBenefits('');
+      if (editingOption) {
+        const updated = await vendorService.updateOption(currentServiceId, editingOption.id, {
+          name: optName.trim(),
+          price: optPrice,
+          maxPaxPerPackage: optType === 'PRIVATE' ? optMaxPax : null,
+          benefits: optBenefits.trim() || null,
+          status: optStatus,
+        });
+        setOptions(prev => prev.map(item => (item.id === updated.id ? updated : item)));
+        showToast(`Đã cập nhật lựa chọn bán "${updated.name}".`);
+      } else {
+        const newOption = await vendorService.createOption(currentServiceId, {
+          name: optName.trim(),
+          optionType: optType,
+          pricingUnit: optPricingUnit,
+          price: optPrice,
+          maxPaxPerPackage: optType === 'PRIVATE' ? optMaxPax : null,
+          benefits: optBenefits.trim() || null,
+        });
+        setOptions(prev => [...prev, newOption]);
+        showToast(`Đã thêm lựa chọn bán "${newOption.name}" thành công.`);
+      }
+      setIsOptionModalOpen(false);
+      setEditingOption(null);
     } catch (err: unknown) {
-      console.error('[ServiceForm] Lỗi tạo option:', err);
-      const msg = extractErrorMessage(err, 'Không thể tạo lựa chọn');
-      toast.error(msg);
+      console.error('[ServiceForm] Lỗi lưu option:', err);
+      toast.error(extractErrorMessage(err, 'Không thể lưu lựa chọn bán'));
+    } finally {
+      setIsSavingOption(false);
     }
   };
 
@@ -496,8 +531,9 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
 
     setIsUploadingDoc(true);
     try {
-      const doc = await vendorService.uploadSafetyDocument(currentServiceId, file);
-      setSafetyDocs(prev => [...prev, doc]);
+      await vendorService.uploadSafetyDocument(currentServiceId, file);
+      const docs = await vendorService.getSafetyDocuments(currentServiceId);
+      setSafetyDocs(docs || []);
       showToast('Đã tải lên chứng từ an toàn dịch vụ thành công.');
       e.target.value = '';
     } catch (err: unknown) {
@@ -506,6 +542,83 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
     } finally {
       setIsUploadingDoc(false);
     }
+  };
+
+  const handleWithdrawSafetyDoc = (documentId: string) => {
+    if (!currentServiceId) return;
+    setConfirmDialog({
+      title: 'Rút lại chứng chỉ an toàn',
+      description: 'Chứng chỉ đang chờ kiểm duyệt sẽ được thu hồi để bạn có thể cập nhật hoặc tải lên tệp mới. Bạn có chắc muốn rút lại?',
+      confirmText: 'Rút lại chứng chỉ',
+      variant: 'primary',
+      onConfirm: async () => {
+        setIsConfirmingAction(true);
+        try {
+          await vendorService.withdrawSafetyDocument(currentServiceId, documentId);
+          const docs = await vendorService.getSafetyDocuments(currentServiceId);
+          setSafetyDocs(docs || []);
+          toast.success('Đã rút lại chứng từ an toàn.');
+          setConfirmDialog(null);
+        } catch (err: unknown) {
+          console.error('[ServiceForm] Lỗi rút lại chứng từ:', err);
+          toast.error(extractErrorMessage(err, 'Không thể rút lại chứng từ'));
+        } finally {
+          setIsConfirmingAction(false);
+        }
+      },
+    });
+  };
+
+  const handleReplaceSafetyDoc = (documentId: string, e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentServiceId) return;
+    e.target.value = '';
+    setConfirmDialog({
+      title: 'Thay thế chứng chỉ an toàn',
+      description: `Tệp "${file.name}" sẽ được gửi lên để thay thế cho chứng chỉ bị từ chối và gửi lại cho Quản trị viên duyệt. Bạn có muốn tiếp tục?`,
+      confirmText: 'Tải lên & Thay thế',
+      variant: 'primary',
+      onConfirm: async () => {
+        setIsConfirmingAction(true);
+        try {
+          await vendorService.replaceSafetyDocument(currentServiceId, documentId, file);
+          const docs = await vendorService.getSafetyDocuments(currentServiceId);
+          setSafetyDocs(docs || []);
+          toast.success('Đã gửi chứng từ thay thế thành công!');
+          setConfirmDialog(null);
+        } catch (err: unknown) {
+          console.error('[ServiceForm] Lỗi thay thế chứng từ:', err);
+          toast.error(extractErrorMessage(err, 'Không thể thay thế chứng từ'));
+        } finally {
+          setIsConfirmingAction(false);
+        }
+      },
+    });
+  };
+
+  const handleDeleteSafetyDoc = (documentId: string) => {
+    if (!currentServiceId) return;
+    setConfirmDialog({
+      title: 'Xóa chứng chỉ an toàn',
+      description: 'Bạn có chắc chắn muốn xóa vĩnh viễn tệp chứng chỉ an toàn này?',
+      confirmText: 'Xóa chứng chỉ',
+      variant: 'danger',
+      onConfirm: async () => {
+        setIsConfirmingAction(true);
+        try {
+          await vendorService.deleteSafetyDocument(currentServiceId, documentId);
+          const docs = await vendorService.getSafetyDocuments(currentServiceId);
+          setSafetyDocs(docs || []);
+          toast.success('Đã xóa chứng từ an toàn.');
+          setConfirmDialog(null);
+        } catch (err: unknown) {
+          console.error('[ServiceForm] Lỗi xóa chứng từ:', err);
+          toast.error(extractErrorMessage(err, 'Không thể xóa chứng từ'));
+        } finally {
+          setIsConfirmingAction(false);
+        }
+      },
+    });
   };
 
   const renderStatusBadge = (status: string) => {
@@ -984,24 +1097,6 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                           <span className="text-xs font-semibold font-mono text-slate-600">Thứ tự: {idx + 1}</span>
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => handleMoveImage(idx, 'UP')}
-                              disabled={idx === 0}
-                              className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
-                              title="Đưa lên"
-                              type="button"
-                            >
-                              <ArrowUp className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleMoveImage(idx, 'DOWN')}
-                              disabled={idx === images.length - 1}
-                              className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-30 cursor-pointer transition-colors"
-                              title="Hạ xuống"
-                              type="button"
-                            >
-                              <ArrowDown className="w-3.5 h-3.5" />
-                            </button>
-                            <button
                               onClick={() => handleDeleteImage(img.id)}
                               className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer transition-colors"
                               title="Xóa ảnh"
@@ -1024,12 +1119,15 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
                   <div>
                     <h2 className="text-base font-bold text-slate-900 font-display">Các gói dịch vụ &amp; Lựa chọn bán</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Cấu hình sẵn các gói ghép đoàn SHARED và bao trọn gói PRIVATE kèm đơn giá để dùng lại khi tạo ca khởi hành.
+                    </p>
                   </div>
 
                   <AtlasButton
                     variant="primary"
                     size="sm"
-                    onClick={() => setIsAddOptionModalOpen(true)}
+                    onClick={handleOpenCreateOption}
                     icon={<Plus className="w-4 h-4" />}
                   >
                     Thêm lựa chọn bán
@@ -1041,13 +1139,13 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                     <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
                       <Tag className="w-6 h-6" />
                     </div>
-                    <p className="text-sm font-semibold text-slate-800">Chưa có lựa chọn bổ sung</p>
+                    <p className="text-sm font-semibold text-slate-800">Chưa có lựa chọn bán nào</p>
                     <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                      Dịch vụ sẽ tự động áp dụng đơn giá niêm yết chuẩn ({price.toLocaleString('vi-VN')} đ) ở Tab 1.
+                      Hãy tạo ít nhất một gói bán (VD: Vé ghép tiêu chuẩn, Bao trọn cano...) với giá cố định tại đây trước khi tạo ca khởi hành.
                     </p>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-slate-200/80 overflow-hidden shadow-2xs">
+                  <div className="rounded-xl border border-slate-200/80 overflow-x-auto shadow-2xs">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-slate-50/80 text-slate-700 font-semibold border-b border-slate-200/80">
@@ -1058,6 +1156,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                           <th className="py-3 px-4 uppercase tracking-wider text-[11px] text-center">Tối đa khách</th>
                           <th className="py-3 px-4 uppercase tracking-wider text-[11px]">Quyền lợi</th>
                           <th className="py-3 px-4 uppercase tracking-wider text-[11px] text-center">Trạng thái</th>
+                          <th className="py-3 px-4 uppercase tracking-wider text-[11px] text-right">Thao tác</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1066,16 +1165,16 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                             <td className="py-3 px-4 font-bold text-slate-900">{opt.name}</td>
                             <td className="py-3 px-4">
                               <span className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold ${
-                                opt.optionType === 'PRIVATE' ? 'bg-slate-100 text-slate-800 border border-slate-200/80' : 'bg-sky-50 text-sky-700 border border-sky-200/80'
+                                opt.optionType === 'PRIVATE' ? 'bg-teal-50 text-teal-800 border border-teal-200/80' : 'bg-sky-50 text-sky-700 border border-sky-200/80'
                               }`}>
-                                {opt.optionType === 'PRIVATE' ? 'Bao trọn gói' : 'Ghép đoàn'}
+                                {opt.optionType === 'PRIVATE' ? 'PRIVATE · Thuê riêng' : 'SHARED · Vé ghép'}
                               </span>
                             </td>
                             <td className="py-3 px-4 text-slate-600">
-                              {opt.pricingUnit === 'PER_PACKAGE' ? 'Theo gói trọn gói' : 'Theo đầu người'}
+                              {opt.pricingUnit === 'PER_PACKAGE' ? 'Theo gói (/gói)' : 'Theo đầu người (/người)'}
                             </td>
-                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 tabular-nums">
-                              {opt.price.toLocaleString('vi-VN')} đ
+                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap">
+                              {opt.price.toLocaleString('vi-VN')} VNĐ/{opt.pricingUnit === 'PER_PACKAGE' ? 'gói' : 'người'}
                             </td>
                             <td className="py-3 px-4 text-center font-mono text-slate-700">
                               {opt.maxPaxPerPackage ? `${opt.maxPaxPerPackage} khách` : '—'}
@@ -1088,6 +1187,17 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                                 label={opt.status === 'ACTIVE' ? 'Đang mở bán' : 'Ngưng bán'}
                                 variant={opt.status === 'ACTIVE' ? 'success' : 'neutral'}
                               />
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditOption(opt)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-semibold transition-colors cursor-pointer"
+                                title="Chỉnh sửa lựa chọn bán"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                                <span>Sửa</span>
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -1133,25 +1243,91 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {safetyDocs.map(doc => (
-                      <div key={doc.id} className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/70 flex items-center justify-between gap-4 text-xs hover:border-slate-300 transition-colors">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center shrink-0 text-slate-500">
-                            <FileText className="w-5 h-5 text-sky-600" />
+                    {safetyDocs.map((doc, docIdx) => (
+                      <div key={doc.id} className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-2 text-xs hover:border-slate-300 transition-colors">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center shrink-0 text-slate-500">
+                              <FileText className="w-5 h-5 text-sky-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-900">
+                                  Chứng từ an toàn #{docIdx + 1}
+                                </span>
+                                <a
+                                  href={doc.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-teal-800 hover:underline inline-flex items-center gap-0.5 text-[11px] font-medium"
+                                >
+                                  <span>Xem tệp</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                              <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                                Ngày nộp: {new Date(doc.createdAt).toLocaleDateString('vi-VN')}
+                                {doc.reviewedAt && ` • Đã xử lý: ${new Date(doc.reviewedAt).toLocaleDateString('vi-VN')}`}
+                              </p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="font-bold text-slate-900 hover:text-sky-600 transition-colors block truncate">
-                              Xem chứng từ đã tải lên
-                            </a>
-                            <p className="text-[11px] text-slate-500 font-mono mt-0.5">Ngày nộp: {new Date(doc.createdAt).toLocaleDateString('vi-VN')}</p>
+
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                            {doc.status === 'APPROVED' && <AtlasBadge label="Đã duyệt" variant="success" />}
+                            {doc.status === 'SUPERSEDED' && <AtlasBadge label="Đã thay thế" variant="neutral" />}
+                            {doc.status === 'WITHDRAWN' && <AtlasBadge label="Đã thu hồi" variant="neutral" />}
+
+                            {doc.status === 'PENDING' && (
+                              <>
+                                <AtlasBadge label="Chờ kiểm tra" variant="warning" />
+                                <button
+                                  type="button"
+                                  onClick={() => handleWithdrawSafetyDoc(doc.id)}
+                                  className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                                >
+                                  Rút lại
+                                </button>
+                              </>
+                            )}
+
+                            {doc.status === 'REJECTED' && (
+                              <>
+                                <AtlasBadge label="Bị từ chối" variant="danger" />
+                                <label className="px-2.5 py-1 rounded-lg bg-teal-800 hover:bg-teal-900 text-white text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1">
+                                  <Upload className="w-3 h-3" />
+                                  <span>Thay thế chứng chỉ</span>
+                                  <input
+                                    type="file"
+                                    accept="application/pdf,image/jpeg,image/png"
+                                    onChange={(e) => handleReplaceSafetyDoc(doc.id, e)}
+                                    className="hidden"
+                                  />
+                                </label>
+                              </>
+                            )}
+
+                            {(doc.status === 'PENDING' || doc.status === 'REJECTED' || doc.status === 'WITHDRAWN') && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSafetyDoc(doc.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                                title="Xóa chứng từ này"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
-                        <div className="shrink-0">
-                          {doc.status === 'APPROVED' && <AtlasBadge label="Đã duyệt" variant="success" />}
-                          {doc.status === 'PENDING' && <AtlasBadge label="Chờ kiểm tra" variant="warning" />}
-                          {doc.status === 'REJECTED' && <AtlasBadge label="Bị từ chối" variant="danger" />}
-                        </div>
+                        {doc.status === 'REJECTED' && doc.rejectionReason && (
+                          <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[11px] flex items-start gap-1.5">
+                            <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold">Lý do từ chối:</span> {doc.rejectionReason}.{' '}
+                              <span className="text-rose-700">Vui lòng bấm &quot;Thay thế chứng chỉ&quot; ở trên để gửi lại tài liệu chuẩn.</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1162,15 +1338,20 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
         )}
       </div>
 
-      {/* Modal: Add Option */}
-      {isAddOptionModalOpen && createPortal(
+      {/* Modal: Create / Edit Option */}
+      {isOptionModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 w-full max-w-md p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-base text-slate-900 font-display">Thêm gói dịch vụ</h3>
-              <button 
+              <h3 className="font-bold text-base text-slate-900 font-display">
+                {editingOption ? 'Chỉnh sửa gói dịch vụ' : 'Thêm gói dịch vụ'}
+              </h3>
+              <button
                 type="button"
-                onClick={() => setIsAddOptionModalOpen(false)} 
+                onClick={() => {
+                  setIsOptionModalOpen(false);
+                  setEditingOption(null);
+                }}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -1194,6 +1375,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">Hình thức:</label>
                   <select
                     value={optType}
+                    disabled={Boolean(editingOption)}
                     onChange={(e) => {
                       const newType = e.target.value as OptionType;
                       setOptType(newType);
@@ -1205,10 +1387,10 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                         setOptMaxPax(null);
                       }
                     }}
-                    className="w-full px-3 py-2.5 border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none bg-white cursor-pointer"
+                    className="w-full px-3 py-2.5 border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none bg-white cursor-pointer disabled:bg-slate-50 disabled:text-slate-500"
                   >
-                    <option value="SHARED">Ghép đoàn</option>
-                    <option value="PRIVATE">Bao trọn gói</option>
+                    <option value="SHARED">SHARED · Vé ghép</option>
+                    <option value="PRIVATE">PRIVATE · Thuê riêng</option>
                   </select>
                 </div>
 
@@ -1217,7 +1399,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                   <input 
                     type="text"
                     disabled
-                    value={optPricingUnit === 'PER_PACKAGE' ? 'Theo gói trọn' : 'Theo người'}
+                    value={optPricingUnit === 'PER_PACKAGE' ? 'Theo gói (/gói)' : 'Theo người (/người)'}
                     className="w-full px-3 py-2.5 border border-slate-200/80 bg-slate-50 rounded-xl text-xs text-slate-600 font-medium"
                   />
                 </div>
@@ -1225,7 +1407,9 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Đơn giá (VNĐ): <span className="text-rose-500">*</span></label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    {optPricingUnit === 'PER_PACKAGE' ? 'Đơn giá trọn gói (VNĐ/gói):' : 'Đơn giá theo người (VNĐ/người):'} <span className="text-rose-500">*</span>
+                  </label>
                   <input 
                     type="number"
                     min={1000}
@@ -1250,6 +1434,20 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                 )}
               </div>
 
+              {editingOption && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Trạng thái gói:</label>
+                  <select
+                    value={optStatus}
+                    onChange={(e) => setOptStatus(e.target.value as 'ACTIVE' | 'INACTIVE')}
+                    className="w-full px-3 py-2.5 border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 focus:outline-none bg-white cursor-pointer"
+                  >
+                    <option value="ACTIVE">Đang mở bán (ACTIVE)</option>
+                    <option value="INACTIVE">Ngưng bán (INACTIVE)</option>
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Quyền lợi bổ sung:</label>
                 <textarea 
@@ -1266,16 +1464,64 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
               <AtlasButton
                 variant="outline"
                 size="sm"
-                onClick={() => setIsAddOptionModalOpen(false)}
+                onClick={() => {
+                  setIsOptionModalOpen(false);
+                  setEditingOption(null);
+                }}
+                disabled={isSavingOption}
               >
                 Hủy
               </AtlasButton>
               <AtlasButton
                 variant="primary"
                 size="sm"
-                onClick={handleCreateOption}
+                onClick={handleSaveOption}
+                disabled={isSavingOption}
               >
-                Lưu lựa chọn
+                {isSavingOption ? 'Đang lưu...' : editingOption ? 'Cập nhật lựa chọn' : 'Lưu lựa chọn'}
+              </AtlasButton>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal: Atlas Confirm Dialog */}
+      {confirmDialog && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200/90 w-full max-w-[440px] p-5 space-y-4 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="font-bold text-base text-slate-900">{confirmDialog.title}</h3>
+              <button
+                type="button"
+                onClick={() => !isConfirmingAction && setConfirmDialog(null)}
+                disabled={isConfirmingAction}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-sm text-slate-600 leading-relaxed">
+              <p>{confirmDialog.description}</p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <AtlasButton
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmDialog(null)}
+                disabled={isConfirmingAction}
+              >
+                Hủy
+              </AtlasButton>
+              <AtlasButton
+                variant={confirmDialog.variant || 'primary'}
+                size="sm"
+                onClick={() => confirmDialog.onConfirm()}
+                disabled={isConfirmingAction}
+              >
+                {isConfirmingAction ? 'Đang xử lý...' : confirmDialog.confirmText}
               </AtlasButton>
             </div>
           </div>
