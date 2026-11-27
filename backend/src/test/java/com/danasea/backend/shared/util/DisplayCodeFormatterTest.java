@@ -25,14 +25,32 @@ class DisplayCodeFormatterTest {
     }
 
     @Test
-    void formatsRandomUuidV4UsingFirstEightHexCharsAndPreservesAlreadyPrefixedCodes() {
+    void formatsRandomUuidV4UsingFirstEightHexCharsAndHandlesEdgeInputs() {
         UUID random = UUID.fromString("7a2f1c4d-9876-4abc-8def-0123456789ab");
         assertThat(DisplayCodeFormatter.format(random, "ORD")).isEqualTo("ORD-7A2F1C4D");
         assertThat(DisplayCodeFormatter.format("ord-7a2f1c4d", "ORD")).isEqualTo("ORD-7A2F1C4D");
+        assertThat(DisplayCodeFormatter.format((UUID) null, "ORD")).isEmpty();
+        assertThat(DisplayCodeFormatter.format((String) null, "ORD")).isEmpty();
+        assertThat(DisplayCodeFormatter.format("   ", "ORD")).isEmpty();
+        assertThat(DisplayCodeFormatter.format("abc12", null)).isEqualTo("ORD-ABC12");
+        assertThat(DisplayCodeFormatter.format("abc12", "  ")).isEqualTo("ORD-ABC12");
+        assertThat(DisplayCodeFormatter.formatWithHash(null, "ORD")).isEmpty();
+        assertThat(DisplayCodeFormatter.formatWithHash(random, "ORD")).isEqualTo("#ORD-7A2F1C4D");
     }
 
     @Test
-    void reconstructsSeedUuidsOnlyForKnownSeedHeads() {
+    void normalizesDetectsSeedHexAndReconstructsOnlyKnownSeedHeads() {
+        assertThat(DisplayCodeFormatter.normalizeCode(null)).isEmpty();
+        assertThat(DisplayCodeFormatter.normalizeCode("  #ord-7a2f1c4d  ")).isEqualTo("ORD-7A2F1C4D");
+        assertThat(DisplayCodeFormatter.normalizeCode("sub-ec938b9f")).isEqualTo("SUB-EC938B9F");
+
+        assertThat(DisplayCodeFormatter.isSeedHex(null)).isFalse();
+        assertThat(DisplayCodeFormatter.isSeedHex("1234")).isFalse();
+        assertThat(DisplayCodeFormatter.isSeedHex("7a2f1c4d9876")).isFalse();
+        assertThat(DisplayCodeFormatter.isSeedHex("666666666666")).isTrue();
+
+        assertThat(DisplayCodeFormatter.tryReconstructSeedUuid(null)).isEmpty();
+        assertThat(DisplayCodeFormatter.tryReconstructSeedUuid("INVALID")).isEmpty();
         assertThat(DisplayCodeFormatter.tryReconstructSeedUuid("#ORD-00010042"))
                 .contains(UUID.fromString("00010000-0000-0000-0000-000000000042"));
         assertThat(DisplayCodeFormatter.tryReconstructSeedUuid("#DISP-77777704"))
