@@ -57,6 +57,14 @@ export const vendorEquipmentService = {
   },
 
   /**
+   * Gỡ liên kết thiết bị khỏi một đơn vị chưa có khách của ca vận hành
+   * DELETE /api/vendor/equipment/{equipmentId}/slots/{slotId}/units/{unitNumber}
+   */
+  async detachEquipmentFromSlot(equipmentId: string, slotId: string, unitNumber: number): Promise<void> {
+    await apiClient.delete(`/vendor/equipment/${equipmentId}/slots/${slotId}/units/${unitNumber}`);
+  },
+
+  /**
    * Lên lịch hoặc cập nhật bảo trì phương tiện / thiết bị
    * PUT /api/vendor/equipment/{equipmentId}/maintenance/{maintenanceId}
    */

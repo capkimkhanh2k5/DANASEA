@@ -28,6 +28,19 @@ public class SlotAvailabilityCalculator {
                 && slot.getDate().atTime(slot.getStartTime()).isAfter(LocalDateTime.now(Booking.VIETNAM_ZONE));
     }
 
+    public static boolean supportsOption(ServiceSlot slot, ServiceOption option) {
+        if (slot == null || option == null) {
+            return false;
+        }
+        if (slot.getOptionIds() != null && !slot.getOptionIds().isEmpty()) {
+            return slot.getOptionIds().contains(option.getId());
+        }
+        if (slot.getOptionId() != null) {
+            return slot.getOptionId().equals(option.getId());
+        }
+        return !option.isPrivate() || slot.getInventoryType() == InventoryType.SHARED_CAPACITY_UNITS;
+    }
+
     public record Availability(int available, int largestSharedUnit) {
         public boolean canBook(int quantity, boolean shared, boolean allowSplit, InventoryType inventoryType) {
             return available >= quantity && (!shared || allowSplit || inventoryType != InventoryType.SHARED_CAPACITY_UNITS

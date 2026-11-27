@@ -682,9 +682,19 @@ class DemoDatabaseAcceptance(unittest.TestCase):
                 with patch.object(IMPORTER, 'db_now_vn', return_value=sim_dt):
                     session = IMPORTER.Session(self.args)
                     try:
-                        res = IMPORTER.execute_replace(session, b_copy, t_copy, 'local-acceptance-secret')
-                        self.assertEqual('REPLACE_SUCCESS', res['status'])
-                        prop_slot = session.query("SELECT json_build_object('prop', p.proposed_slot_id, 'sl_date', sl.date::text, 'exp', p.expires_at > now()) FROM public.sub_order_reschedule_proposals p JOIN public.service_slots sl ON sl.id = p.proposed_slot_id")
+                        send = session.send
+                        # Keep SQL deadline checks on the same fixed clock as the importer.
+                        with patch.object(session, 'send', side_effect=lambda sql: send(
+                            sql.replace('CURRENT_TIMESTAMP', f"TIMESTAMPTZ '{sim_dt.isoformat()}'")
+                        )):
+                            res = IMPORTER.execute_replace(session, b_copy, t_copy, 'local-acceptance-secret')
+                            self.assertEqual('REPLACE_SUCCESS', res['status'])
+                            prop_slot = session.query(
+                                "SELECT json_build_object('prop', p.proposed_slot_id, 'sl_date', sl.date::text, "
+                                f"'exp', p.expires_at > TIMESTAMPTZ '{sim_dt.isoformat()}') "
+                                "FROM public.sub_order_reschedule_proposals p "
+                                "JOIN public.service_slots sl ON sl.id = p.proposed_slot_id"
+                            )
                         self.assertEqual((sim_dt.date() + timedelta(days=7)).isoformat(), prop_slot['sl_date'])
                         self.assertTrue(prop_slot['exp'])
                     finally:

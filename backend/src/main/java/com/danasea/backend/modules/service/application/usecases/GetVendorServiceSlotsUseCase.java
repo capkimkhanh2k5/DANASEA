@@ -7,8 +7,10 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.danasea.backend.modules.service.application.services.SlotAvailabilityCalculator;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedException;
+import com.danasea.backend.modules.service.domain.models.OptionStatus;
 import com.danasea.backend.modules.service.domain.models.OptionType;
 import com.danasea.backend.modules.service.domain.models.Service;
 import com.danasea.backend.modules.service.domain.models.ServiceOption;
@@ -86,15 +88,20 @@ public class GetVendorServiceSlotsUseCase {
         List<ServiceSlotOptionSummaryResponse> optionSummaries = optIds.stream()
                 .map(optionMap::get)
                 .filter(Objects::nonNull)
-                .map(o -> new ServiceSlotOptionSummaryResponse(
-                        o.getId(),
-                        o.getName(),
-                        o.getOptionType(),
-                        o.getPricingUnit(),
-                        o.getPrice(),
-                        o.getMaxPaxPerPackage()
-                ))
+                .map(this::toOptionSummary)
                 .toList();
+
+        String bindingMode = (s.getOptionIds() != null && !s.getOptionIds().isEmpty())
+                ? "V61_MULTI"
+                : (s.getOptionId() != null ? "LEGACY_OPTION_ID" : "LEGACY_UNBOUND");
+
+        List<ServiceSlotOptionSummaryResponse> legacyCompatible = "LEGACY_UNBOUND".equals(bindingMode)
+                ? optionMap.values().stream()
+                        .filter(o -> OptionStatus.ACTIVE.equals(o.getStatus()))
+                        .filter(o -> SlotAvailabilityCalculator.supportsOption(s, o))
+                        .map(this::toOptionSummary)
+                        .toList()
+                : List.of();
 
         UUID singleOptionId = (optIds.size() == 1) ? optIds.get(0) : s.getOptionId();
         OptionType singleOptionType = (optionSummaries.size() == 1)
@@ -111,6 +118,8 @@ public class GetVendorServiceSlotsUseCase {
                 .optionType(singleOptionType)
                 .optionName(singleOptionName)
                 .options(optionSummaries)
+                .optionBindingMode(bindingMode)
+                .legacyCompatibleOptions(legacyCompatible)
                 .date(s.getDate())
                 .startTime(s.getStartTime())
                 .endTime(s.getEndTime())
@@ -121,6 +130,17 @@ public class GetVendorServiceSlotsUseCase {
                 .availableCapacity(s.getAvailableCapacity())
                 .units(unitResponses)
                 .build();
+    }
+
+    private ServiceSlotOptionSummaryResponse toOptionSummary(ServiceOption o) {
+        return new ServiceSlotOptionSummaryResponse(
+                o.getId(),
+                o.getName(),
+                o.getOptionType(),
+                o.getPricingUnit(),
+                o.getPrice(),
+                o.getMaxPaxPerPackage()
+        );
     }
 
     private ServiceSlotUnitResponse toUnitResponse(ServiceSlotUnit u) {
