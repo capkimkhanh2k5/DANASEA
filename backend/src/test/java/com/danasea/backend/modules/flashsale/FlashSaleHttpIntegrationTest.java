@@ -334,7 +334,7 @@ class FlashSaleHttpIntegrationTest extends BaseFlashSaleIntegrationTest {
         var bad=terms(shared,1,30000,OffsetDateTime.now(),OffsetDateTime.now().minusSeconds(1));
         assertThat(call("POST","/api/admin/flash-sales",adminToken,bad,null).statusCode()).isEqualTo(422);
         UUID booking=hold(sale,1);
-        assertThat(call("POST","/api/checkout/discount-preview",customerToken,Map.of("bookingId",booking,"code","ANY"),null).statusCode()).isEqualTo(422);
+        assertThat(body(call("POST","/api/checkout/discount-preview",customerToken,Map.of("bookingId",booking,"code","ANY"),null),200).path("valid").asBoolean()).isFalse();
         UUID other=user("CUSTOMER"); String otherToken=token(other,"CUSTOMER");
         assertThat(call("DELETE","/api/bookings/hold/"+booking,otherToken,null,null).statusCode()).isEqualTo(403);
         assertThat(state(booking)).isEqualTo("RESERVED");

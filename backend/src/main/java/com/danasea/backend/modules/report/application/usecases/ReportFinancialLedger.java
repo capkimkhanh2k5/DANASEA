@@ -179,13 +179,31 @@ final class ReportFinancialLedger {
     }
 
     private static BigDecimal effectiveCashPayable(SubOrderRecord o) {
-        if (o.finalAmount() != null) return safe(o.finalAmount());
-        return safe(o.subtotalAmount());
+        if (o.finalAmount() != null && o.finalAmount().signum() > 0) {
+            return o.finalAmount();
+        }
+        BigDecimal gross = safe(o.subtotalAmount());
+        if (gross.signum() > 0) {
+            BigDecimal net = gross.subtract(safe(o.vendorDiscountAmount())).subtract(safe(o.platformDiscountAmount()));
+            if (net.signum() > 0) {
+                return net;
+            }
+        }
+        return safe(o.finalAmount());
     }
 
     private static BigDecimal effectiveCommissionBasis(SubOrderRecord o) {
-        if (o.commissionBasisAmount() != null) return safe(o.commissionBasisAmount());
-        return safe(o.subtotalAmount());
+        if (o.commissionBasisAmount() != null && o.commissionBasisAmount().signum() > 0) {
+            return o.commissionBasisAmount();
+        }
+        BigDecimal gross = safe(o.subtotalAmount());
+        if (gross.signum() > 0) {
+            BigDecimal net = gross.subtract(safe(o.vendorDiscountAmount()));
+            if (net.signum() > 0) {
+                return net;
+            }
+        }
+        return safe(o.commissionBasisAmount());
     }
 
     private static BigDecimal effectiveVendorNetRevenue(SubOrderRecord o) {
