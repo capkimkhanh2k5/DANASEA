@@ -2,6 +2,7 @@ package com.danasea.backend.modules.order.infrastructure.persistence.mappers;
 
 import com.danasea.backend.modules.order.domain.models.SubOrder;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
+import com.danasea.backend.shared.util.DisplayCodeFormatter;
 
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,9 @@ public class SubOrderMapper {
         domain.setId(entity.getId());
         domain.setBookingItemId(entity.getBookingItemId());
         domain.setMasterOrderId(entity.getMasterOrderId());
+        domain.setSubOrderCode(entity.getSubOrderCode() != null && !entity.getSubOrderCode().isBlank()
+                ? entity.getSubOrderCode()
+                : DisplayCodeFormatter.format(entity.getId(), "SUB"));
         domain.setVendorId(entity.getVendorId());
         domain.setServiceId(entity.getServiceId());
         domain.setSlotId(entity.getSlotId());
@@ -63,6 +67,11 @@ public class SubOrderMapper {
         }
         entity.setBookingItemId(domain.getBookingItemId());
         entity.setMasterOrderId(domain.getMasterOrderId());
+        if (domain.getSubOrderCode() != null && !domain.getSubOrderCode().isBlank()) {
+            entity.setSubOrderCode(domain.getSubOrderCode());
+        } else if (domain.getId() != null) {
+            entity.setSubOrderCode(DisplayCodeFormatter.format(domain.getId(), "SUB"));
+        }
         entity.setVendorId(domain.getVendorId());
         entity.setServiceId(domain.getServiceId());
         entity.setSlotId(domain.getSlotId());

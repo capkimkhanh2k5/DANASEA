@@ -105,6 +105,10 @@ export const AssistantCardList: React.FC<AssistantCardListProps> = ({
           card.type === 'ITINERARY_LIST' && Array.isArray(card.facts?.itineraries)
             ? (card.facts.itineraries as Array<{ index?: number; id?: string }>)
             : [];
+        const orderItems =
+          card.type === 'ORDER_LIST' && Array.isArray(card.facts?.orders)
+            ? (card.facts.orders as Array<{ index?: number; id?: string; orderCode?: string }>)
+            : [];
 
         if (!summary && !confirmAction && !acceptAction && !rejectAction) return null;
 
@@ -279,6 +283,27 @@ export const AssistantCardList: React.FC<AssistantCardListProps> = ({
                       className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-medium text-[11px] cursor-pointer"
                     >
                       {isEn ? `Select #${num}` : `Chọn lịch trình #${num}`}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Quick selection buttons for numbered order list (#ORD-...) */}
+            {onQuickPrompt && orderItems.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {orderItems.slice(0, 5).map((item, idx) => {
+                  const code = item.orderCode ? `#${item.orderCode}` : `#${item.index ?? idx + 1}`;
+                  return (
+                    <button
+                      key={item.id || code}
+                      type="button"
+                      onClick={() =>
+                        onQuickPrompt(isEn ? `Check order ${code}` : `Kiểm tra đơn ${code}`)
+                      }
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-medium text-[11px] cursor-pointer"
+                    >
+                      {code}
                     </button>
                   );
                 })}

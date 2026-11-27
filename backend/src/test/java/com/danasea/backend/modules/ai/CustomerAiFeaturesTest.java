@@ -352,4 +352,12 @@ class CustomerAiFeaturesTest {
                 null, null, 2, date, date, null, null, null, null, null, null, null, null, null).context();
         assertThat(manThaiSonTra.criteria().unsupportedConstraints()).doesNotContain("PLACE_NAME_REQUIRES_COORDINATES");
     }
+
+    @Test void assessTextDoesNotFlagRandomUuidAsVietnamesePhone() {
+        var cases = mock(AssessmentCaseStorePort.class);
+        var result = new AssessTextUseCase(model, cases)
+                .execute(owner, "Kiểm tra đơn hàng 14ceea3b-a086-4975-854a-1bdbaedc8a1d giúp tôi", false);
+        assertThat(result.contactMatches()).isEmpty();
+        assertThat(result.reasonCodes()).doesNotContain("EXTERNAL_CONTACT_DETECTED");
+    }
 }

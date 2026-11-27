@@ -80,13 +80,17 @@ class UnifiedInstallerTest(unittest.TestCase):
         sample = {
             'services': [{'id': '088d874c-a61e-5b58-a7a9-497f32a56901'}],
             'refunds': [{'id': '00040000-0000-0000-0000-000000000001', 'amount': '100.00'}],
-            'settlements': [{'id': '00060000-0000-0000-0000-000000000001', 'gross_amount': '1000.00'}]
+            'settlements': [{'id': '00060000-0000-0000-0000-000000000001', 'gross_amount': '1000.00'}],
+            'master_orders': [{'id': '00010000-0000-0000-0000-000000000042'}],
+            'sub_orders': [{'id': '00020000-0000-0000-0000-000000000042'}]
         }
         colmap = {
             ('services', 'waiver_required'): {'column_name': 'waiver_required'},
             ('refunds', 'retry_count'): {'column_name': 'retry_count'},
             ('refunds', 'verification_attempts'): {'column_name': 'verification_attempts'},
-            ('settlements', 'version'): {'column_name': 'version'}
+            ('settlements', 'version'): {'column_name': 'version'},
+            ('master_orders', 'order_code'): {'column_name': 'order_code'},
+            ('sub_orders', 'sub_order_code'): {'column_name': 'sub_order_code'}
         }
         INSTALLER['align_schema_defaults'](sample, colmap)
         self.assertFalse(sample['services'][0]['waiver_required'])
@@ -94,21 +98,29 @@ class UnifiedInstallerTest(unittest.TestCase):
         self.assertEqual(0, sample['refunds'][0]['retry_count'])
         self.assertEqual(0, sample['refunds'][0]['verification_attempts'])
         self.assertEqual(0, sample['settlements'][0]['version'])
+        self.assertEqual('ORD-00010042', sample['master_orders'][0]['order_code'])
+        self.assertEqual('SUB-00020042', sample['sub_orders'][0]['sub_order_code'])
 
     def test_align_schema_defaults_preserves_existing_values(self):
         sample = {
             'refunds': [{'id': '00040000-0000-0000-0000-000000000001', 'retry_count': 5, 'verification_attempts': 2}],
-            'settlements': [{'id': '00060000-0000-0000-0000-000000000001', 'version': 3}]
+            'settlements': [{'id': '00060000-0000-0000-0000-000000000001', 'version': 3}],
+            'master_orders': [{'id': '00010000-0000-0000-0000-000000000042', 'order_code': 'ORD-CUSTOM'}],
+            'sub_orders': [{'id': '00020000-0000-0000-0000-000000000042', 'sub_order_code': 'SUB-CUSTOM'}]
         }
         colmap = {
             ('refunds', 'retry_count'): {'column_name': 'retry_count'},
             ('refunds', 'verification_attempts'): {'column_name': 'verification_attempts'},
-            ('settlements', 'version'): {'column_name': 'version'}
+            ('settlements', 'version'): {'column_name': 'version'},
+            ('master_orders', 'order_code'): {'column_name': 'order_code'},
+            ('sub_orders', 'sub_order_code'): {'column_name': 'sub_order_code'}
         }
         INSTALLER['align_schema_defaults'](sample, colmap)
         self.assertEqual(5, sample['refunds'][0]['retry_count'])
         self.assertEqual(2, sample['refunds'][0]['verification_attempts'])
         self.assertEqual(3, sample['settlements'][0]['version'])
+        self.assertEqual('ORD-CUSTOM', sample['master_orders'][0]['order_code'])
+        self.assertEqual('SUB-CUSTOM', sample['sub_orders'][0]['sub_order_code'])
 
     def test_legacy_cloudinary_url_is_classified_as_reconcilable(self):
         db_val = "https://res.cloudinary.com/dbkxwc5gr/image/upload/v1792170671/danasea_demo_data_package/services/sample.jpg"

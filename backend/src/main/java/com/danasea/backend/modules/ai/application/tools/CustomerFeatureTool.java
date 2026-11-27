@@ -11,8 +11,13 @@ import java.util.UUID;
 import java.util.stream.StreamSupport;
 
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 
 import com.danasea.backend.modules.ai.application.dtos.TravelRequest;
+import com.danasea.backend.modules.ai.application.services.AiEntityReferenceResolver;
+import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
+import com.danasea.backend.modules.order.domain.exceptions.SubOrderNotFoundException;
+import com.danasea.backend.modules.order.domain.exceptions.UnauthorizedOrderAccessException;
 import com.danasea.backend.modules.ai.application.usecases.CompareServicesUseCase;
 import com.danasea.backend.modules.ai.application.usecases.CustomerMarineBriefingUseCase;
 import com.danasea.backend.modules.ai.application.usecases.CustomerSupportUseCase;
@@ -38,7 +43,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class CustomerFeatureTool implements ToolExecutor {
     private static final Set<String> AUTHENTICATED_TOOLS = Set.of(
             "ai_plan_itinerary", "ai_replan_itinerary", "ai_list_itineraries",
-            "ai_get_itinerary", "ai_itinerary_history", "ai_customer_support", "ai_marine_briefing");
+            "ai_get_itinerary", "ai_itinerary_history", "ai_list_orders",
+            "ai_customer_support", "ai_marine_briefing");
     private final String name;
     private final DiscoverServicesUseCase discovery;
     private final CompareServicesUseCase comparisons;
@@ -47,19 +53,28 @@ public class CustomerFeatureTool implements ToolExecutor {
     private final WeatherAwareUseCase weather;
     private final CustomerSupportUseCase support;
     private final CustomerMarineBriefingUseCase marineBriefing;
+    private final AiEntityReferenceResolver entityResolver;
     private final ObjectMapper mapper;
 
     public CustomerFeatureTool(String name, DiscoverServicesUseCase discovery, CompareServicesUseCase comparisons,
                                PlanItineraryUseCase plans, ReviewSummaryUseCase reviews, WeatherAwareUseCase weather,
                                CustomerSupportUseCase support, ObjectMapper mapper) {
-        this(name, discovery, comparisons, plans, reviews, weather, support, null, mapper);
+        this(name, discovery, comparisons, plans, reviews, weather, support, null, null, mapper);
     }
 
     public CustomerFeatureTool(String name, DiscoverServicesUseCase discovery, CompareServicesUseCase comparisons,
                                PlanItineraryUseCase plans, ReviewSummaryUseCase reviews, WeatherAwareUseCase weather,
                                CustomerSupportUseCase support, CustomerMarineBriefingUseCase marineBriefing, ObjectMapper mapper) {
+        this(name, discovery, comparisons, plans, reviews, weather, support, marineBriefing, null, mapper);
+    }
+
+    public CustomerFeatureTool(String name, DiscoverServicesUseCase discovery, CompareServicesUseCase comparisons,
+                               PlanItineraryUseCase plans, ReviewSummaryUseCase reviews, WeatherAwareUseCase weather,
+                               CustomerSupportUseCase support, CustomerMarineBriefingUseCase marineBriefing,
+                               AiEntityReferenceResolver entityResolver, ObjectMapper mapper) {
         this.name = name; this.discovery = discovery; this.comparisons = comparisons; this.plans = plans;
-        this.reviews = reviews; this.weather = weather; this.support = support; this.marineBriefing = marineBriefing; this.mapper = mapper;
+        this.reviews = reviews; this.weather = weather; this.support = support;
+        this.marineBriefing = marineBriefing; this.entityResolver = entityResolver; this.mapper = mapper;
     }
 
     @Override public String getName() { return name; }
@@ -92,14 +107,19 @@ public class CustomerFeatureTool implements ToolExecutor {
                 case "ai_itinerary_history" -> itineraryHistory(userId, args, language);
                 case "ai_review_summary" -> reviews.execute(id(args, "serviceId"), language);
                 case "ai_weather_slot" -> weather.execute(id(args, "serviceId"), id(args, "optionId"), id(args, "slotId"), criteria(args), language);
-                case "ai_customer_support" -> support.execute(userId, args.hasNonNull("orderId") ? id(args, "orderId") : null,
-                        args.path("message").asText(), args.path("includeCancellationPreview").asBoolean(false));
-                case "ai_marine_briefing" -> marineBriefing.getMarineBriefing(userId, id(args, "orderId"), language);
+                case "ai_list_orders" -> listOrders(userId, args);
+                case "ai_customer_support" -> support.execute(userId,
+                        args.hasNonNull("orderId") ? resolveCustomerOrderId(userId, args, "orderId") : null,
+                        args.path("message").asText("Kiểm tra thông tin đơn hàng"),
+                        args.path("includeCancellationPreview").asBoolean(false));
+                case "ai_marine_briefing" -> marineBriefing.getMarineBriefing(userId, resolveCustomerOrderId(userId, args, "orderId"), language);
                 default -> throw new IllegalArgumentException("Unknown customer feature tool");
             };
             return mapper.writeValueAsString(result);
         } catch (IllegalArgumentException exception) {
             return error("INVALID_ARGUMENTS", exception.getMessage());
+        } catch (OrderNotFoundException | SubOrderNotFoundException | UnauthorizedOrderAccessException | AccessDeniedException exception) {
+            return error("ORDER_NOT_FOUND_OR_DENIED", "The requested order was not found in your account");
         } catch (AiResourceNotFoundException exception) {
             String message = exception.getMessage();
             String code = message != null && message.contains("revision") ? "REVISION_NOT_FOUND" : "ITINERARY_NOT_FOUND";
@@ -293,6 +313,51 @@ public class CustomerFeatureTool implements ToolExecutor {
     private TravelContext criteria(JsonNode args) throws Exception {
         if (!args.hasNonNull("criteria") || !args.get("criteria").isObject()) throw new IllegalArgumentException("criteria is required");
         return mapper.treeToValue(args.get("criteria"), TravelRequest.class).context();
+    }
+
+    private Map<String, Object> listOrders(UUID userId, JsonNode args) {
+        int limit = args.hasNonNull("limit") ? boundedInt(args, "limit", 1, 10) : 5;
+        var ownedOrders = support.listOrders(userId, limit);
+        List<Map<String, Object>> summaries = new ArrayList<>();
+        for (int index = 0; index < ownedOrders.size(); index++) {
+            var order = ownedOrders.get(index);
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("index", index + 1);
+            entry.put("id", order.id());
+            entry.put("orderCode", order.orderCode());
+            entry.put("status", order.status());
+            entry.put("paymentStatus", order.paymentStatus());
+            entry.put("totalAmount", order.totalAmount());
+            entry.put("createdAt", order.createdAt());
+            entry.put("items", order.items());
+            summaries.add(entry);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("status", summaries.isEmpty() ? "NO_ORDERS" : "AVAILABLE");
+        out.put("count", summaries.size());
+        out.put("orders", summaries);
+        return out;
+    }
+
+    private UUID resolveCustomerOrderId(UUID userId, JsonNode args, String key) {
+        if (!args.path(key).isTextual()) {
+            throw new IllegalArgumentException(key + " must be a string");
+        }
+        String raw = args.get(key).asText().trim();
+        if (raw.isEmpty()) {
+            throw new IllegalArgumentException(key + " is required");
+        }
+        if (entityResolver != null) {
+            var resolved = entityResolver.resolveOrderForCustomer(userId, raw);
+            if (resolved.isPresent()) {
+                return resolved.get().masterOrderId();
+            }
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException exception) {
+            throw new OrderNotFoundException(UUID.nameUUIDFromBytes(raw.getBytes()));
+        }
     }
 
     private UUID id(JsonNode args, String key) {

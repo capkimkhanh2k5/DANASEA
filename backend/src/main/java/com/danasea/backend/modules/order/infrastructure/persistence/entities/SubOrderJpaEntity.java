@@ -3,6 +3,7 @@ package com.danasea.backend.modules.order.infrastructure.persistence.entities;
 import com.danasea.backend.modules.order.domain.models.RefundReason;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.shared.core.infrastructure.persistence.entities.BaseJpaEntity;
+import com.danasea.backend.shared.util.DisplayCodeFormatter;
 
 import jakarta.persistence.*;
 
@@ -23,6 +24,9 @@ public class SubOrderJpaEntity extends BaseJpaEntity {
     private UUID bookingItemId;
 
     private UUID masterOrderId;
+
+    @Column(name = "sub_order_code", length = 24)
+    private String subOrderCode;
 
     private UUID vendorId;
 
@@ -127,6 +131,13 @@ public class SubOrderJpaEntity extends BaseJpaEntity {
     @PrePersist
     @PreUpdate
     private void initializeFinancialSnapshot() {
+        if (getId() == null) {
+            setId(UUID.randomUUID());
+            markNew();
+        }
+        if ((subOrderCode == null || subOrderCode.isBlank()) && getId() != null) {
+            subOrderCode = DisplayCodeFormatter.format(getId(), "SUB");
+        }
         if (finalAmount == null) {
             finalAmount = getFinalAmount();
         }

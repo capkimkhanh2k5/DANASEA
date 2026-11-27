@@ -6,10 +6,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 import com.danasea.backend.modules.ai.application.ports.TravelPolicyPort;
+import com.danasea.backend.modules.ai.application.services.AiEntityReferenceResolver;
 import com.danasea.backend.modules.dispute.application.services.DisputeWindowService;
 import com.danasea.backend.modules.order.application.dtos.GetCancellationPreviewQuery;
 import com.danasea.backend.modules.order.application.usecases.GetCancellationPreviewUseCase;
@@ -45,6 +47,9 @@ public class PolicyChatAnswer {
     private final GetCancellationPreviewUseCase previews;
     private final LocalizedMessageService messages;
 
+    @Autowired(required = false)
+    private AiEntityReferenceResolver entityResolver;
+
     record Reply(String message, String tool, String status, Map<String, Object> facts) {}
 
     static UUID reference(String message) {
@@ -71,8 +76,15 @@ public class PolicyChatAnswer {
                 || HOURS.matcher(text).find())) {
             return null;
         }
-        UUID orderId = reference(message);
+        UUID orderId = resolveOrderReference(message, actorId, vendorId, admin);
         if (orderId == null) orderId = orderContext;
+        if (orderId == null && actorId == null && vendorId == null && !admin
+                && entityResolver != null && entityResolver.containsOrderLikeReference(message)
+                && (refund || POLICY.matcher(text).find() || HOURS.matcher(text).find())) {
+            return new Reply(messages.get("ai.guest.login_required_for_orders", language),
+                    "ai_cancellation_preview", "NEEDS_INPUT",
+                    Map.of("requiredInputs", java.util.List.of("AUTHENTICATION")));
+        }
         if (orderId != null && (refund || POLICY.matcher(text).find() || HOURS.matcher(text).find())) {
             return preview(orderId, actorId, vendorId, admin, language);
         }
@@ -106,6 +118,32 @@ public class PolicyChatAnswer {
                                 "legacyPolicy", "LEGACY_TIERED_V1"),
                         "orderSpecificEligibilityChecked", false,
                         "changeRequestRequiresHumanApproval", true));
+    }
+
+    private UUID resolveOrderReference(String message, UUID actorId, UUID vendorId, boolean admin) {
+        if (entityResolver != null) {
+            if (admin) {
+                var resolved = entityResolver.resolveOrderForAdmin(message);
+                if (resolved.isPresent()) {
+                    return resolved.get().subOrderId() != null
+                            ? resolved.get().subOrderId()
+                            : resolved.get().masterOrderId();
+                }
+            } else if (vendorId != null) {
+                var resolved = entityResolver.resolveOrderForVendor(vendorId, message);
+                if (resolved.isPresent()) {
+                    return resolved.get().subOrderId() != null
+                            ? resolved.get().subOrderId()
+                            : resolved.get().masterOrderId();
+                }
+            } else if (actorId != null) {
+                var resolved = entityResolver.resolveOrderForCustomer(actorId, message);
+                if (resolved.isPresent()) {
+                    return resolved.get().masterOrderId();
+                }
+            }
+        }
+        return reference(message);
     }
 
     private Reply preview(UUID orderId, UUID actorId, UUID vendorId, boolean admin, SupportedLanguage language) {

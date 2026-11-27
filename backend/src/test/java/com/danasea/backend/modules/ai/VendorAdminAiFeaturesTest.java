@@ -1601,4 +1601,29 @@ class VendorAdminAiFeaturesTest {
         assertThat(v29.toolsUsed()).containsExactly("vendor_slot_advisor");
         assertThat(v29.message()).contains("Mô tô nước – Danabeach").contains("1/20 (5.0%)");
     }
+
+    @Test
+    void pastedUuidWithDigitRunDoesNotTriggerTextAssessmentModeration() {
+        var caseStore = mock(AssessmentCaseStorePort.class);
+        var copilot = extendedCopilot(new AssessTextUseCase(decisionModel, caseStore),
+                mock(TransactionRiskReadPort.class), caseStore, mock(AnalyzeTransactionRiskUseCase.class));
+
+        var adminConv = adminConversation();
+        for (String uuid : List.of("14ceea3b-a086-4975-854a-1bdbaedc8a1d", "14ceea3b-0123-4567-8901-1bdbaedc8a1d")) {
+            var adminReply = copilot.processMessage(adminUserId, "ADMIN", null, adminConv.id(),
+                    "Kiểm tra đơn hàng " + uuid, null, null, SupportedLanguage.VI);
+            assertThat(adminReply.toolsUsed()).doesNotContain("admin_text_assessment");
+            assertThat(adminReply.artifacts()).noneMatch(c -> "COPILOT_CONTENT_ASSESSMENT_CARD".equals(c.get("type")));
+        }
+
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "TOP_RATED")));
+        var vendorConv = vendorConversation();
+        for (String uuid : List.of("14ceea3b-a086-4975-854a-1bdbaedc8a1d", "14ceea3b-0123-4567-8901-1bdbaedc8a1d")) {
+            var vendorReply = copilot.processMessage(vendorUserId, "VENDOR", vendorId, vendorConv.id(),
+                    "Kiểm tra đơn hàng " + uuid, null, null, SupportedLanguage.VI);
+            assertThat(vendorReply.toolsUsed()).doesNotContain("vendor_text_assessment");
+            assertThat(vendorReply.artifacts()).noneMatch(c -> "COPILOT_CONTENT_ASSESSMENT_CARD".equals(c.get("type")));
+        }
+    }
 }

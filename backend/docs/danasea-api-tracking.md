@@ -520,6 +520,7 @@ Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi 
 ### Trợ lý hội thoại Customer & Multi-Session Control — API
 - [x] POST /api/assistant/chat (tự động đặt tên tiêu đề khi bắt đầu cuộc trò chuyện mới)
 - [x] POST /api/assistant/conversations/{id}/confirm (tạo hold từ confirmation card)
+- [x] POST /api/assistant/conversations/{id}/claim (gắn hội thoại khách vào tài khoản sau đăng nhập)
 - [x] GET /api/assistant/conversations (liệt kê danh sách hội thoại của user, hỗ trợ lọc archived)
 - [x] GET /api/assistant/conversations/{id}
 - [x] GET /api/assistant/conversations/{id}/history

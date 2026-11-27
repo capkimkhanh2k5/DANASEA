@@ -75,11 +75,67 @@ export function summarizeAssistantCard(card: AssistantCard, language: 'vi' | 'en
       } : null;
     }
     case 'CUSTOMER_SUPPORT': {
+      const order = object(facts.order);
+      const orderId = string(order.id);
+      const orderCode = string(order.orderCode);
+      const status = string(order.status);
+      const paymentStatus = string(order.paymentStatus);
+      const totalAmount = numeric(order.totalAmount);
+      if (orderId || orderCode || status) {
+        const displayCode = orderCode ? `#${orderCode}` : (orderId ?? copy('Đơn hàng', 'Order'));
+        rows.push({
+          label: displayCode,
+          value: [status, paymentStatus].filter(Boolean).join(' · '),
+          href: orderId && /^[a-f0-9-]{36}$/i.test(orderId) ? `/profile/orders?orderId=${orderId}` : undefined,
+        });
+        if (totalAmount !== undefined) {
+          add(copy('Tổng thanh toán', 'Total'), vnd(totalAmount));
+        }
+        for (const itemObj of list(order.items).slice(0, 4)) {
+          const item = object(itemObj);
+          const subCode = string(item.subOrderCode);
+          const label = [subCode ? `#${subCode}` : undefined, string(item.serviceName)].filter(Boolean).join(' · ')
+            || copy('Dịch vụ', 'Service');
+          const slotInfo = [date(item.slotDate, language), time(item.slotStartTime), string(item.status)]
+            .filter(Boolean)
+            .join(' · ');
+          add(label, slotInfo);
+        }
+      }
       const amount = numeric(object(facts.cancellationPreview).refundAmount);
-      if (amount === undefined) return null;
-      add(copy('Dự kiến hoàn', 'Estimated refund'), vnd(amount));
-      return { title: copy('Xem trước hủy', 'Cancellation preview'), rows,
-        note: copy('Chưa thực hiện giao dịch hoàn tiền.', 'No refund transaction has been performed.') };
+      if (amount !== undefined) {
+        add(copy('Dự kiến hoàn', 'Estimated refund'), vnd(amount));
+      }
+      if (!rows.length) return null;
+      return {
+        title: orderCode || orderId ? copy('Thông tin đơn hàng', 'Order details') : copy('Xem trước hủy', 'Cancellation preview'),
+        rows,
+        note: amount !== undefined
+          ? copy('Chưa thực hiện giao dịch hoàn tiền.', 'No refund transaction has been performed.')
+          : undefined,
+      };
+    }
+    case 'ORDER_LIST': {
+      const orders = list(facts.orders);
+      for (const entry of orders.slice(0, 5)) {
+        const ord = object(entry);
+        const ordId = string(ord.id);
+        const ordCode = string(ord.orderCode);
+        const total = numeric(ord.totalAmount);
+        const displayCode = ordCode ? `#${ordCode}` : (ordId ?? copy('Đơn hàng', 'Order'));
+        rows.push({
+          label: displayCode,
+          value: [string(ord.status), total !== undefined ? vnd(total) : undefined].filter(Boolean).join(' · '),
+          href: ordId && /^[a-f0-9-]{36}$/i.test(ordId) ? `/profile/orders?orderId=${ordId}` : undefined,
+        });
+      }
+      return {
+        title: copy('Đơn hàng của bạn', 'Your orders'),
+        rows,
+        note: rows.length
+          ? copy('Chọn một đơn để xem chi tiết hoặc hỏi hoàn/đổi lịch.', 'Select an order to inspect details or check cancellation.')
+          : copy('Tài khoản hiện chưa có đơn hàng nào.', 'You have no orders yet.'),
+      };
     }
     case 'WEATHER': {
       const assessment = object(facts.assessment);

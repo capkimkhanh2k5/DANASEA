@@ -26,8 +26,10 @@ export function formatDisplayCode(id: string, prefix = 'ORD'): string {
   const isSeed =
     clean.startsWith('00010000') ||
     clean.startsWith('00020000') ||
+    clean.startsWith('00040000') ||
     clean.startsWith('00050000') ||
     clean.startsWith('00060000') ||
+    clean.startsWith('00080000') ||
     clean.startsWith('00090000') ||
     clean.startsWith('b0010000') ||
     clean.startsWith('b0020000') ||
@@ -91,31 +93,49 @@ export function formatTextWithDisplayCodes(text?: string | null): string {
   });
 }
 
+const ZERO_PAD_SEED_HEADS = new Set([
+  '0001', '0002', '0004', '0005', '0006', '0008', '0009', 'b001', 'b002', '0000',
+]);
+const REPEAT_SEED_HEADS = new Set(['6666', '7777', '9999']);
+
+function reconstructSeedUuidIfKnown(head: string, tail: string): string | null {
+  const lowerHead = head.toLowerCase();
+  const lowerTail = tail.toLowerCase();
+  if (ZERO_PAD_SEED_HEADS.has(lowerHead)) {
+    return `${lowerHead}0000-0000-0000-0000-00000000${lowerTail}`;
+  }
+  if (REPEAT_SEED_HEADS.has(lowerHead)) {
+    const ch = lowerHead[0];
+    return `${ch.repeat(8)}-${ch.repeat(4)}-${ch.repeat(4)}-${ch.repeat(4)}-${ch.repeat(8)}${lowerTail}`;
+  }
+  return null;
+}
+
 /**
- * Reconstructs a full 36-char UUID from a display code or short seed code.
- * (e.g. ORD-00010042 -> 00010000-0000-0000-0000-000000000042).
- * Returns original input if not matching the seed pattern.
+ * Reconstructs a full 36-char seed UUID from a display code ONLY when its prefix
+ * belongs to known deterministic seed patterns (e.g. ORD-00010042, DISP-77777704).
+ * Non-seed codes (e.g. #ORD-7A2F1C4D) are returned unchanged so the backend resolves
+ * them directly from PostgreSQL without corrupting the UUID.
  */
 export function resolveDisplayCodeToUuid(input: string): string {
   if (!input) return '';
   const clean = input.trim().replace(/^#/, '');
-  const match = clean.match(/^(?:ORD|SUB|DISP|PAY|STL|VND|DOC|LOG|CUST)-([0-9a-fA-F]{4})([0-9a-fA-F]{4})$/i);
+  const match = clean.match(/^(?:ORD|SUB|DNS|DISP|PAY|STL|VND|DOC|LOG|CUST|REF|SRV|SLOT|REV)-([0-9a-fA-F]{4})([0-9a-fA-F]{4})$/i);
   if (match) {
-    const head = match[1].toLowerCase();
-    const tail = match[2].toLowerCase();
-    return `${head}0000-0000-0000-0000-00000000${tail}`;
+    const reconstructed = reconstructSeedUuidIfKnown(match[1], match[2]);
+    if (reconstructed) return reconstructed;
   }
   return input;
 }
 
 /**
- * Translates any display codes in user messages into raw seed UUIDs
- * so that backend regexes (e.g. PolicyChatAnswer) and queries can locate the records.
+ * Translates known deterministic seed display codes into seed UUIDs while leaving
+ * random UUIDv4 display codes (e.g. #ORD-7A2F1C4D) intact for backend DB lookup.
  */
 export function translateDisplayCodesToUuids(text?: string | null): string {
   if (!text) return '';
-  return text.replace(/#?(?:ORD|SUB|DISP|PAY|STL|VND|DOC|LOG|CUST)-([0-9a-fA-F]{4})([0-9a-fA-F]{4})\b/gi, (_, head, tail) => {
-    return `${head.toLowerCase()}0000-0000-0000-0000-00000000${tail.toLowerCase()}`;
+  return text.replace(/#?(?:ORD|SUB|DNS|DISP|PAY|STL|VND|DOC|LOG|CUST|REF|SRV|SLOT|REV)-([0-9a-fA-F]{4})([0-9a-fA-F]{4})\b/gi, (full, head, tail) => {
+    return reconstructSeedUuidIfKnown(head, tail) ?? full;
   });
 }
 

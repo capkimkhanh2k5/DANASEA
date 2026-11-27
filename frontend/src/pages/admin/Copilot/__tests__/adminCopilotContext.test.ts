@@ -6,14 +6,14 @@ import {
   formatTextWithDisplayCodes,
   resolveDisplayCodeToUuid,
   translateDisplayCodesToUuids,
-} from '../../../../utils/displayCode';
+} from '../../../../utils/displayCode.ts';
 import {
   DANABOT_PINNED_SESSION_KEY,
   getStoredPinnedSession,
   savePinnedSession,
   clearPinnedSessionStorage,
   type PinnedCopilotSession,
-} from '../adminCopilotSession';
+} from '../adminCopilotSession.ts';
 
 describe('Admin DaNaBot — Context & Display Code Synchronization', () => {
   const seedOrderUuid = '00010000-0000-0000-0000-000000000039';

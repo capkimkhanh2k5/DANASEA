@@ -7,6 +7,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import com.danasea.backend.shared.core.infrastructure.persistence.entities.BaseJpaEntity;
+import com.danasea.backend.shared.util.DisplayCodeFormatter;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -21,6 +22,9 @@ public class MasterOrderJpaEntity extends BaseJpaEntity {
     private UUID bookingId;
 
     private UUID customerId;
+
+    @Column(name = "order_code", length = 24)
+    private String orderCode;
 
     @Enumerated(EnumType.STRING)
     private MasterOrderStatus status;
@@ -40,4 +44,15 @@ public class MasterOrderJpaEntity extends BaseJpaEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", length = 50)
     private PaymentOrderStatus paymentStatus = PaymentOrderStatus.UNPAID;
+
+    @PrePersist
+    private void ensureOrderCode() {
+        if (getId() == null) {
+            setId(UUID.randomUUID());
+            markNew();
+        }
+        if ((orderCode == null || orderCode.isBlank()) && getId() != null) {
+            orderCode = DisplayCodeFormatter.format(getId(), "ORD");
+        }
+    }
 }

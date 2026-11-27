@@ -868,6 +868,27 @@
       "slice": "risk_benign",
       "state": {"risk_signals": [], "complaint": "Tôi muốn hỏi giờ tập trung của chuyến chèo SUP ngày mai.", "payment_status": "PAID"},
       "expected": {"needs_review": false}
+    },
+    {
+      "id": "hold-order-intent-01",
+      "task": "intent",
+      "slice": "order_code_lookup",
+      "state": {"message": "Đơn hàng #ORD-00010042 trạng thái thế nào?"},
+      "expected": {"intent": "SUPPORT"}
+    },
+    {
+      "id": "hold-order-intent-02",
+      "task": "intent",
+      "slice": "order_uuid_lookup",
+      "state": {"message": "Kiểm tra đơn b0010000-0000-0000-0000-000000000001"},
+      "expected": {"intent": "SUPPORT"}
+    },
+    {
+      "id": "hold-order-mod-01",
+      "task": "moderation",
+      "slice": "order_uuid_benign",
+      "state": {"content": "Đơn hàng b0010000-0000-0000-0000-000000000001 trạng thái thế nào?"},
+      "expected": {"external_payment": false, "spam": false, "abuse": false}
     }
   ]
 }

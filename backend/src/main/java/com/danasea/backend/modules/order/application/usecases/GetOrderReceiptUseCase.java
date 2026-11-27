@@ -26,6 +26,7 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.presentation.dtos.OrderReceiptItemResponse;
 import com.danasea.backend.modules.order.presentation.dtos.OrderReceiptResponse;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
+import com.danasea.backend.shared.util.DisplayCodeFormatter;
 
 @Service
 public class GetOrderReceiptUseCase {
@@ -79,8 +80,11 @@ public class GetOrderReceiptUseCase {
         OffsetDateTime paidAt = payment.getPaidAt();
         String paymentProvider = payment.getProvider() == null ? null : payment.getProvider().name();
 
-        String orderCode = "ORD-" + order.getId().toString().substring(0, 8).toUpperCase();
-        String receiptCode = "REC-" + order.getId().toString().substring(0, 8).toUpperCase();
+        String orderCode = (order.getOrderCode() != null && !order.getOrderCode().isBlank())
+                ? order.getOrderCode()
+                : DisplayCodeFormatter.format(order.getId(), "ORD");
+        String codeSuffix = orderCode.contains("-") ? orderCode.substring(orderCode.indexOf('-') + 1) : orderCode;
+        String receiptCode = "REC-" + codeSuffix;
 
         List<OrderReceiptItemResponse> items = subOrders.stream()
                 .map(subOrder -> {

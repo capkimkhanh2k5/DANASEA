@@ -98,7 +98,8 @@ class ProxyModerationRoutingTest {
                         assertThat(path.get()).isEqualTo("/v1/chat/completions");
                         assertThat(authorization.get()).isEqualTo("Bearer gateway-key");
                         assertThat(requestCount.get()).isEqualTo(1);
-                        assertThat(body.get()).contains("gateway-model", "system", "BENIGN", "Xin chào");
+                        assertThat(body.get()).contains("gateway-model", "system", "BENIGN", "Xin chào",
+                                "#ORD-", "#SUB-", "36-character UUIDs");
                         try {
                             assertThat(mapper.readTree(body.get()).path("reasoning_effort").asText()).isEqualTo("high");
                             assertThat(mapper.readTree(body.get()).path("messages").path(1).path("content").asText()).hasSize(2000);
