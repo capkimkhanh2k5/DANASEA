@@ -35,12 +35,42 @@ public class ChatHistoryService {
     public AiConversationJpaEntity getOrCreateConversation(
             UUID conversationId, UUID userId, SupportedLanguage language) {
         if (conversationId != null) {
-            return conversationRepository.findById(conversationId)
-                    .filter(conversation -> !conversation.isDeleted())
-                    .map(conversation -> requireOwnership(conversation, userId))
-                    .orElseGet(() -> createNewConversation(userId, language));
+            var existing = conversationRepository.findForUpdate(conversationId)
+                    .filter(conversation -> !conversation.isDeleted());
+            if (existing.isPresent()) {
+                AiConversationJpaEntity conv = existing.get();
+                if (userId != null && conv.getUserId() == null) {
+                    // Authenticated user continuing a guest conversation claims ownership and preserves history.
+                    conv.setUserId(userId);
+                    return conversationRepository.save(conv);
+                }
+                return requireOwnership(conv, userId);
+            }
         }
         return createNewConversation(userId, language);
+    }
+
+    @Transactional
+    public Optional<AiConversationJpaEntity> claimGuestConversation(UUID conversationId, UUID userId) {
+        if (conversationId == null || userId == null) return Optional.empty();
+        return conversationRepository.findForUpdate(conversationId)
+                .filter(conversation -> !conversation.isDeleted())
+                .map(conv -> {
+                    if (conv.getUserId() == null) {
+                        conv.setUserId(userId);
+                        return conversationRepository.save(conv);
+                    }
+                    if (userId.equals(conv.getUserId())) {
+                        return conv;
+                    }
+                    throw new AccessDeniedException("Conversation does not belong to the authenticated user");
+                });
+    }
+
+    @Transactional(readOnly = true)
+    public long countUserMessages(UUID conversationId) {
+        if (conversationId == null) return 0L;
+        return messageRepository.countByConversationIdAndRole(conversationId, AiMessageRole.USER);
     }
 
     @Transactional(readOnly = true)
@@ -184,6 +214,12 @@ public class ChatHistoryService {
     }
 
     private AiConversationJpaEntity requireOwnership(AiConversationJpaEntity conversation, UUID userId) {
+        if (conversation.getUserId() == null) {
+            if (userId == null) {
+                return conversation;
+            }
+            throw new AccessDeniedException("Guest conversation cannot be accessed directly by this endpoint");
+        }
         if (userId == null || !userId.equals(conversation.getUserId())) {
             throw new AccessDeniedException("Conversation does not belong to the authenticated user");
         }

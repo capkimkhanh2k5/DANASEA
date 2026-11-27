@@ -20,6 +20,7 @@ public class SubOrder extends BaseDomainModel {
 
     private UUID bookingItemId;
     private UUID masterOrderId;
+    private String subOrderCode;
     private UUID vendorId;
     private UUID serviceId;
     private UUID slotId;

@@ -49,8 +49,10 @@ public final class CustomerFeatureToolDefinitions {
                         "expectedVersion", Map.of("type", "integer", "minimum", 0)), List.of("itineraryId")),
                 definition("ai_review_summary", "Read an extractive summary with real public review IDs, rating counts and tentative Quyet aspect/sentiment suggestions. No reviews means no claims.", Map.of("serviceId", uuid()), List.of("serviceId")),
                 definition("ai_weather_slot", "Evaluate backend weather rules for a specific current service option and slot; unknown data never authorizes booking.", Map.of("criteria", criteria, "serviceId", uuid(), "optionId", uuid(), "slotId", uuid()), List.of("criteria", "serviceId", "optionId", "slotId")),
-                definition("ai_customer_support", "Read the authenticated customer's own order and optional cancellation preview. Ask for an order ID if missing. Never cancel, refund or change payment state.", Map.of("orderId", uuid(), "message", Map.of("type", "string"), "includeCancellationPreview", Map.of("type", "boolean")), List.of("message")),
-                definition("ai_marine_briefing", "Read pre-trip marine briefing, safety checklist, and slot weather summary for an owned order.", Map.of("orderId", uuid()), List.of("orderId")));
+                definition("ai_list_orders", "List the authenticated customer's recent orders with standardized order codes (#ORD-XXXXXXXX), statuses, totals, and sub-order items.", Map.of(
+                        "limit", Map.of("type", "integer", "minimum", 1, "maximum", 10)), List.of()),
+                definition("ai_customer_support", "Read the authenticated customer's own order (by UUID or display code such as #ORD-XXXXXXXX / #SUB-XXXXXXXX) and optional cancellation preview. Ask for an order ID if missing. Never cancel, refund or change payment state.", Map.of("orderId", Map.of("type", "string", "description", "Order UUID or display code (#ORD-XXXXXXXX / #SUB-XXXXXXXX)"), "message", Map.of("type", "string"), "includeCancellationPreview", Map.of("type", "boolean")), List.of("message")),
+                definition("ai_marine_briefing", "Read pre-trip marine briefing, safety checklist, and slot weather summary for an owned order (UUID or #ORD-XXXXXXXX).", Map.of("orderId", Map.of("type", "string", "description", "Order UUID or display code (#ORD-XXXXXXXX / #SUB-XXXXXXXX)")), List.of("orderId")));
     }
 
     private static Map<String, Object> definition(String name, String description, Map<String, Object> properties, List<String> required) {

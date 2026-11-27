@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
@@ -31,6 +32,7 @@ import com.danasea.backend.modules.ai.application.ports.LlmClientPort;
 import com.danasea.backend.modules.ai.application.ports.ModerationPort;
 import com.danasea.backend.modules.ai.application.ports.TransactionRiskReadPort;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort;
+import com.danasea.backend.modules.ai.application.services.AiEntityReferenceResolver;
 import com.danasea.backend.modules.ai.application.tools.AdminFeatureTool;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutionContext;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutor;
@@ -41,6 +43,7 @@ import com.danasea.backend.modules.ai.domain.models.LlmResponse;
 import com.danasea.backend.modules.report.domain.models.TimeRange;
 import com.danasea.backend.shared.i18n.LocalizedException;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
+import com.danasea.backend.shared.util.DisplayCodeFormatter;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -107,19 +110,19 @@ public class RoleCopilotUseCase {
             "cho xu ly|cho duyet|chua duoc phe duyet|dang cho|pending|waiting|how many|bao nhieu|tom tat");
     private static final Pattern SLOT_HORIZON = Pattern.compile("\\b(\\d{1,3}) (?:ngay|days?)\\b");
 
-    private static final Pattern CONTENT_MODERATION = Pattern.compile(
+    private static final Pattern CONTENT_MODERATION_KEYWORDS_AND_LINKS = Pattern.compile(
             "\\b(?:so dien thoai|sdt|hotline|zalo|duong link|link dat tour|link ben ngoai|ngoai san|ngoai danasea|"
                     + "ngoai nen tang|quang cao qua muc|kiem duyet|duyet dang bai|tu dong.*duyet|"
                     + "off[- ]?platform|external link|external payment|phone number|moderate|moderation)\\b"
                     + "|\\b(?:chuyen khoan|chuyen tien|thanh toan)\\b.*\\b(?:ngoai|ben ngoai|outside)\\b"
-                    + "|(?<!\\d)(?:\\+84|0)(?:[ .-]?\\d){9}(?!\\d)|https?://[^\\s<>]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+                    + "|https?://[^\\s<>]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+    private static final Pattern PHONE_LITERAL = Pattern.compile("(?<![a-zA-Z0-9])(?:\\+84|0)(?:[ .-]?\\d){9}(?![a-zA-Z0-9])");
+    private static final Pattern LINK_OR_EMAIL_LITERAL = Pattern.compile("https?://[^\\s<>]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
     private static final Pattern QUOTED_SNIPPET = Pattern.compile("[\"“]([^\"”]{5,2000})[\"”]");
     private static final Pattern UNQUOTED_NEGATED_WARNING = Pattern.compile(
             "(?i)(?:vui long |xin |luu y )?(?:không|khong|không nên|khong nen|tuyệt đối không|tuyet doi khong|đừng|dung)\\s+"
                     + "(?:chuyển tiền|chuyen tien|chuyển khoản|chuyen khoan|thanh toán|thanh toan|trả tiền|tra tien)\\s+"
                     + "(?:bên )?ngoài\\s+(?:nền tảng |nen tang )?danasea");
-    private static final Pattern CONTACT_LITERAL = Pattern.compile(
-            "(?<!\\d)(?:\\+84|0)(?:[ .-]?\\d){9}(?!\\d)|https?://[^\\s<>]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
     private static final Pattern PERSIST_MODERATION = CopilotRequest.words(
             "tao case|luu case|lap case|gui duyet|create case|persist");
     private static final Pattern ADMIN_ORDER_RISK = Pattern.compile(
@@ -163,6 +166,8 @@ public class RoleCopilotUseCase {
     private final ObjectMapper mapper;
     private final PolicyChatAnswer policyAnswers;
     private final VendorAiDataPort vendorAiData;
+    @Autowired(required = false)
+    private AiEntityReferenceResolver entityResolver;
 
     private final Map<String, ToolExecutor> vendorToolMap = new HashMap<>();
     private final Map<String, ToolExecutor> adminToolMap = new HashMap<>();
@@ -418,25 +423,85 @@ public class RoleCopilotUseCase {
         }
 
         UUID messageReference = PolicyChatAnswer.reference(message);
-        String ruleReply = resolveOperationalRuleReply(intentNormalized, admin, vendorId, english, attachmentType, attachmentId, messageReference);
+        String effectiveAttachmentType = attachmentType;
+        UUID effectiveAttachmentId = attachmentId;
+        String unresolvedCodeNote = null;
+        if (effectiveAttachmentId == null && entityResolver != null) {
+            boolean disputeCue = CopilotRequest.matches(ADMIN_DISPUTE, intentNormalized)
+                    || !entityResolver.extractCodes(message, Set.of("DISP")).isEmpty();
+            if (admin) {
+                if (disputeCue) {
+                    var resolvedDispute = entityResolver.resolveDisputeForAdmin(message);
+                    if (resolvedDispute.isPresent()) {
+                        effectiveAttachmentType = "DISPUTE";
+                        effectiveAttachmentId = resolvedDispute.get();
+                    }
+                }
+                if (effectiveAttachmentId == null) {
+                    var resolvedOrder = entityResolver.resolveOrderForAdmin(message);
+                    if (resolvedOrder.isPresent()) {
+                        var ord = resolvedOrder.get();
+                        effectiveAttachmentType = "ORDER";
+                        effectiveAttachmentId = ord.subOrderId() != null ? ord.subOrderId() : ord.masterOrderId();
+                        if (messageReference == null) {
+                            messageReference = effectiveAttachmentId;
+                        }
+                    } else if (entityResolver.containsOrderOrDisputeCode(message)) {
+                        unresolvedCodeNote = "The order/dispute code mentioned by the user was NOT found in the platform database; say so clearly and do not guess or invent details.";
+                    }
+                }
+            } else if (vendorId != null) {
+                if (disputeCue) {
+                    var resolvedDispute = entityResolver.resolveDisputeForVendor(vendorId, message);
+                    if (resolvedDispute.isPresent()) {
+                        effectiveAttachmentType = "DISPUTE";
+                        effectiveAttachmentId = resolvedDispute.get();
+                    }
+                }
+                if (effectiveAttachmentId == null) {
+                    var resolvedOrder = entityResolver.resolveOrderForVendor(vendorId, message);
+                    if (resolvedOrder.isPresent()) {
+                        var ord = resolvedOrder.get();
+                        effectiveAttachmentType = "ORDER";
+                        effectiveAttachmentId = ord.subOrderId() != null ? ord.subOrderId() : ord.masterOrderId();
+                        if (messageReference == null) {
+                            messageReference = effectiveAttachmentId;
+                        }
+                    } else if (entityResolver.containsOrderOrDisputeCode(message)) {
+                        unresolvedCodeNote = "The order/dispute code mentioned by the user was NOT found in this vendor's shop; say so clearly and do not guess or invent details.";
+                    }
+                }
+            }
+        }
+        String ruleReply = resolveOperationalRuleReply(intentNormalized, admin, vendorId, english,
+                effectiveAttachmentType, effectiveAttachmentId, messageReference);
         if (ruleReply != null) {
             return ruleReply;
         }
 
-        String tool = selectTool(intentNormalized, admin, message, attachmentType, attachmentId);
+        String tool = selectTool(intentNormalized, admin, message, effectiveAttachmentType, effectiveAttachmentId);
         if (tool == null && CopilotRequest.isPeriodFollowUp(intentNormalized)) {
             String revenueTool = admin ? "admin_revenue_timeseries" : "vendor_dashboard_summary";
             if (lastReplyUsedTool(context.conversationId(), revenueTool)) tool = revenueTool;
         }
         if (tool == null) {
-            return generateText(admin, english, context, today,
-                    describeAttachment(admin, vendorId, attachmentType, attachmentId, attachmentLabel));
+            String facts = describeAttachment(admin, vendorId, effectiveAttachmentType, effectiveAttachmentId, attachmentLabel);
+            if (facts == null) {
+                facts = unresolvedCodeNote;
+            }
+            return generateText(admin, english, context, today, facts);
         }
 
+        attachmentType = effectiveAttachmentType;
+        attachmentId = effectiveAttachmentId;
         var args = mapper.createObjectNode();
         if ("admin_dispute_summarize".equals(tool)) {
-            UUID disputeId = messageReference != null ? messageReference
-                    : ("DISPUTE".equalsIgnoreCase(attachmentType) ? attachmentId : resolveDisputeId(message, attachmentType, attachmentId));
+            UUID disputeId = "DISPUTE".equalsIgnoreCase(attachmentType) && attachmentId != null
+                    ? attachmentId
+                    : (messageReference != null ? messageReference : resolveDisputeId(message, attachmentType, attachmentId));
+            if (disputeId == null && entityResolver != null) {
+                disputeId = entityResolver.resolveDisputeForAdmin(message).orElse(null);
+            }
             if (disputeId == null) {
                 if (CHECKIN_CONFLICT.matcher(normalized).find() || DISPUTE_SUMMARY.matcher(normalized).find()) {
                     return english
@@ -739,7 +804,7 @@ public class RoleCopilotUseCase {
         if (matcher.find()) {
             return matcher.group(1).trim();
         }
-        if (!CONTACT_LITERAL.matcher(message).find()
+        if (!containsContactLiteral(message)
                 && CopilotRequest.matches(CopilotRequest.words("co nen xem|co phai|vi pham|quang cao thanh toan ngoai|is this"),
                 CopilotRequest.normalize(message))) {
             Matcher unquoted = UNQUOTED_NEGATED_WARNING.matcher(message);
@@ -748,6 +813,23 @@ public class RoleCopilotUseCase {
             }
         }
         return null;
+    }
+
+    private static boolean containsContactLiteral(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        return LINK_OR_EMAIL_LITERAL.matcher(message).find()
+                || PHONE_LITERAL.matcher(AiEntityReferenceResolver.stripUuids(message)).find();
+    }
+
+    private static boolean isContentModerationQuery(String text, String rawMessage) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        String phoneCandidate = AiEntityReferenceResolver.stripUuids(rawMessage != null ? rawMessage : text);
+        return CONTENT_MODERATION_KEYWORDS_AND_LINKS.matcher(text).find()
+                || PHONE_LITERAL.matcher(phoneCandidate).find();
     }
 
     private UUID findSingleMatchingReview(UUID vendorId, String normalizedQuestion) {
@@ -852,7 +934,7 @@ public class RoleCopilotUseCase {
                     && CopilotRequest.matches(CopilotRequest.words("rui ro|risk|canh bao|tin hieu|flag"), text))) {
                 return "admin_order_risk_assessment";
             }
-            if (CONTENT_MODERATION.matcher(text).find()) return "admin_text_assessment";
+            if (isContentModerationQuery(text, rawMessage)) return "admin_text_assessment";
             if ((ADMIN_DISPUTE.matcher(text).find() && DISPUTE_SUMMARY.matcher(text).find())
                     || (DISPUTE_SUMMARY.matcher(text).find() && CHECKIN_CONFLICT.matcher(text).find())
                     || ((CopilotRequest.matches(ADMIN_DISPUTE, text) || "DISPUTE".equalsIgnoreCase(attachmentType))
@@ -876,7 +958,7 @@ public class RoleCopilotUseCase {
             if (CopilotRequest.matches(ADMIN_OVERVIEW, text)) return "admin_platform_dashboard";
         } else {
             boolean hasPinnedEntity = attachmentType != null && attachmentId != null;
-            if (CONTENT_MODERATION.matcher(text).find()) return "vendor_text_assessment";
+            if (isContentModerationQuery(text, rawMessage)) return "vendor_text_assessment";
             if (CopilotRequest.isRevenue(text)) return "vendor_dashboard_summary";
             if (CopilotRequest.matches(VENDOR_SLOT, text)) {
                 boolean pinnedSlotDetailQuery = "SLOT".equalsIgnoreCase(attachmentType) && attachmentId != null
@@ -1071,7 +1153,9 @@ public class RoleCopilotUseCase {
         var detail = adminAiData.getOrderDetail(orderId);
         if (detail.isEmpty()) return notFoundInPlatform("ORDER", orderId);
         var d = detail.get();
-        var sb = new StringBuilder("subOrderId=").append(d.subOrderId());
+        var sb = new StringBuilder("orderCode=#").append(DisplayCodeFormatter.format(d.masterOrderId(), "ORD"));
+        appendFact(sb, "subOrderCode", "#" + DisplayCodeFormatter.format(d.subOrderId(), "SUB"));
+        appendFact(sb, "subOrderId", d.subOrderId());
         appendFact(sb, "masterOrderId", d.masterOrderId());
         appendFact(sb, "vendor", sanitizeFactText(d.vendorBusinessName(), 150));
         appendFact(sb, "service", sanitizeFactText(d.serviceTitle(), 200));
@@ -1181,7 +1265,9 @@ public class RoleCopilotUseCase {
         var detail = vendorAiData.getOrderDetail(vendorId, orderId);
         if (detail.isEmpty()) return notFoundInShop("ORDER", orderId);
         var d = detail.get();
-        var sb = new StringBuilder("subOrderId=").append(d.id());
+        var sb = new StringBuilder("subOrderCode=#").append(DisplayCodeFormatter.format(d.id(), "SUB"));
+        appendFact(sb, "orderCode", "#" + DisplayCodeFormatter.format(d.masterOrderId(), "ORD"));
+        appendFact(sb, "subOrderId", d.id());
         appendFact(sb, "masterOrderId", d.masterOrderId());
         appendFact(sb, "service", sanitizeFactText(d.serviceTitle(), 200));
         appendFact(sb, "status", d.status());

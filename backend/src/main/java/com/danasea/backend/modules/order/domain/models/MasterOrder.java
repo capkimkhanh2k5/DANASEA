@@ -19,6 +19,7 @@ public class MasterOrder extends BaseDomainModel {
 
     private UUID bookingId;
     private UUID customerId;
+    private String orderCode;
     private MasterOrderStatus status;
     private PaymentOrderStatus paymentStatus;
     private BigDecimal totalAmount;

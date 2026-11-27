@@ -1,18 +1,20 @@
 package com.danasea.backend.modules.ai.application.usecases;
 
 import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.text.NumberFormat;
-import java.util.Arrays;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -26,6 +28,7 @@ import org.springframework.stereotype.Service;
 import com.danasea.backend.modules.ai.application.ports.LlmClientPort;
 import com.danasea.backend.modules.ai.application.ports.AiExecutionBudget;
 import com.danasea.backend.modules.ai.application.ports.ModerationPort;
+import com.danasea.backend.modules.ai.application.services.AiEntityReferenceResolver;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutionContext;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutor;
 import com.danasea.backend.modules.ai.application.dtos.TravelRequest;
@@ -109,6 +112,14 @@ public class ChatUseCase {
     private static final Pattern ITINERARY_INDEX_REF = Pattern.compile(
             "(?:lich trinh|phuong an|itinerary)(?:\\s+(?:so|thu|number|#))?\\s*#?(\\d{1,2})\\b",
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern ORDER_INDEX_REF = Pattern.compile(
+            "(?:don(?:\\s+hang)?|order)(?:\\s+(?:so|thu|number|#))?\\s*#?(\\d{1,2})\\b",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern MY_ORDERS_QUERY = CopilotRequest.words(
+            "don hang cua toi|cac don hang|danh sach don|don da dat|xem don hang|tra cuu don hang|"
+                    + "my orders|list (?:my )?orders|my bookings|recent orders");
+    private static final Pattern ORDER_CONTEXT_KEYWORDS = CopilotRequest.words(
+            "don(?:\\s+hang)?|ma don|order|booking|trang thai|kiem tra|tra cuu|tinh trang|check|status");
     private static final Pattern RADIUS_KM_PATTERN = Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*km\\b", Pattern.CASE_INSENSITIVE);
     private record ToolRequest(String name, String arguments) {}
     private static final int MAX_USER_MESSAGE_CHARS = 1800;
@@ -125,6 +136,7 @@ public class ChatUseCase {
     private final AssistantAuditLogService auditLogService;
     private PolicyChatAnswer policyAnswers;
     private CustomerPreferenceUseCase customerPreferences;
+    private AiEntityReferenceResolver entityResolver;
     private LocalizedMessageService messages = LocalizedMessageService.standalone();
 
     @Autowired
@@ -135,6 +147,11 @@ public class ChatUseCase {
     @Autowired(required = false)
     void setCustomerPreferences(CustomerPreferenceUseCase customerPreferences) {
         this.customerPreferences = customerPreferences;
+    }
+
+    @Autowired(required = false)
+    void setEntityReferenceResolver(AiEntityReferenceResolver entityResolver) {
+        this.entityResolver = entityResolver;
     }
 
     @Autowired
@@ -176,18 +193,30 @@ public class ChatUseCase {
     }
 
     public LlmResponse processMessage(UUID conversationId, String content, SupportedLanguage language, UUID userId) {
-        return processMessageInternal(conversationId, content, language == null ? SupportedLanguage.VI : language, userId);
+        return processMessageInternal(conversationId, content, language == null ? SupportedLanguage.VI : language, userId, null, null);
+    }
+
+    public LlmResponse processMessage(UUID conversationId, String content, SupportedLanguage language, UUID userId,
+                                      String contextType, String contextId) {
+        return processMessageInternal(conversationId, content, language == null ? SupportedLanguage.VI : language, userId, contextType, contextId);
     }
 
     private LlmResponse processMessageInternal(
             UUID conversationId, String userMessageContent, SupportedLanguage language, UUID userId) {
+        return processMessageInternal(conversationId, userMessageContent, language, userId, null, null);
+    }
+
+    private LlmResponse processMessageInternal(
+            UUID conversationId, String userMessageContent, SupportedLanguage language, UUID userId,
+            String contextType, String contextId) {
         try (var budget = AiExecutionBudget.open(AiExecutionBudget.LLM_REQUEST_TIMEOUT, 6)) {
-            return processWithinBudget(conversationId, userMessageContent, language, userId);
+            return processWithinBudget(conversationId, userMessageContent, language, userId, contextType, contextId);
         }
     }
 
     private LlmResponse processWithinBudget(
-            UUID conversationId, String userMessageContent, SupportedLanguage language, UUID userId) {
+            UUID conversationId, String userMessageContent, SupportedLanguage language, UUID userId,
+            String contextType, String contextId) {
         String effectiveContent = userMessageContent;
         if (effectiveContent != null && effectiveContent.length() > MAX_USER_MESSAGE_CHARS) {
             int maxChars = MAX_USER_MESSAGE_CHARS;
@@ -219,8 +248,13 @@ public class ChatUseCase {
                 answer.setContent(messages.get("ai.customer.finance_scope", language == null ? SupportedLanguage.EN : language));
                 return finish(conversationId, answer, List.of(), readContext(conversationId));
             }
+            ObjectNode initialState = readContext(conversationId);
+            UUID pinnedOrderId = resolvePinnedOrderId(userId, contextType, contextId);
+            if (language != null && userId == null && isGuestOrderInquiry(effectiveContent, contextType, contextId)) {
+                return finishGuestOrderLoginRequired(conversationId, language, initialState);
+            }
             if (policyAnswers != null && language != null) {
-                var policyReply = policyAnswers.resolve(effectiveContent, language, userId, null, false, null);
+                var policyReply = policyAnswers.resolve(effectiveContent, language, userId, null, false, pinnedOrderId);
                 if (policyReply != null) return finishPolicyReply(conversationId, policyReply);
             }
             if (language != null) {
@@ -250,7 +284,8 @@ public class ChatUseCase {
                         && !CopilotRequest.words("lich trinh|itinerary").matcher(query).find()) {
                     return finishBeyondHorizonWeather(conversationId, language);
                 }
-                if (PolicyChatAnswer.reference(effectiveContent) == null) {
+                if (PolicyChatAnswer.reference(effectiveContent) == null
+                        && (entityResolver == null || !entityResolver.containsOrderLikeReference(effectiveContent))) {
                     if (PRICE_CHANGED_QUERY.matcher(query).find()) {
                         return finishGroundedGuidance(conversationId, language, "POLICY", "get_policy",
                                 "ai.booking.price_changed_flow", Map.of("topic", "PRICE_CHANGED",
@@ -277,12 +312,23 @@ public class ChatUseCase {
                     return finish(conversationId, answer, List.of(), readContext(conversationId));
                 }
                 if (shouldReadBudgetSearch(effectiveContent, query)
-                        && (!readContext(conversationId).has("criteria") || needsBudgetClarification(effectiveContent))) {
+                        && (!initialState.has("criteria") || needsBudgetClarification(effectiveContent))) {
                     return finishBudgetSearch(conversationId, userId, language, effectiveContent);
                 }
-                UUID orderId = PolicyChatAnswer.reference(effectiveContent);
+                UUID orderId = resolveCustomerOrderFromTurn(userId, effectiveContent, query, pinnedOrderId, initialState);
                 if (orderId != null && TRIP_BRIEFING.matcher(query).find() && toolExecutors.containsKey("ai_marine_briefing")) {
                     return finishMarineBriefing(conversationId, userId, language, orderId);
+                }
+                if (userId != null) {
+                    if (orderId != null && toolExecutors.containsKey("ai_customer_support")) {
+                        return finishCustomerOrderLookup(conversationId, userId, language, orderId, effectiveContent, query, initialState);
+                    }
+                    if (orderId == null && hasExplicitUnresolvedOrderRef(effectiveContent, query)) {
+                        return finishOrderNotFoundInAccount(conversationId, language, initialState);
+                    }
+                    if (MY_ORDERS_QUERY.matcher(query).find() && toolExecutors.containsKey("ai_list_orders")) {
+                        return finishCustomerOrderList(conversationId, userId, language, initialState);
+                    }
                 }
             }
             return executeChatLoop(conversationId, language, userId, effectiveContent);
@@ -807,9 +853,22 @@ public class ChatUseCase {
                 if (item.get("lifecycle") instanceof String lc) entry.put("lifecycle", lc);
                 if (item.get("from") instanceof String f) entry.put("from", f);
                 if (item.get("to") instanceof String t) entry.put("to", t);
-                displayed.add(entry);
+            displayed.add(entry);
             }
             state.set("displayedItineraries", displayed);
+        }
+        if ("ai_list_orders".equals(card.tool()) && card.facts().get("orders") instanceof List<?> orders) {
+            var displayedOrders = objectMapper.createArrayNode();
+            for (int idx = 0; idx < Math.min(10, orders.size()); idx++) {
+                if (!(orders.get(idx) instanceof Map<?, ?> item)) continue;
+                ObjectNode entry = objectMapper.createObjectNode();
+                entry.put("index", item.get("index") instanceof Number n ? n.intValue() : idx + 1);
+                if (item.get("id") instanceof String id) entry.put("id", id);
+                if (item.get("orderCode") instanceof String code) entry.put("orderCode", code);
+                if (item.get("status") instanceof String st) entry.put("status", st);
+                displayedOrders.add(entry);
+            }
+            state.set("displayedOrders", displayedOrders);
         }
         if (Set.of("ai_get_itinerary", "ai_replan_itinerary", "ai_itinerary_history").contains(card.tool())) {
             Object version = card.facts().getOrDefault("version", card.facts().get("currentVersion"));
@@ -1128,6 +1187,9 @@ public class ChatUseCase {
         AssistantArtifact itineraryCard = cards.stream().filter(c -> "ITINERARY".equals(c.type()) && !"UNAVAILABLE".equals(c.status())).findFirst().orElse(null);
         AssistantArtifact listCard = cards.stream().filter(c -> "ITINERARY_LIST".equals(c.type())).findFirst().orElse(null);
         AssistantArtifact historyCard = cards.stream().filter(c -> "ITINERARY_HISTORY".equals(c.type())).findFirst().orElse(null);
+        AssistantArtifact supportCard = cards.stream().filter(c -> "CUSTOMER_SUPPORT".equals(c.type()) && !"UNAVAILABLE".equals(c.status())).findFirst().orElse(null);
+        AssistantArtifact orderListCard = cards.stream().filter(c -> "ORDER_LIST".equals(c.type()) && !"UNAVAILABLE".equals(c.status())).findFirst().orElse(null);
+        AssistantArtifact briefingCard = cards.stream().filter(c -> "MARINE_BRIEFING_CARD".equals(c.type()) && !"UNAVAILABLE".equals(c.status())).findFirst().orElse(null);
         AssistantArtifact reviewCard = cards.stream().filter(c -> "REVIEW_SUMMARY".equals(c.type()) && !"UNAVAILABLE".equals(c.status())).findFirst().orElse(null);
         AssistantArtifact paymentCard = cards.stream().filter(c -> "PAYMENT_PROVIDERS".equals(c.type()) && !"UNAVAILABLE".equals(c.status())).findFirst().orElse(null);
         boolean noMatches = cards.stream().anyMatch(c -> "NO_MATCHES".equals(c.status()));
@@ -1141,6 +1203,15 @@ public class ChatUseCase {
             out.setResponseStatus("NEEDS_INPUT");
         } else if (hasBookingCard) {
             out.setContent(messages.get("ai.booking.confirmation_ready", language));
+            out.setResponseStatus("ANSWERED");
+        } else if (supportCard != null) {
+            out.setContent(formatCustomerSupportMessage(supportCard, language));
+            out.setResponseStatus("ANSWERED");
+        } else if (orderListCard != null) {
+            out.setContent(formatOrderListMessage(orderListCard, language));
+            out.setResponseStatus("ANSWERED");
+        } else if (briefingCard != null) {
+            out.setContent(messages.get("ai.weather.briefing", language));
             out.setResponseStatus("ANSWERED");
         } else if (itineraryCard != null) {
             String key = "ai_replan_itinerary".equals(itineraryCard.tool())
@@ -1182,6 +1253,225 @@ public class ChatUseCase {
         return language == SupportedLanguage.EN
                 ? String.format("Review summary: average %s/5 from %s/%s public reviews (status: %s).", avg, sampled, total, status)
                 : String.format("Tổng hợp đánh giá: điểm trung bình %s/5 trên %s/%s đánh giá công khai (trạng thái: %s).", avg, sampled, total, status);
+    }
+
+    private UUID resolvePinnedOrderId(UUID userId, String contextType, String contextId) {
+        if (contextType == null || contextId == null || contextId.isBlank()) {
+            return null;
+        }
+        String normalizedType = contextType.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("ORDER", "SUB_ORDER").contains(normalizedType)) {
+            return null;
+        }
+        if (entityResolver != null && userId != null) {
+            return entityResolver.resolveOrderForCustomer(userId, contextId)
+                    .map(AiEntityReferenceResolver.ResolvedOrder::masterOrderId)
+                    .orElse(null);
+        }
+        try {
+            return UUID.fromString(contextId.trim());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private boolean isGuestOrderInquiry(String message, String contextType, String contextId) {
+        if (contextType != null && Set.of("ORDER", "SUB_ORDER").contains(contextType.trim().toUpperCase(Locale.ROOT))
+                && contextId != null && !contextId.isBlank()) {
+            return true;
+        }
+        String norm = CopilotRequest.normalize(message);
+        if (MY_ORDERS_QUERY.matcher(norm).find()) {
+            return true;
+        }
+        if (entityResolver != null) {
+            if (!entityResolver.extractCodes(message, Set.of("ORD", "SUB", "DNS")).isEmpty()) {
+                return true;
+            }
+            return !entityResolver.extractUuids(message).isEmpty() && ORDER_CONTEXT_KEYWORDS.matcher(norm).find();
+        }
+        return false;
+    }
+
+    private UUID resolveCustomerOrderFromTurn(UUID userId, String rawMessage, String normalizedQuery,
+                                              UUID pinnedOrderId, ObjectNode state) {
+        if (pinnedOrderId != null) {
+            return pinnedOrderId;
+        }
+        if (userId != null && entityResolver != null) {
+            var resolved = entityResolver.resolveOrderForCustomer(userId, rawMessage);
+            if (resolved.isPresent()) {
+                return resolved.get().masterOrderId();
+            }
+        }
+        if (state != null && state.path("displayedOrders").isArray() && rawMessage != null) {
+            Matcher idxMatch = ORDER_INDEX_REF.matcher(normalizedQuery);
+            if (idxMatch.find()) {
+                int targetIdx = Integer.parseInt(idxMatch.group(1));
+                for (JsonNode entry : state.path("displayedOrders")) {
+                    if (entry.path("index").asInt(-1) == targetIdx && entry.hasNonNull("id")) {
+                        try {
+                            return UUID.fromString(entry.get("id").asText());
+                        } catch (IllegalArgumentException ignored) { }
+                    }
+                }
+            }
+        }
+        UUID rawUuid = PolicyChatAnswer.reference(rawMessage);
+        if (rawUuid != null && ORDER_CONTEXT_KEYWORDS.matcher(normalizedQuery).find()) {
+            return rawUuid;
+        }
+        return null;
+    }
+
+    private boolean hasExplicitUnresolvedOrderRef(String rawMessage, String normalizedQuery) {
+        if (entityResolver != null && !entityResolver.extractCodes(rawMessage, Set.of("ORD", "SUB", "DNS")).isEmpty()) {
+            return true;
+        }
+        return PolicyChatAnswer.reference(rawMessage) != null && ORDER_CONTEXT_KEYWORDS.matcher(normalizedQuery).find();
+    }
+
+    private LlmResponse finishGuestOrderLoginRequired(UUID conversationId, SupportedLanguage language, ObjectNode state) {
+        var response = new LlmResponse();
+        response.setContent(messages.get("ai.guest.login_required_for_orders", language));
+        response.setResponseStatus("NEEDS_INPUT");
+        var card = new AssistantArtifact(UUID.randomUUID().toString(), "CUSTOMER_SUPPORT", "ai_customer_support",
+                "NEEDS_INPUT", Map.of("requiredInputs", List.of("AUTHENTICATION")), List.of(), List.of(),
+                List.of("AUTHENTICATION"), false);
+        return finish(conversationId, response, List.of(card), state);
+    }
+
+    private LlmResponse finishOrderNotFoundInAccount(UUID conversationId, SupportedLanguage language, ObjectNode state) {
+        var response = new LlmResponse();
+        response.setContent(messages.get("ai.order.not_found_in_account", language));
+        response.setResponseStatus("ANSWERED");
+        var card = new AssistantArtifact(UUID.randomUUID().toString(), "CUSTOMER_SUPPORT", "ai_customer_support",
+                "UNAVAILABLE", Map.of("errorCode", "ORDER_NOT_FOUND_OR_DENIED"), List.of(), List.of(), List.of(), false);
+        return finish(conversationId, response, List.of(card), state);
+    }
+
+    private LlmResponse finishCustomerOrderLookup(UUID conversationId, UUID userId, SupportedLanguage language,
+                                                    UUID orderId, String message, String normalizedQuery, ObjectNode state) {
+        boolean includePreview = CopilotRequest.words("huy|hoan|refund|cancel").matcher(normalizedQuery).find();
+        var args = objectMapper.createObjectNode()
+                .put("orderId", orderId.toString())
+                .put("message", message == null || message.isBlank() ? "Check order details" : message)
+                .put("includeCancellationPreview", includePreview);
+        var call = new ToolCall(UUID.randomUUID().toString(), "ai_customer_support", args.toString());
+        String result = executeTool(toolExecutors.get(call.getName()), call.getArguments(), language, conversationId, userId, call);
+        var card = new AssistantArtifactMapper(objectMapper).map(call, result, conversationId);
+        var response = new LlmResponse();
+        if ("UNAVAILABLE".equals(card.status())) {
+            response.setContent(messages.get("ai.order.not_found_in_account", language));
+            response.setResponseStatus("ANSWERED");
+        } else {
+            response.setContent(formatCustomerSupportMessage(card, language));
+            response.setResponseStatus("ANSWERED");
+            state.put("orderId", orderId.toString());
+        }
+        return finish(conversationId, response, List.of(card), state);
+    }
+
+    private LlmResponse finishCustomerOrderList(UUID conversationId, UUID userId, SupportedLanguage language, ObjectNode state) {
+        var call = new ToolCall(UUID.randomUUID().toString(), "ai_list_orders", "{\"limit\":5}");
+        String result = executeTool(toolExecutors.get(call.getName()), call.getArguments(), language, conversationId, userId, call);
+        var card = new AssistantArtifactMapper(objectMapper).map(call, result, conversationId);
+        rememberItineraryState(state, card);
+        var response = new LlmResponse();
+        response.setContent(formatOrderListMessage(card, language));
+        response.setResponseStatus("ANSWERED");
+        return finish(conversationId, response, List.of(card), state);
+    }
+
+    private String formatCustomerSupportMessage(AssistantArtifact card, SupportedLanguage language) {
+        boolean isEn = language == SupportedLanguage.EN;
+        Object orderObj = card.facts().get("order");
+        if (!(orderObj instanceof Map<?, ?> order)) {
+            if (card.facts().get("cancellationPreview") instanceof Map<?, ?> preview && preview.get("refundAmount") instanceof Number amt) {
+                String amountStr = NumberFormat.getNumberInstance(language.locale()).format(amt);
+                return messages.get("ai.policy.verified_facts", language) + " (" + amountStr + (isEn ? " VND)" : " ₫)");
+            }
+            return messages.get("ai.policy.verified_facts", language);
+        }
+        String code = order.get("orderCode") instanceof String c && !c.isBlank() ? "#" + c : "#" + order.get("id");
+        String status = String.valueOf(order.get("status"));
+        String payment = String.valueOf(order.get("paymentStatus"));
+        NumberFormat fmt = NumberFormat.getNumberInstance(language.locale());
+        String total = order.get("totalAmount") instanceof Number n
+                ? fmt.format(n) + (isEn ? " VND" : " ₫") : "-";
+        StringBuilder sb = new StringBuilder();
+        sb.append(messages.get("ai.order.detail_verified", language)).append("\n");
+        sb.append(isEn
+                ? String.format("- **Order**: %s | **Status**: %s | **Payment**: %s | **Total**: %s", code, status, payment, total)
+                : String.format("- **Mã đơn**: %s | **Trạng thái**: %s | **Thanh toán**: %s | **Tổng tiền**: %s", code, status, payment, total));
+        if (order.get("items") instanceof List<?> items) {
+            for (Object itemObj : items) {
+                if (!(itemObj instanceof Map<?, ?> item)) continue;
+                String subCode = item.get("subOrderCode") instanceof String sc && !sc.isBlank() ? "#" + sc : "";
+                String svc = item.get("serviceName") instanceof String sn && !sn.isBlank() ? sn : (isEn ? "Service" : "Dịch vụ");
+                String slotDate = formatSlotDatePart(item.get("slotDate"), isEn);
+                String slotTime = formatSlotTimePart(item.get("slotStartTime"));
+                String slotInfo = slotDate;
+                if (!slotTime.isBlank()) {
+                    slotInfo = slotInfo.isBlank() ? slotTime : slotInfo + " " + slotTime;
+                }
+                sb.append("\n  • ").append(subCode.isBlank() ? "" : subCode + " — ").append(svc);
+                if (!slotInfo.isBlank()) sb.append(" (").append(slotInfo).append(")");
+                sb.append(" [").append(item.get("status")).append("]");
+            }
+        }
+        if (card.facts().get("cancellationPreview") instanceof Map<?, ?> preview && preview.get("refundAmount") instanceof Number refund) {
+            String refundStr = fmt.format(refund) + (isEn ? " VND" : " ₫");
+            sb.append("\n").append(isEn
+                    ? "Estimated cancellation refund under current policy: " + refundStr + " (preview only, no refund executed)."
+                    : "Dự kiến hoàn hủy theo chính sách hiện hành: " + refundStr + " (chỉ xem trước, chưa thực hiện hủy/hoàn).");
+        }
+        return sb.toString();
+    }
+
+    private String formatSlotDatePart(Object dateVal, boolean isEn) {
+        if (dateVal == null) return "";
+        if (dateVal instanceof List<?> parts && parts.size() >= 3) {
+            int year = ((Number) parts.get(0)).intValue();
+            int month = ((Number) parts.get(1)).intValue();
+            int day = ((Number) parts.get(2)).intValue();
+            return isEn
+                    ? String.format("%04d-%02d-%02d", year, month, day)
+                    : String.format("%02d/%02d/%04d", day, month, year);
+        }
+        String text = String.valueOf(dateVal).trim();
+        if (!isEn && text.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            String[] p = text.split("-");
+            return p[2] + "/" + p[1] + "/" + p[0];
+        }
+        return text;
+    }
+
+    private String formatSlotTimePart(Object timeVal) {
+        if (timeVal == null) return "";
+        if (timeVal instanceof List<?> parts && parts.size() >= 2) {
+            return String.format("%02d:%02d", ((Number) parts.get(0)).intValue(), ((Number) parts.get(1)).intValue());
+        }
+        String text = String.valueOf(timeVal).trim();
+        return text.length() >= 5 && text.charAt(2) == ':' ? text.substring(0, 5) : text;
+    }
+
+    private String formatOrderListMessage(AssistantArtifact card, SupportedLanguage language) {
+        boolean isEn = language == SupportedLanguage.EN;
+        if (!(card.facts().get("orders") instanceof List<?> orders) || orders.isEmpty()) {
+            return messages.get("ai.order.list_empty", language);
+        }
+        NumberFormat fmt = NumberFormat.getNumberInstance(language.locale());
+        StringBuilder sb = new StringBuilder(messages.get("ai.order.list_available", language));
+        for (int i = 0; i < orders.size(); i++) {
+            if (!(orders.get(i) instanceof Map<?, ?> o)) continue;
+            int idx = o.get("index") instanceof Number n ? n.intValue() : i + 1;
+            String code = o.get("orderCode") instanceof String c && !c.isBlank() ? "#" + c : String.valueOf(o.get("id"));
+            String total = o.get("totalAmount") instanceof Number n ? fmt.format(n) + (isEn ? " VND" : " ₫") : "-";
+            sb.append("\n").append(idx).append(". **").append(code).append("** — ")
+                    .append(o.get("status")).append(" (").append(total).append(")");
+        }
+        return sb.toString();
     }
 
     private boolean containsPolicyKeywords(String content) {

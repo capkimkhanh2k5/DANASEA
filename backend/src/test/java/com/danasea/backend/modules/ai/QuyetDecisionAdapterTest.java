@@ -2,6 +2,7 @@ package com.danasea.backend.modules.ai;
 
 import static org.assertj.core.api.Assertions.*;
 
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +18,7 @@ import org.springframework.web.client.RestClient;
 import com.danasea.backend.modules.ai.domain.models.DecisionTask;
 import com.danasea.backend.modules.ai.infrastructure.quyet.QuyetDecisionAdapter;
 import com.danasea.backend.modules.ai.infrastructure.quyet.QuyetProperties;
+import com.danasea.backend.modules.ai.support.AiAcceptanceRecorder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import com.danasea.backend.modules.ai.support.AiAcceptanceRecorder;
@@ -49,7 +51,7 @@ class QuyetDecisionAdapterTest {
     }
     private QuyetDecisionAdapter adapter() { return adapter(true, "http://127.0.0.1:" + server.getAddress().getPort(), KEY); }
     private String valid() { return """
-        {"model":"chinhnc/Quyet-1.0-Small","revision":"%s","rubricVersion":"danasea-2026-11-18-v2",
+        {"model":"chinhnc/Quyet-1.0-Small","revision":"%s","rubricVersion":"danasea-2026-11-27-v3",
          "task":"risk","latencyMs":50,"warnings":[],"answers":{"needs_review":{"type":"noul","noul":0.71}}}
         """.formatted(REVISION); }
     @Test void postsFixedTaskWithBearerAndReturnsSuggestionMetadata() throws Exception {
@@ -60,7 +62,7 @@ class QuyetDecisionAdapterTest {
         assertThat(request.path("task").asText()).isEqualTo("risk"); assertThat(request.has("questions")).isFalse();
     }
     @Test void mismatchedMetadataCannotReachBusinessDecisions() {
-        for (String corrupt : List.of(valid().replace(REVISION, "other"), valid().replace("danasea-2026-11-18-v2", "v2"),
+        for (String corrupt : List.of(valid().replace(REVISION, "other"), valid().replace("danasea-2026-11-27-v3", "v2"),
                 valid().replace("Quyet-1.0-Small", "Other"), valid().replace("\"risk\"", "\"review\""))) {
             response.set(corrupt); assertThat(adapter().decide(DecisionTask.RISK, Map.of()).available()).isFalse();
         }

@@ -3,13 +3,15 @@ package com.danasea.backend.modules.ai.infrastructure.cliproxy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.List;
 import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -21,6 +23,7 @@ import org.springframework.web.client.RestClient;
 import com.danasea.backend.configs.properties.HttpClientProperties;
 import com.danasea.backend.modules.ai.domain.exceptions.AiModerationUnavailableException;
 import com.danasea.backend.modules.ai.infrastructure.cliproxy.configs.CliProxyProperties;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -101,7 +104,8 @@ class ProxyModerationRoutingTest {
                         assertThat(path.get()).isEqualTo("/v1/chat/completions");
                         assertThat(authorization.get()).isEqualTo("Bearer gateway-key");
                         assertThat(requestCount.get()).isEqualTo(1);
-                        assertThat(body.get()).contains("gateway-model", "system", "BENIGN", "Xin chào");
+                        assertThat(body.get()).contains("gateway-model", "system", "BENIGN", "Xin chào",
+                                "#ORD-", "#SUB-", "36-character UUIDs");
                         try {
                             assertThat(mapper.readTree(body.get()).path("reasoning_effort").asText()).isEqualTo("high");
                             assertThat(mapper.readTree(body.get()).path("messages").path(1).path("content").asText()).hasSize(2000);

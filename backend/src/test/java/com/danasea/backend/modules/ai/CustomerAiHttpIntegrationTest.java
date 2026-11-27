@@ -1,11 +1,15 @@
 package com.danasea.backend.modules.ai;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,13 +25,15 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.danasea.backend.modules.ai.application.ports.*;
 import com.danasea.backend.modules.ai.domain.exceptions.AiModerationUnavailableException;
 import com.danasea.backend.modules.ai.domain.models.DecisionResult;
-import com.danasea.backend.modules.ai.domain.services.ChatHistoryService;
 import com.danasea.backend.modules.ai.domain.models.TravelContext;
+import com.danasea.backend.modules.ai.domain.services.ChatHistoryService;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
+import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -242,6 +248,158 @@ class CustomerAiHttpIntegrationTest extends BaseSecurityIntegrationTest {
                 .andExpect(jsonPath("$.evidence.riskSignals[0]").value("THREE_FAILED_PAYMENTS_IN_24H"))
                 .andExpect(jsonPath("$.evidence.fraudConfirmed").value(false));
         assertThat(jdbc.queryForObject("select count(*) from payments where master_order_id=? and status='FAILED'", Integer.class, order)).isEqualTo(3);
+    }
+
+    @Test void guestCanChatFiveTurnsThenHitsLimitAndCannotAccessSignedInConversation() throws Exception {
+        when(moderation.isSafe(any())).thenReturn(true);
+        String convId = null;
+        for (int turn = 1; turn <= 5; turn++) {
+            String payload = convId == null
+                    ? "{\"message\":\"Các phương thức thanh toán được hỗ trợ là gì?\"}"
+                    : "{\"conversationId\":\"" + convId + "\",\"message\":\"Các phương thức thanh toán được hỗ trợ là gì?\"}";
+            var res = mvc.perform(post("/api/assistant/chat")
+                            .contentType(MediaType.APPLICATION_JSON).content(payload))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.guestLimit").value(5))
+                    .andExpect(jsonPath("$.guestRemainingTurns").value(5 - turn))
+                    .andReturn();
+            convId = mapper.readTree(res.getResponse().getContentAsString()).path("conversationId").asText();
+        }
+        mvc.perform(post("/api/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"conversationId\":\"" + convId + "\",\"message\":\"Hỏi thêm lần thứ 6\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("GUEST_CHAT_LIMIT_REACHED"));
+
+        mvc.perform(post("/api/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Đơn hàng của tôi đâu?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.responseStatus").value("NEEDS_INPUT"))
+                .andExpect(jsonPath("$.cards[0].type").value("CUSTOMER_SUPPORT"))
+                .andExpect(jsonPath("$.cards[0].status").value("NEEDS_INPUT"));
+
+        var ownedConv = chatHistory.getOrCreateConversation(null, owner, SupportedLanguage.VI);
+        mvc.perform(post("/api/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"conversationId\":\"" + ownedConv.getId() + "\",\"message\":\"Xin chào\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test void guestConversationIsClaimedOnLoginAndRetainsFullHistoryWhileBlockingOtherUsers() throws Exception {
+        when(moderation.isSafe(any())).thenReturn(true);
+        String convId = null;
+        for (int turn = 1; turn <= 5; turn++) {
+            String payload = convId == null
+                    ? "{\"message\":\"Các phương thức thanh toán được hỗ trợ là gì?\"}"
+                    : "{\"conversationId\":\"" + convId + "\",\"message\":\"Các phương thức thanh toán được hỗ trợ là gì?\"}";
+            var res = mvc.perform(post("/api/assistant/chat")
+                            .contentType(MediaType.APPLICATION_JSON).content(payload))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            convId = mapper.readTree(res.getResponse().getContentAsString()).path("conversationId").asText();
+        }
+        mvc.perform(post("/api/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"conversationId\":\"" + convId + "\",\"message\":\"Hỏi thêm lượt 6\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("GUEST_CHAT_LIMIT_REACHED"));
+
+        mvc.perform(post("/api/assistant/conversations/" + convId + "/claim")
+                        .with(user(owner.toString()).roles("CUSTOMER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(owner.toString()));
+
+        mvc.perform(get("/api/assistant/conversations").with(user(owner.toString()).roles("CUSTOMER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(convId));
+
+        mvc.perform(get("/api/assistant/conversations/" + convId + "/history")
+                        .with(user(owner.toString()).roles("CUSTOMER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(10));
+
+        mvc.perform(post("/api/assistant/chat").with(user(owner.toString()).roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"conversationId\":\"" + convId + "\",\"message\":\"Các phương thức thanh toán được hỗ trợ là gì?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.conversationId").value(convId));
+
+        mvc.perform(post("/api/assistant/conversations/" + convId + "/claim")
+                        .with(user(other.toString()).roles("CUSTOMER")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/assistant/conversations/" + convId + "/history")
+                        .with(user(other.toString()).roles("CUSTOMER")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"conversationId\":\"" + convId + "\",\"message\":\"Xin chào\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test void customerOrderLookupSupportsCanonicalDisplayCodesSubOrderDnsPinnedContextAndOwnershipIsolation() throws Exception {
+        when(moderation.isSafe(any())).thenReturn(true);
+        UUID orderId = UUID.fromString("7a2f1c4d-1234-4abc-9def-0123456789ab");
+        UUID subOrderId = UUID.fromString("ec938b9f-5678-4abc-9def-0123456789ab");
+        UUID vendorId = UUID.randomUUID();
+        jdbc.update("insert into master_orders(id,customer_id,order_code,total_amount,status,created_at,updated_at) values(?,?,'ORD-7A2F1C4D',600000,'PAID',now(),now())",
+                orderId, owner);
+        jdbc.update("insert into sub_orders(id,master_order_id,vendor_id,service_id,slot_id,sub_order_code,quantity,unit_price,subtotal_amount,final_amount,status,created_at,updated_at) values(?,?,?,?,?,'SUB-EC938B9F',2,300000,600000,600000,'CONFIRMED',now(),now())",
+                subOrderId, orderId, vendorId, serviceId, slotId);
+        jdbc.update("insert into payments(id,master_order_id,provider,status,amount,created_at,updated_at) values(?,?,'VNPAY','SUCCESS',600000,now(),now())",
+                UUID.randomUUID(), orderId);
+
+        mvc.perform(post("/api/assistant/chat").with(user(owner.toString()).roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Kiểm tra đơn hàng #ORD-7A2F1C4D\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.responseStatus").value("ANSWERED"))
+                .andExpect(jsonPath("$.cards[0].type").value("CUSTOMER_SUPPORT"))
+                .andExpect(jsonPath("$.message").value(allOf(
+                        containsString("#ORD-7A2F1C4D"),
+                        containsString("PAID"))));
+
+        mvc.perform(post("/api/assistant/chat").with(user(owner.toString()).roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Trạng thái mã #SUB-EC938B9F\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.responseStatus").value("ANSWERED"))
+                .andExpect(jsonPath("$.message").value(allOf(
+                        containsString("#ORD-7A2F1C4D"),
+                        containsString("#SUB-EC938B9F"))));
+
+        mvc.perform(post("/api/assistant/chat").with(user(owner.toString()).roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Đơn DNS-7A2F1C4D của tôi thế nào?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.responseStatus").value("ANSWERED"))
+                .andExpect(jsonPath("$.message").value(containsString("#ORD-7A2F1C4D")));
+
+        mvc.perform(post("/api/assistant/chat").with(user(owner.toString()).roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Đơn này thanh toán chưa?\",\"contextType\":\"ORDER\",\"contextId\":\"#ORD-7A2F1C4D\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.responseStatus").value("ANSWERED"))
+                .andExpect(jsonPath("$.message").value(containsString("#ORD-7A2F1C4D")));
+
+        mvc.perform(post("/api/assistant/chat").with(user(owner.toString()).roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Xem đơn hàng của tôi\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.responseStatus").value("ANSWERED"))
+                .andExpect(jsonPath("$.cards[0].type").value("ORDER_LIST"))
+                .andExpect(jsonPath("$.message").value(containsString("#ORD-7A2F1C4D")));
+
+        mvc.perform(post("/api/assistant/chat").with(user(other.toString()).roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Kiểm tra đơn hàng #ORD-7A2F1C4D\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cards[0].status").value("UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").value(not(
+                        anyOf(
+                                containsString("Kayak test"),
+                                containsString("600.000"),
+                                containsString("600,000")))));
     }
 
 }

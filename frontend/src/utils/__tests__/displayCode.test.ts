@@ -141,4 +141,14 @@ describe('displayCode — formatDisplayCode standardizer', () => {
       'tra cứu trạng thái đơn hàng 00010000-0000-0000-0000-000000000042 và sub 00020000-0000-0000-0000-000000000015'
     );
   });
+
+  test('does NOT corrupt non-seed random UUIDv4 display codes into synthetic 0000 UUIDs', () => {
+    assert.equal(resolveDisplayCodeToUuid('#ORD-7A2F1C4D'), '#ORD-7A2F1C4D');
+    assert.equal(resolveDisplayCodeToUuid('SUB-EC938B9F'), 'SUB-EC938B9F');
+    const prompt = 'Kiểm tra trạng thái đơn #ORD-7A2F1C4D và #ORD-00010042';
+    assert.equal(
+      translateDisplayCodesToUuids(prompt),
+      'Kiểm tra trạng thái đơn #ORD-7A2F1C4D và 00010000-0000-0000-0000-000000000042'
+    );
+  });
 });

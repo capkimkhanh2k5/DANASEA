@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Minus, X, Send, RotateCcw } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Minus, X, Send, RotateCcw, LogIn } from 'lucide-react';
 import { useAiModalStore, type AiChatMessage } from '../../store/useAiModalStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { MarkdownText } from '../common/MarkdownText';
 import { AssistantCardList } from './AssistantCardList';
@@ -22,9 +24,13 @@ const QUICK_SUGGESTIONS_EN = [
 ];
 
 export const AiChatPopup: React.FC = () => {
-  const { isOpen, conversationId, messages, isGenerating, closeAiModal, sendMessage, clearHistory } = useAiModalStore();
+  const { isOpen, conversationId, messages, isGenerating, closeAiModal, sendMessage, clearHistory, prepareGuestLoginRedirect } = useAiModalStore();
+  const { isAuthenticated, accessToken } = useAuthStore();
   const { language } = useLanguageStore();
+  const location = useLocation();
   const isEn = language === 'en';
+  const isGuest = !isAuthenticated || !accessToken;
+  const returnTo = `${location.pathname}${location.search}`;
 
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -143,6 +149,19 @@ export const AiChatPopup: React.FC = () => {
                   language={isEn ? 'en' : 'vi'}
                   onQuickPrompt={handleSuggestionClick}
                 />
+                {isGuest && msg.requiresLogin && (
+                  <div className="mt-2 pt-2 border-t border-slate-100">
+                    <Link
+                      to="/auth"
+                      state={{ returnTo }}
+                      onClick={prepareGuestLoginRedirect}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-800 text-white font-semibold text-[11px] transition-colors"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>{isEn ? 'Sign in to DANASEA' : 'Đăng nhập tài khoản'}</span>
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -184,7 +203,7 @@ export const AiChatPopup: React.FC = () => {
           onChange={(e) => setInputValue(e.target.value)}
           placeholder={isEn ? 'Ask a question or request advice...' : 'Nhập câu hỏi cần hỗ trợ...'}
           disabled={isGenerating}
-          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white transition-all shadow-xs"
+          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white transition-all shadow-xs disabled:opacity-60"
         />
         <button
           type="submit"

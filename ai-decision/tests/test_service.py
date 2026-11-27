@@ -50,7 +50,7 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(model.calls[0][2])
         self.assertEqual(response.json()["rubricVersion"], VERSION)
-        self.assertEqual(response.json()["rubricVersion"], "danasea-2026-11-18-v2")
+        self.assertEqual(response.json()["rubricVersion"], "danasea-2026-11-27-v3")
         self.assertFalse(response.json()["calibratedOnDanasea"])
         self.assertEqual(response.json()["answers"]["needs_review"]["noul"], 0.2)
 

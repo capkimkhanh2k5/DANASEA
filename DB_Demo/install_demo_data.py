@@ -606,6 +606,19 @@ def align_payment_attempt_defaults(rows):
             p.setdefault('is_canonical', p is canonical)
 
 
+def format_display_code(raw_id, prefix):
+    clean = str(raw_id).replace('-', '').lower()
+    is_seed = (
+        clean.startswith((
+            '00010000', '00020000', '00040000', '00050000', '00060000',
+            '00080000', '00090000', 'b0010000', 'b0020000', '00000000'
+        ))
+        or (len(clean) >= 8 and len(set(clean[:8])) <= 2)
+    )
+    code = (clean[:4] + clean[-4:]) if (is_seed and len(clean) >= 8) else clean[:8]
+    return f'{prefix}-{code.upper()}'
+
+
 def align_schema_defaults(rows, colmap):
     if ('services', 'waiver_required') in colmap:
         for s in rows.get('services', []):
@@ -655,6 +668,12 @@ def align_schema_defaults(rows, colmap):
             pr.setdefault('bank_reference', None)
             pr.setdefault('admin_note', None)
             pr.setdefault('vendor_note', None)
+    if ('master_orders', 'order_code') in colmap:
+        for mo in rows.get('master_orders', []):
+            mo.setdefault('order_code', format_display_code(mo['id'], 'ORD'))
+    if ('sub_orders', 'sub_order_code') in colmap:
+        for so in rows.get('sub_orders', []):
+            so.setdefault('sub_order_code', format_display_code(so['id'], 'SUB'))
 
 
 class Session:
@@ -1588,8 +1607,8 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     }
 
 
-# Replacement accepts only the exact reviewed V1-V62 table/column/FK/trigger inventory.
-REPLACEMENT_FLYWAY_VERSION = 62
+# Replacement accepts only the exact reviewed V1-V63 table/column/FK/trigger inventory.
+REPLACEMENT_FLYWAY_VERSION = 63
 RESET_INVENTORY_SQL = """
 SELECT json_build_object(
  'schemas',(SELECT json_agg(nspname ORDER BY nspname) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),

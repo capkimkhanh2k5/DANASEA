@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -25,6 +26,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.entities.S
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
+import com.danasea.backend.shared.util.DisplayCodeFormatter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -76,14 +78,23 @@ public class CustomerMarineBriefingUseCase {
 
     @Transactional
     public MarineBriefingOverview getMarineBriefing(UUID customerUserId, UUID orderId, SupportedLanguage language) {
-        MasterOrderJpaEntity order = masterOrderRepo.findById(orderId)
+        UUID resolvedMasterOrderId = orderId;
+        Optional<MasterOrderJpaEntity> orderOpt = masterOrderRepo.findById(orderId);
+        if (orderOpt.isEmpty()) {
+            UUID parentId = subOrderRepo.findMasterOrderIdById(orderId).orElse(null);
+            if (parentId != null) {
+                resolvedMasterOrderId = parentId;
+                orderOpt = masterOrderRepo.findById(parentId);
+            }
+        }
+        MasterOrderJpaEntity order = orderOpt
                 .orElseThrow(() -> new IllegalArgumentException("Order not found with ID: " + orderId));
 
         if (!order.getCustomerId().equals(customerUserId)) {
             throw new AccessDeniedException("Order does not belong to the authenticated user");
         }
 
-        List<SubOrderJpaEntity> subOrders = subOrderRepo.findByMasterOrderId(orderId);
+        List<SubOrderJpaEntity> subOrders = subOrderRepo.findByMasterOrderId(resolvedMasterOrderId);
         List<SubOrderBriefing> briefings = new ArrayList<>();
 
         for (SubOrderJpaEntity subOrder : subOrders) {
@@ -91,7 +102,9 @@ public class CustomerMarineBriefingUseCase {
             briefings.add(briefing);
         }
 
-        String orderCode = "DNS-" + order.getId().toString().substring(0, 8).toUpperCase(Locale.ROOT);
+        String orderCode = (order.getOrderCode() != null && !order.getOrderCode().isBlank())
+                ? order.getOrderCode()
+                : DisplayCodeFormatter.format(order.getId(), "ORD");
         return new MarineBriefingOverview(
                 order.getId(),
                 orderCode,

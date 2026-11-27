@@ -17,7 +17,7 @@ import {
   formatRiskSignalLabel,
   formatContentReasonLabel,
   formatEvidenceTypeLabel,
-} from '../copilotArtifactHelpers';
+} from '../copilotArtifactHelpers.ts';
 
 describe('formatVendorIssueLabel & enum label mappers', () => {
   it('maps known vendor issue enums to Vietnamese labels and humanises unknown ones', () => {

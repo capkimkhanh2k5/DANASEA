@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { translateDisplayCodesToUuids } from '../utils/displayCode';
 import type { MarineBriefingOverview } from '../types/marineBriefing';
 
 export interface AssistantChatRequest {
@@ -60,6 +61,8 @@ export interface AssistantChatResponse {
   requiredInputs: string[];
   context: Record<string, unknown>;
   generatedTextVerified?: boolean;
+  guestRemainingTurns?: number;
+  guestLimit?: number;
 }
 
 export interface AiRecommendationRequest {
@@ -87,16 +90,63 @@ export interface AiItineraryItem {
   updatedAt: string;
 }
 
+export interface AssistantConversationSummary {
+  id: string;
+  userId?: string | null;
+  title?: string | null;
+  locale?: string;
+  updatedAt?: string;
+}
+
+export interface AssistantHistoryMessageRecord {
+  id: string;
+  conversationId?: string;
+  role: 'USER' | 'ASSISTANT' | 'TOOL' | string;
+  content: string;
+  responsePayload?: string | null;
+  createdAt?: string;
+}
+
 export const aiService = {
   /**
    * POST /api/assistant/chat — Chat tư vấn dịch vụ và giải đáp hải văn
    */
   async chat(message: string, conversationId?: string): Promise<AssistantChatResponse> {
     const res = await apiClient.post<AssistantChatResponse>('/assistant/chat', {
-      message,
+      message: translateDisplayCodesToUuids(message),
       conversationId: conversationId || undefined,
     }, { timeout: 130_000 });
     return res.data;
+  },
+
+  /**
+   * POST /api/assistant/conversations/{id}/claim — Gắn hội thoại khách vào tài khoản sau đăng nhập
+   */
+  async claimConversation(conversationId: string): Promise<AssistantConversationSummary> {
+    const res = await apiClient.post<AssistantConversationSummary>(
+      `/assistant/conversations/${encodeURIComponent(conversationId)}/claim`
+    );
+    return res.data;
+  },
+
+  /**
+   * GET /api/assistant/conversations — Liệt kê các cuộc trò chuyện của người dùng
+   */
+  async listConversations(limit = 10): Promise<AssistantConversationSummary[]> {
+    const res = await apiClient.get<AssistantConversationSummary[]>(
+      `/assistant/conversations?archived=false&limit=${limit}`
+    );
+    return Array.isArray(res.data) ? res.data : [];
+  },
+
+  /**
+   * GET /api/assistant/conversations/{id}/history — Lấy lịch sử tin nhắn của cuộc trò chuyện
+   */
+  async getConversationHistory(conversationId: string, limit = 40): Promise<AssistantHistoryMessageRecord[]> {
+    const res = await apiClient.get<AssistantHistoryMessageRecord[]>(
+      `/assistant/conversations/${encodeURIComponent(conversationId)}/history?limit=${limit}`
+    );
+    return Array.isArray(res.data) ? res.data : [];
   },
 
   /**

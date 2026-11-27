@@ -29,6 +29,11 @@ public class CustomerSupportUseCase {
     private final CustomerOrderReadPort orders;
     private final DecisionModelPort decisions;
 
+    public List<OwnedOrder> listOrders(UUID userId, int limit) {
+        if (userId == null) throw new IllegalArgumentException("An authenticated customer is required");
+        return orders.listRecent(userId, limit);
+    }
+
     public Result execute(UUID userId, UUID orderId, String message, boolean includeCancellationPreview) {
         if (userId == null) throw new IllegalArgumentException("An authenticated customer is required");
         if (message == null || message.isBlank() || message.length() > 1800) throw new IllegalArgumentException("Support message must contain 1 to 1800 characters");

@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -23,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,9 +33,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockMakers;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockMakers;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -64,12 +67,10 @@ import com.danasea.backend.modules.ai.application.tools.VendorFeatureTool;
 import com.danasea.backend.modules.ai.application.usecases.AdminDisputeSummaryUseCase;
 import com.danasea.backend.modules.ai.application.usecases.AnalyzeTransactionRiskUseCase;
 import com.danasea.backend.modules.ai.application.usecases.AssessTextUseCase;
-import com.danasea.backend.modules.ai.infrastructure.persistence.AssessmentCaseStoreAdapter;
-import com.danasea.backend.modules.ai.infrastructure.persistence.entities.AiAssessmentCaseJpaEntity;
-import com.danasea.backend.modules.ai.infrastructure.persistence.repositories.JpaAiAssessmentCaseRepository;
 import com.danasea.backend.modules.ai.application.usecases.CustomerMarineBriefingUseCase;
 import com.danasea.backend.modules.ai.application.usecases.CustomerMarineBriefingUseCase.MarineBriefingOverview;
 import com.danasea.backend.modules.ai.application.usecases.MarineSlotWeather;
+import com.danasea.backend.modules.ai.application.usecases.PolicyChatAnswer;
 import com.danasea.backend.modules.ai.application.usecases.RoleCopilotUseCase;
 import com.danasea.backend.modules.ai.application.usecases.RoleCopilotUseCase.CopilotChatResponse;
 import com.danasea.backend.modules.ai.application.usecases.VendorListingOptimizerUseCase;
@@ -82,6 +83,13 @@ import com.danasea.backend.modules.ai.application.usecases.VendorSlotAdvisorUseC
 import com.danasea.backend.modules.ai.application.usecases.VendorSlotAdvisorUseCase.SlotAdvisorResult;
 import com.danasea.backend.modules.ai.domain.models.DecisionResult;
 import com.danasea.backend.modules.ai.domain.models.DecisionTask;
+import com.danasea.backend.modules.ai.infrastructure.persistence.AssessmentCaseStoreAdapter;
+import com.danasea.backend.modules.ai.infrastructure.persistence.entities.AiAssessmentCaseJpaEntity;
+import com.danasea.backend.modules.ai.infrastructure.persistence.repositories.JpaAiAssessmentCaseRepository;
+import com.danasea.backend.modules.order.application.api.AiPolicyReader;
+import com.danasea.backend.modules.order.application.usecases.GetCancellationPreviewUseCase;
+import com.danasea.backend.modules.order.domain.services.RefundPolicyEngine;
+import com.danasea.backend.shared.i18n.LocalizedMessageService;
 import com.danasea.backend.modules.ai.domain.models.LlmResponse;
 import com.danasea.backend.modules.ai.domain.models.ToolCall;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
@@ -1607,5 +1615,30 @@ class VendorAdminAiFeaturesTest {
                 null, null, SupportedLanguage.VI);
         assertThat(v29.toolsUsed()).containsExactly("vendor_slot_advisor");
         assertThat(v29.message()).contains("Mô tô nước – Danabeach").contains("1/20 (5.0%)");
+    }
+
+    @Test
+    void pastedUuidWithDigitRunDoesNotTriggerTextAssessmentModeration() {
+        var caseStore = mock(AssessmentCaseStorePort.class);
+        var copilot = extendedCopilot(new AssessTextUseCase(decisionModel, caseStore),
+                mock(TransactionRiskReadPort.class), caseStore, mock(AnalyzeTransactionRiskUseCase.class));
+
+        var adminConv = adminConversation();
+        for (String uuid : List.of("14ceea3b-a086-4975-854a-1bdbaedc8a1d", "14ceea3b-0123-4567-8901-1bdbaedc8a1d")) {
+            var adminReply = copilot.processMessage(adminUserId, "ADMIN", null, adminConv.id(),
+                    "Kiểm tra đơn hàng " + uuid, null, null, SupportedLanguage.VI);
+            assertThat(adminReply.toolsUsed()).doesNotContain("admin_text_assessment");
+            assertThat(adminReply.artifacts()).noneMatch(c -> "COPILOT_CONTENT_ASSESSMENT_CARD".equals(c.get("type")));
+        }
+
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "TOP_RATED")));
+        var vendorConv = vendorConversation();
+        for (String uuid : List.of("14ceea3b-a086-4975-854a-1bdbaedc8a1d", "14ceea3b-0123-4567-8901-1bdbaedc8a1d")) {
+            var vendorReply = copilot.processMessage(vendorUserId, "VENDOR", vendorId, vendorConv.id(),
+                    "Kiểm tra đơn hàng " + uuid, null, null, SupportedLanguage.VI);
+            assertThat(vendorReply.toolsUsed()).doesNotContain("vendor_text_assessment");
+            assertThat(vendorReply.artifacts()).noneMatch(c -> "COPILOT_CONTENT_ASSESSMENT_CARD".equals(c.get("type")));
+        }
     }
 }

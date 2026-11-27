@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -352,5 +353,13 @@ class CustomerAiFeaturesTest {
         var manThaiSonTra = new TravelRequest("Tôi muốn vừa chèo SUP ở Mân Thái vừa trải nghiệm biển Sơn Trà, hãy sắp xếp hợp lý.",
                 null, null, 2, date, date, null, null, null, null, null, null, null, null, null).context();
         assertThat(manThaiSonTra.criteria().unsupportedConstraints()).doesNotContain("PLACE_NAME_REQUIRES_COORDINATES");
+    }
+
+    @Test void assessTextDoesNotFlagRandomUuidAsVietnamesePhone() {
+        var cases = mock(AssessmentCaseStorePort.class);
+        var result = new AssessTextUseCase(model, cases)
+                .execute(owner, "Kiểm tra đơn hàng 14ceea3b-a086-4975-854a-1bdbaedc8a1d giúp tôi", false);
+        assertThat(result.contactMatches()).isEmpty();
+        assertThat(result.reasonCodes()).doesNotContain("EXTERNAL_CONTACT_DETECTED");
     }
 }

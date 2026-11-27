@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { getAdminAiError, AI_TIMEOUT_CONFIG } from '../adminAiService';
+import { getAdminAiError, AI_TIMEOUT_CONFIG } from '../adminAiErrors.ts';
 
 describe('Admin AI Service Configuration & Error Handling', () => {
   it('has calibrated timeout values matching technical architecture', () => {
