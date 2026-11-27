@@ -30,7 +30,6 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   late final CatalogRepository _repository;
   late TextEditingController _searchController;
-  bool _isMapView = false;
   String? _selectedLocation;
   String? _selectedCategory;
   String? _selectedTimeOfDay;
@@ -1013,119 +1012,6 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      InkWell(
-                        onTap: () => setState(() => _isMapView = false),
-                        borderRadius: BorderRadius.circular(18),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: !_isMapView
-                                ? AppColors.surfaceContainerLowest
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(18),
-                            boxShadow: !_isMapView
-                                ? [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.06,
-                                      ),
-                                      blurRadius: 4,
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.view_agenda,
-                                size: 15,
-                                color: !_isMapView
-                                    ? AppColors.secondary
-                                    : AppColors.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 4),
-                              LocalizedText(
-                                'Danh sách',
-                                style: AppTypography.labelSm(
-                                  color: !_isMapView
-                                      ? AppColors.secondary
-                                      : AppColors.onSurfaceVariant,
-                                  fontWeight: !_isMapView
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => setState(() => _isMapView = true),
-                        borderRadius: BorderRadius.circular(18),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _isMapView
-                                ? AppColors.surfaceContainerLowest
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(18),
-                            boxShadow: _isMapView
-                                ? [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.06,
-                                      ),
-                                      blurRadius: 4,
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.map,
-                                size: 15,
-                                color: _isMapView
-                                    ? AppColors.secondary
-                                    : AppColors.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 4),
-                              LocalizedText(
-                                'Bản đồ',
-                                style: AppTypography.labelSm(
-                                  color: _isMapView
-                                      ? AppColors.secondary
-                                      : AppColors.onSurfaceVariant,
-                                  fontWeight: _isMapView
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
@@ -1197,11 +1083,9 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
 
-          // CONTENT: LIST OR MAP
+          // CONTENT: LIST
           Expanded(
-            child: _isMapView
-                ? _buildMapPreview(services)
-                : services.isEmpty && !_loading
+            child: services.isEmpty && !_loading
                 ? _buildEmptyState()
                 : ListView.separated(
                     padding: const EdgeInsets.symmetric(
@@ -1589,74 +1473,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildMapPreview(List<ServiceModel> services) {
-    final pinPositions = <Alignment>[
-      const Alignment(-0.55, -0.55),
-      const Alignment(0.55, -0.35),
-      const Alignment(-0.45, 0.45),
-      const Alignment(0.45, 0.55),
-    ];
-    final topServices = services.take(4).toList();
-
-    return Container(
-      color: AppColors.secondaryContainer.withValues(alpha: 0.2),
-      child: Stack(
-        children: [
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.map_outlined,
-                  size: 64,
-                  color: AppColors.secondary,
-                ),
-                const SizedBox(height: 12),
-                LocalizedText(
-                  'Bản đồ vị trí bãi biển Đà Nẵng',
-                  style: AppTypography.headlineSm(color: AppColors.secondary),
-                ),
-                const SizedBox(height: 6),
-                LocalizedText(
-                  'Đang hiển thị ${services.length} điểm dịch vụ ven biển từ hệ thống',
-                  style: AppTypography.bodySm(
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          for (var i = 0; i < topServices.length; i++)
-            Align(
-              alignment: pinPositions[i % pinPositions.length],
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CatalogDetailScreen(
-                          serviceId: topServices[i].id,
-                          repository: _repository,
-                        ),
-                      ),
-                    );
-                  },
-                  child: _buildMapPin(
-                    topServices[i].locationName.trim().isNotEmpty
-                        ? topServices[i].locationName.trim()
-                        : topServices[i].name,
-                    '${topServices[i].name} • ${_formatPrice(_aiQuoteByServiceId[topServices[i].id] ?? topServices[i].price)}',
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _showAiCompareResultModal(Map<String, dynamic> result) async {
     final matrixRaw = result['matrix'];
     final rows = matrixRaw is List
@@ -1921,44 +1737,6 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildMapPin(String title, String desc) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppShapes.shadowLevel2,
-        border: Border.all(color: AppColors.secondary, width: 1.2),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.location_on, size: 16, color: AppColors.primary),
-          const SizedBox(width: 4),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LocalizedText(
-                title,
-                style: AppTypography.labelSm(
-                  color: AppColors.onSurface,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              LocalizedText(
-                desc,
-                style: AppTypography.bodySm(
-                  color: AppColors.outline,
-                ).copyWith(fontSize: 10),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
