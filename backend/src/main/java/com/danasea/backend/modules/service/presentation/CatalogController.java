@@ -2,6 +2,8 @@ package com.danasea.backend.modules.service.presentation;
 
 import com.danasea.backend.modules.flashsale.application.FlashSaleService;
 import com.danasea.backend.modules.flashsale.application.FlashSaleService.PublicOffer;
+import com.danasea.backend.modules.order.infrastructure.persistence.entities.DiscountCodeJpaEntity;
+import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaDiscountCodeRepository;
 import com.danasea.backend.modules.service.application.dtos.SearchServicesCriteria;
 import com.danasea.backend.modules.service.application.dtos.ServiceDetailResult;
 import com.danasea.backend.modules.service.application.dtos.ServiceSummaryResult;
@@ -11,8 +13,10 @@ import com.danasea.backend.modules.service.domain.models.Service;
 import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.presentation.dtos.PageResponse;
+import com.danasea.backend.modules.service.presentation.dtos.PublicVendorPromotionResponse;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceDetailResponse;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSummaryResponse;
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
 import com.danasea.backend.shared.i18n.LocaleContextFilter;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
@@ -21,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -33,7 +38,12 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.HtmlUtils;
 
 @RestController
@@ -45,9 +55,16 @@ public class CatalogController {
 
     private FlashSaleService flashSale;
 
-    @Autowired
+    @Autowired(required = false)
     public void setFlashSale(FlashSaleService flashSale) {
         this.flashSale = flashSale;
+    }
+
+    private JpaDiscountCodeRepository discountCodeRepository;
+
+    @Autowired(required = false)
+    public void setDiscountCodeRepository(JpaDiscountCodeRepository discountCodeRepository) {
+        this.discountCodeRepository = discountCodeRepository;
     }
 
     private ServiceRepositoryPort serviceRepositoryPort;
@@ -78,8 +95,9 @@ public class CatalogController {
             @RequestParam(required = false) Integer guests,
             @RequestParam(required = false) Integer participantCount,
             @RequestParam(required = false) UUID vendorId,
-            @RequestParam(required = false) com.danasea.backend.modules.vendor.domain.models.BadgeTier badgeTier,
+            @RequestParam(required = false) BadgeTier badgeTier,
             @RequestParam(required = false) BigDecimal minRating,
+            @RequestParam(required = false) Boolean onSale,
             @RequestParam(required = false) String sortBy,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
@@ -111,6 +129,7 @@ public class CatalogController {
                 .vendorId(vendorId)
                 .badgeTier(badgeTier)
                 .minRating(minRating)
+                .onSale(onSale)
                 .sortBy(sortBy)
                 .page(page)
                 .size(size)
@@ -120,8 +139,12 @@ public class CatalogController {
         long total = searchServicesUseCase.count(criteria);
 
         List<PublicOffer> offers = flashSale != null ? flashSale.active() : List.of();
+        List<DiscountCodeJpaEntity> activeVendorCodes = discountCodeRepository != null
+                ? discountCodeRepository.findActivePublicVendorDiscounts(OffsetDateTime.now())
+                : List.of();
         List<ServiceSummaryResponse> responses = results.stream().map(r -> ServiceSummaryResponse.builder()
                 .flashSales(offers.stream().filter(o -> o.serviceId().equals(r.getId())).toList())
+                .vendorPromotions(matchingVendorPromotions(r.getVendorId(), r.getId(), activeVendorCodes))
                 .id(r.getId())
                 .vendorId(r.getVendorId())
                 .vendorBadgeTier(r.getVendorBadgeTier())
@@ -355,9 +378,13 @@ public class CatalogController {
 
     private ServiceDetailResponse toServiceDetailResponse(ServiceDetailResult result) {
         final UUID serviceId = result.getId();
+        List<DiscountCodeJpaEntity> activeVendorCodes = discountCodeRepository != null
+                ? discountCodeRepository.findActivePublicVendorDiscounts(OffsetDateTime.now())
+                : List.of();
 
         return ServiceDetailResponse.builder()
                 .flashSales(flashSale != null ? flashSale.active().stream().filter(o -> o.serviceId().equals(serviceId)).toList() : List.of())
+                .vendorPromotions(matchingVendorPromotions(result.getVendorId(), serviceId, activeVendorCodes))
                 .id(result.getId())
                 .name(result.getName())
                 .slug(result.getSlug())
@@ -441,5 +468,29 @@ public class CatalogController {
         if (guests != null && guests <= 0) {
             throw new IllegalArgumentException("guests must be greater than 0");
         }
+    }
+
+    private List<PublicVendorPromotionResponse> matchingVendorPromotions(
+            UUID vendorId,
+            UUID serviceId,
+            List<DiscountCodeJpaEntity> activeVendorCodes) {
+        if (vendorId == null || activeVendorCodes == null || activeVendorCodes.isEmpty()) {
+            return List.of();
+        }
+        return activeVendorCodes.stream()
+                .filter(d -> vendorId.equals(d.getVendorId())
+                        && (d.getServiceId() == null || d.getServiceId().equals(serviceId)))
+                .map(d -> new PublicVendorPromotionResponse(
+                        d.getId(),
+                        d.getCode(),
+                        d.getVendorId(),
+                        d.getServiceId(),
+                        d.getDiscountType() != null ? d.getDiscountType().name() : null,
+                        d.getDiscountValue(),
+                        d.getMinOrderAmount(),
+                        d.getMaxDiscountAmount(),
+                        d.getValidTo()
+                ))
+                .toList();
     }
 }

@@ -65,4 +65,23 @@ class FlashSaleReportLedgerTest {
         var entries=ledger(List.of(order),"0.03",List.of(refund(order,"0.01",1),refund(order,"0.01",2),refund(order,"0.01",3)));
         assertThat(commission(entries)).isEqualByComparingTo("0"); assertThat(payout(entries)).isEqualByComparingTo("0");
     }
+    @Test void stackedFlashSaleAndVendorVoucherReconcilesK2PayoutAndPartialRefund() {
+        // K2 stacked: original=650k, platformSubsidy=50k, vendorDiscount=150k, customerCash=450k, basis=650k, commission=65k, payout=435k
+        var stacked = new SubOrderRecord(
+                UUID.randomUUID(), master, vendor, UUID.randomUUID(), UUID.randomUUID(), 1,
+                n("650000"), n("650000"), n("0.10"), n("65000"), n("435000"), SubOrderStatus.COMPLETED,
+                paid, paid, null, n("450000"), n("50000"), n("650000"), n("150000")
+        );
+        var paidEntries = ledger(List.of(stacked), "450000", List.of());
+        assertThat(commission(paidEntries)).isEqualByComparingTo("65000");
+        assertThat(payout(paidEntries)).isEqualByComparingTo("435000");
+
+        var partialEntries = ledger(List.of(stacked), "450000", List.of(refund(stacked, "225000", 1)));
+        assertThat(commission(partialEntries)).isEqualByComparingTo("32500");
+        assertThat(payout(partialEntries)).isEqualByComparingTo("217500");
+
+        var fullRefundEntries = ledger(List.of(stacked), "450000", List.of(refund(stacked, "450000", 1)));
+        assertThat(commission(fullRefundEntries)).isEqualByComparingTo("0");
+        assertThat(payout(fullRefundEntries)).isEqualByComparingTo("0");
+    }
 }

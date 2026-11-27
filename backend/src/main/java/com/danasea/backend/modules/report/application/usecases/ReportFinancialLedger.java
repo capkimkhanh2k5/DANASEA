@@ -92,8 +92,8 @@ final class ReportFinancialLedger {
                 BigDecimal gross = safe(order.subtotalAmount());
                 BigDecimal cash = cashShares.getOrDefault(order.id(), BigDecimal.ZERO);
                 BigDecimal comm = commission(order, BigDecimal.ZERO);
-                BigDecimal basis = effectiveCommissionBasis(order);
-                BigDecimal payout = basis.subtract(comm);
+                BigDecimal vendorNet = effectiveVendorNetRevenue(order);
+                BigDecimal payout = vendorNet.subtract(comm).max(BigDecimal.ZERO);
                 result.add(
                         new Entry(
                                 order.id(),
@@ -124,7 +124,7 @@ final class ReportFinancialLedger {
         for (Map.Entry<UUID, List<RefundRecord>> group : history.entrySet()) {
             SubOrderRecord order = orders.get(group.getKey());
             if (order == null) continue;
-            BigDecimal basis = effectiveCommissionBasis(order);
+            BigDecimal vendorNet = effectiveVendorNetRevenue(order);
             BigDecimal cash = effectiveCashPayable(order);
             BigDecimal cumulative = BigDecimal.ZERO;
             for (RefundRecord refund :
@@ -133,17 +133,17 @@ final class ReportFinancialLedger {
                                     Comparator.comparing(RefundRecord::processedAt)
                                             .thenComparing(r -> r.id().toString()))
                                     .toList()) {
-                BigDecimal beforeBasis = basis.subtract(cash.signum() > 0 ? basis.multiply(cumulative).divide(cash, 2, RoundingMode.HALF_UP) : cumulative).max(BigDecimal.ZERO);
+                BigDecimal beforeVendorNet = vendorNet.subtract(cash.signum() > 0 ? vendorNet.multiply(cumulative).divide(cash, 2, RoundingMode.HALF_UP) : cumulative).max(BigDecimal.ZERO);
                 BigDecimal beforeComm = commission(order, cumulative);
 
                 cumulative = cumulative.add(safe(refund.amount()));
 
-                BigDecimal afterBasis = basis.subtract(cash.signum() > 0 ? basis.multiply(cumulative).divide(cash, 2, RoundingMode.HALF_UP) : cumulative).max(BigDecimal.ZERO);
+                BigDecimal afterVendorNet = vendorNet.subtract(cash.signum() > 0 ? vendorNet.multiply(cumulative).divide(cash, 2, RoundingMode.HALF_UP) : cumulative).max(BigDecimal.ZERO);
                 BigDecimal afterComm = commission(order, cumulative);
 
                 BigDecimal commReversal = beforeComm.subtract(afterComm);
-                BigDecimal basisReversal = beforeBasis.subtract(afterBasis);
-                BigDecimal payoutReversal = basisReversal.subtract(commReversal);
+                BigDecimal vendorNetReversal = beforeVendorNet.subtract(afterVendorNet);
+                BigDecimal payoutReversal = vendorNetReversal.subtract(commReversal);
 
                 commissionReversals.put(refund.id(), commReversal);
                 payoutReversals.put(refund.id(), payoutReversal);
@@ -186,6 +186,13 @@ final class ReportFinancialLedger {
     private static BigDecimal effectiveCommissionBasis(SubOrderRecord o) {
         if (o.commissionBasisAmount() != null) return safe(o.commissionBasisAmount());
         return safe(o.subtotalAmount());
+    }
+
+    private static BigDecimal effectiveVendorNetRevenue(SubOrderRecord o) {
+        BigDecimal basis = effectiveCommissionBasis(o);
+        if (o.subtotalAmount() == null) return basis;
+        BigDecimal netAfterVendorDiscount = safe(o.subtotalAmount()).subtract(safe(o.vendorDiscountAmount())).max(BigDecimal.ZERO);
+        return basis.min(netAfterVendorDiscount);
     }
 
     private static BigDecimal commission(SubOrderRecord order, BigDecimal refundedCash) {

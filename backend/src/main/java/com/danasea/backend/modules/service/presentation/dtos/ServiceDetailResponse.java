@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ServiceDetailResponse {
     private List<PublicOffer> flashSales;
+    private List<PublicVendorPromotionResponse> vendorPromotions;
     private UUID id;
     private String name;
     private String slug;

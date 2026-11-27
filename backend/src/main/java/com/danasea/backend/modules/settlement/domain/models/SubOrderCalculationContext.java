@@ -44,6 +44,23 @@ public class SubOrderCalculationContext {
         }
         return BigDecimal.ZERO;
     }
+
+    /**
+     * Vendor net revenue before commission deduction.
+     * - Regular orders (K1): commissionBasis == subtotal - vendorDiscount -> identical to basis.
+     * - Stacked Flash Sale + Vendor Voucher orders (K2): commissionBasis == subtotal while vendor still absorbs vendorDiscount,
+     *   so vendor net revenue before commission is (subtotal - vendorDiscount).
+     */
+    public BigDecimal getEffectiveVendorNetRevenue() {
+        BigDecimal basis = getEffectiveCommissionBasis();
+        if (subtotalAmount == null) {
+            return basis;
+        }
+        BigDecimal vd = vendorDiscountAmount != null ? vendorDiscountAmount : BigDecimal.ZERO;
+        BigDecimal netAfterVendorDiscount = subtotalAmount.subtract(vd).max(BigDecimal.ZERO);
+        return basis.min(netAfterVendorDiscount);
+    }
+
     public BigDecimal getEffectiveFinalAmount() {
         if (finalAmount != null) {
             return finalAmount;

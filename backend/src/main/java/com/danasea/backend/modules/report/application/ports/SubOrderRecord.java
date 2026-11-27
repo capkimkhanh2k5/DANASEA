@@ -26,13 +26,37 @@ public record SubOrderRecord(
         RefundReason cancellationReason,
         BigDecimal finalAmount,
         BigDecimal platformDiscountAmount,
-        BigDecimal commissionBasisAmount) {
+        BigDecimal commissionBasisAmount,
+        BigDecimal vendorDiscountAmount) {
+    public SubOrderRecord(
+            UUID id,
+            UUID masterOrderId,
+            UUID vendorId,
+            UUID serviceId,
+            UUID slotId,
+            Integer quantity,
+            BigDecimal unitPrice,
+            BigDecimal subtotalAmount,
+            BigDecimal commissionRate,
+            BigDecimal commissionAmount,
+            BigDecimal vendorPayoutAmount,
+            SubOrderStatus status,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            RefundReason cancellationReason,
+            BigDecimal finalAmount,
+            BigDecimal platformDiscountAmount,
+            BigDecimal commissionBasisAmount) {
+        this(id, masterOrderId, vendorId, serviceId, slotId, quantity, unitPrice, subtotalAmount, commissionRate,
+                commissionAmount, vendorPayoutAmount, status, createdAt, updatedAt, cancellationReason, finalAmount,
+                platformDiscountAmount, commissionBasisAmount, null);
+    }
     public SubOrderRecord(UUID id,UUID masterOrderId,UUID vendorId,UUID serviceId,UUID slotId,Integer quantity,
             BigDecimal unitPrice,BigDecimal subtotalAmount,BigDecimal commissionRate,BigDecimal commissionAmount,
             BigDecimal vendorPayoutAmount,SubOrderStatus status,OffsetDateTime createdAt,OffsetDateTime updatedAt,
             RefundReason cancellationReason) {
         this(id,masterOrderId,vendorId,serviceId,slotId,quantity,unitPrice,subtotalAmount,commissionRate,commissionAmount,
-                vendorPayoutAmount,status,createdAt,updatedAt,cancellationReason,null,null,null);
+                vendorPayoutAmount,status,createdAt,updatedAt,cancellationReason,null,null,null,null);
     }
     public SubOrderRecord(
             UUID id,

@@ -12,6 +12,7 @@ import lombok.Data;
 @Builder
 public class ServiceSummaryResponse {
     private List<PublicOffer> flashSales;
+    private List<PublicVendorPromotionResponse> vendorPromotions;
     private UUID id;
     private UUID vendorId;
     private BadgeTier vendorBadgeTier;

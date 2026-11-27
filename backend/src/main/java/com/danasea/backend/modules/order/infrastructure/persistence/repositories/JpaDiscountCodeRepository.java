@@ -1,5 +1,7 @@
 package com.danasea.backend.modules.order.infrastructure.persistence.repositories;
 
+import com.danasea.backend.modules.order.domain.models.DiscountScope;
+import com.danasea.backend.modules.order.domain.models.DiscountSponsorType;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.DiscountCodeJpaEntity;
 
 import jakarta.persistence.LockModeType;
@@ -14,11 +16,33 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface JpaDiscountCodeRepository extends JpaRepository<DiscountCodeJpaEntity, UUID>, JpaSpecificationExecutor<DiscountCodeJpaEntity> {
+
+    @Query("""
+            SELECT d FROM DiscountCodeJpaEntity d
+            WHERE d.scope = :scope
+              AND d.sponsorType = :sponsorType
+              AND d.isActive = true
+              AND d.recipientCustomerId IS NULL
+              AND (d.validFrom IS NULL OR d.validFrom <= :now)
+              AND (d.validTo IS NULL OR d.validTo > :now)
+              AND (d.maxUses IS NULL OR COALESCE(d.usedCount, 0) < d.maxUses)
+            ORDER BY d.discountValue DESC, d.createdAt DESC
+            """)
+    List<DiscountCodeJpaEntity> findActivePublicDiscounts(
+            @Param("scope") DiscountScope scope,
+            @Param("sponsorType") DiscountSponsorType sponsorType,
+            @Param("now") OffsetDateTime now);
+
+    default List<DiscountCodeJpaEntity> findActivePublicVendorDiscounts(OffsetDateTime now) {
+        return findActivePublicDiscounts(DiscountScope.VENDOR, DiscountSponsorType.VENDOR, now);
+    }
 
     Optional<DiscountCodeJpaEntity> findByCodeIgnoreCase(String code);
 

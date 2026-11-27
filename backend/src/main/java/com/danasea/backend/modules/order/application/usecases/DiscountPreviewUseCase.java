@@ -97,8 +97,7 @@ public class DiscountPreviewUseCase {
             return DiscountPreviewResponse.invalid("EMPTY_ITEMS", messages.get("error.empty_items"), request.code());
         }
 
-        if(flashSale!=null && flashSale.hasAllocation(request.bookingId()))
-            throw new FlashSaleException("FLASH_SALE_VOUCHER_STACKING_NOT_ALLOWED");
+        boolean hasFlashSale = flashSale != null && flashSale.hasAllocation(request.bookingId());
 
         // 2. Tìm Discount Code
         String cleanCode = request.code().trim().toUpperCase(Locale.ROOT);
@@ -110,14 +109,25 @@ public class DiscountPreviewUseCase {
         DiscountCodeJpaEntity codeEntity = codeOpt.get();
         DiscountCode discountCode = discountCodeMapper.toDomain(codeEntity);
 
+        if (hasFlashSale && !discountCode.isStackableWithFlashSale()) {
+            return DiscountPreviewResponse.invalid(
+                    "FLASH_SALE_VOUCHER_STACKING_NOT_ALLOWED",
+                    messages.get("error.flash_sale_voucher_stacking_not_allowed"),
+                    cleanCode
+            );
+        }
+
         // 3. Đếm số lần user đã sử dụng mã này
         long userUsageCount = discountRedemptionRepository.countByDiscountCodeIdAndCustomerId(codeEntity.getId(), customerId);
 
         // 4. Chuẩn bị danh sách CandidateItem
         List<CandidateItem> candidateItems = new ArrayList<>();
         for (BookingOrderView.BookingItemOrderView item : booking.items()) {
-            BigDecimal rate = commissionPolicyPort != null ? commissionPolicyPort.resolveCommissionRate(item.vendorId(), item.serviceId(), null) : null;
-            if (rate == null && commissionPolicyPort != null) {
+            var promotion = flashSale != null ? flashSale.snapshot(item.bookingItemId()).orElse(null) : null;
+            BigDecimal rate = promotion != null
+                    ? promotion.commissionRate()
+                    : (commissionPolicyPort != null ? commissionPolicyPort.resolveCommissionRate(item.vendorId(), item.serviceId(), null) : null);
+            if (rate == null && promotion == null && commissionPolicyPort != null) {
                 rate = commissionPolicyPort.getCommissionRate(item.vendorId());
             }
             if (rate == null) {
@@ -150,6 +160,33 @@ public class DiscountPreviewUseCase {
         if (result.finalPayableAmount().signum() <= 0) {
             return DiscountPreviewResponse.invalid("DISCOUNT_ZERO_PAYABLE_UNSUPPORTED",
                     messages.get("error.discount_zero_payable_unsupported"), cleanCode);
+        }
+
+        // 5.1. Rào chắn K2 cho các item đang hưởng Flash Sale: đảm bảo vendorPayout >= 0 và itemFinal > 0
+        if (hasFlashSale) {
+            for (var alloc : result.itemAllocations()) {
+                if (!alloc.eligible()) continue;
+                var promotion = flashSale.snapshot(alloc.itemId()).orElse(null);
+                if (promotion == null) continue;
+                BigDecimal stackedVendorPayout = promotion.vendorReceivable().subtract(alloc.vendorDiscountAmount());
+                if (stackedVendorPayout.signum() < 0) {
+                    return DiscountPreviewResponse.invalid(
+                            "DISCOUNT_EXCEEDS_VENDOR_RECEIVABLE",
+                            messages.get("error.discount_exceeds_vendor_receivable"),
+                            cleanCode
+                    );
+                }
+                BigDecimal stackedItemPayable = promotion.customerPayable()
+                        .subtract(alloc.vendorDiscountAmount())
+                        .subtract(alloc.platformDiscountAmount());
+                if (stackedItemPayable.signum() <= 0) {
+                    return DiscountPreviewResponse.invalid(
+                            "DISCOUNT_ZERO_PAYABLE_UNSUPPORTED",
+                            messages.get("error.discount_zero_payable_unsupported"),
+                            cleanCode
+                    );
+                }
+            }
         }
 
         List<ItemDiscountPreviewResponse> itemBreakdown = result.itemAllocations().stream()
