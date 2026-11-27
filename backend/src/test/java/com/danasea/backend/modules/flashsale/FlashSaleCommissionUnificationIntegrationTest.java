@@ -14,7 +14,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -28,16 +27,12 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-import com.danasea.backend.modules.booking.application.usecases.CreateBookingHoldUseCase;
 import com.danasea.backend.modules.flashsale.application.FlashSaleService;
 import com.danasea.backend.modules.flashsale.application.FlashSaleService.Terms;
 import com.danasea.backend.modules.flashsale.domain.FlashSaleException;
 import com.danasea.backend.modules.flashsale.domain.FlashSalePricing;
-import com.danasea.backend.modules.order.application.OrderPaymentService;
 import com.danasea.backend.modules.order.domain.ports.OrderEventPublisherPort;
 import com.danasea.backend.modules.order.infrastructure.adapters.CommissionPolicyAdapter;
 import com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext;
@@ -45,8 +40,14 @@ import com.danasea.backend.modules.settlement.domain.services.SettlementCalculat
 import com.danasea.backend.modules.systemconfig.infrastructure.persistence.repositories.JpaSystemConfigRepository;
 import com.danasea.backend.security.authentication.domain.models.Authentication;
 import com.danasea.backend.security.authentication.infrastructure.security.JwtTokenProvider;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
+import java.sql.Date;
+import java.sql.Time;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.mail.javamail.JavaMailSender;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
     "spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=validate", "spring.autoconfigure.exclude=",
@@ -84,10 +85,10 @@ class FlashSaleCommissionUnificationIntegrationTest extends BaseFlashSaleIntegra
     OrderEventPublisherPort orderEvents;
 
     @MockitoBean
-    org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
+    RabbitTemplate rabbit;
 
     @MockitoBean
-    org.springframework.mail.javamail.JavaMailSender mail;
+    JavaMailSender mail;
 
     final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
     final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -109,10 +110,10 @@ class FlashSaleCommissionUnificationIntegrationTest extends BaseFlashSaleIntegra
         db.update("DELETE FROM system_configs WHERE key IN ('PLATFORM_COMMISSION_RATE','FLASH_SALE_MAX_SUBSIDY_RATIO','FLASH_SALE_ESTIMATED_UNIT_COST','FLASH_SALE_MINIMUM_UNIT_MARGIN')");
 
         // Verify Redis logical database 15 and flush DB 15 cleanly for test isolation
-        if (redis.getConnectionFactory() instanceof org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory lettuce) {
+        if (redis.getConnectionFactory() instanceof LettuceConnectionFactory lettuce) {
             assertThat(lettuce.getDatabase()).isEqualTo(15);
         }
-        redis.execute((org.springframework.data.redis.connection.RedisConnection conn) -> {
+        redis.execute((RedisConnection conn) -> {
             conn.serverCommands().flushDb();
             return null;
         });
@@ -135,8 +136,8 @@ class FlashSaleCommissionUnificationIntegrationTest extends BaseFlashSaleIntegra
 
         slotId = UUID.randomUUID();
         db.update("INSERT INTO service_slots(id,service_id,date,start_time,end_time,capacity,booked_count,status,inventory_type,created_at,updated_at) VALUES (?,?,?,?,?,?,0,'OPEN','PERSON_LIMIT',now(),now())",
-                slotId, serviceId, java.sql.Date.valueOf(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(5)),
-                java.sql.Time.valueOf(LocalTime.of(9, 0)), java.sql.Time.valueOf(LocalTime.of(10, 0)), 100);
+                slotId, serviceId, Date.valueOf(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(5)),
+                Time.valueOf(LocalTime.of(9, 0)), Time.valueOf(LocalTime.of(10, 0)), 100);
 
         adminToken = token(adminId, "ADMIN");
         customerToken = token(customerId, "CUSTOMER");
@@ -270,7 +271,7 @@ class FlashSaleCommissionUnificationIntegrationTest extends BaseFlashSaleIntegra
                 .finalAmount(n("470000"))
                 .platformDiscountAmount(n("30000"))
                 .commissionRate(n("0.100000")) // snapshot rate
-                .status(com.danasea.backend.modules.order.domain.models.SubOrderStatus.COMPLETED)
+                .status(SubOrderStatus.COMPLETED)
                 .build();
 
         var line = settlementEngine.calculateLineItem(context);

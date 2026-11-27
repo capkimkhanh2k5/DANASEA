@@ -9,7 +9,6 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -27,7 +26,6 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.web.client.RestClient;
 
 import com.danasea.backend.configs.properties.PayPalProperties;
-import com.danasea.backend.configs.properties.VNPayProperties;
 import com.danasea.backend.modules.booking.application.usecases.ConfirmBookingUseCase;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
 import com.danasea.backend.modules.order.application.usecases.CreatePaymentIntentUseCase;

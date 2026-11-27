@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.danasea.backend.modules.service.application.ports.FileStoragePort;
-import com.danasea.backend.modules.service.domain.exceptions.InvalidFileTypeException;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.UnauthorizedServiceAccessException;
 import com.danasea.backend.modules.service.domain.models.DocStatus;

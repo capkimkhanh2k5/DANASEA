@@ -4,13 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 
 import com.danasea.backend.modules.service.domain.models.ServiceStatus;
-import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /** Executable regression cases retaining the original legacy case identities. */
 @DisplayName("Services: strict integration tier 4")

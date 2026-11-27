@@ -10,13 +10,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Collection;
 
 @Repository
 public interface JpaServiceSafetyDocumentRepository extends JpaRepository<ServiceSafetyDocumentJpaEntity, UUID> {
 
     List<ServiceSafetyDocumentJpaEntity> findByServiceId(UUID serviceId);
 
-    List<ServiceSafetyDocumentJpaEntity> findByServiceIdAndStatusIn(UUID serviceId, java.util.Collection<DocStatus> statuses);
+    List<ServiceSafetyDocumentJpaEntity> findByServiceIdAndStatusIn(UUID serviceId, Collection<DocStatus> statuses);
 
     Optional<ServiceSafetyDocumentJpaEntity> findByIdAndServiceId(UUID id, UUID serviceId);
 

@@ -27,6 +27,8 @@ import com.danasea.backend.modules.ai.domain.models.AiMessageRole;
 import com.danasea.backend.modules.ai.infrastructure.cliproxy.configs.CliProxyProperties;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.danasea.backend.modules.ai.support.AiAcceptanceRecorder;
+import com.danasea.backend.shared.infrastructure.http.HttpRequestDeadline;
 
 @EnabledIfSystemProperty(named = "ai.proxy.smoke", matches = "true")
 class ProxyLiveSmokeTest {
@@ -62,7 +64,7 @@ class ProxyLiveSmokeTest {
             assertThat(prepared.removedMessages()).isPositive();
             assertThat(prepared.inputEstimate()).isLessThanOrEqualTo(15808);
             assertThat(serialized).contains("Earlier user quotations", "I cannot swim", question);
-            var response = com.danasea.backend.shared.infrastructure.http.HttpRequestDeadline.execute(Duration.ofSeconds(120),
+            var response = HttpRequestDeadline.execute(Duration.ofSeconds(120),
                     () -> transport.post().uri("/chat/completions").header("Authorization", "Bearer " + key)
                             .body(prepared.request()).retrieve().body(String.class));
             var responseTree = new ObjectMapper().readTree(response);
@@ -71,7 +73,7 @@ class ProxyLiveSmokeTest {
                     .containsAnyOf("cannot", "can't", "not", "don't", "không");
             long reportedInput = responseTree.path("usage").path("prompt_tokens").asLong(-1);
             assertThat(reportedInput).isPositive().isLessThanOrEqualTo(24000);
-            com.danasea.backend.modules.ai.support.AiAcceptanceRecorder.write("compaction", Map.of(
+            AiAcceptanceRecorder.write("compaction", Map.of(
                     "requested_model", model, "http_status", 200, "finish_reason", "stop",
                     "constraint_preservation", true, "prompt_tokens", reportedInput,
                     "latency_ms", (System.nanoTime() - start) / 1_000_000.0));
@@ -88,7 +90,7 @@ class ProxyLiveSmokeTest {
         var properties = new CliProxyProperties(true, System.getProperty("ai.proxy.base-url"), key, model, model);
         var client = new CliProxyLlmClient(RestClient.builder(), null, properties);
         var moderation = new CliProxyModerationClient(RestClient.builder(), properties,
-                new HttpClientProperties(java.time.Duration.ofSeconds(5), java.time.Duration.ofSeconds(10)),
+                new HttpClientProperties(Duration.ofSeconds(5), Duration.ofSeconds(10)),
                 new ObjectMapper());
         var message = new AiMessage();
         message.setRole(AiMessageRole.USER);
@@ -100,7 +102,7 @@ class ProxyLiveSmokeTest {
             assertThat(response.getResponseStatus()).isEqualTo("ANSWERED");
             String content = response.getContent().toLowerCase(Locale.ROOT).replaceAll("\\p{Zs}", " ");
             assertThat(content).containsAnyOf("da nang", "đà nẵng", "danang");
-            com.danasea.backend.modules.ai.support.AiAcceptanceRecorder.write("reasoning-" + model, Map.of(
+            AiAcceptanceRecorder.write("reasoning-" + model, Map.of(
                     "requested_model", model, "response_status", response.getResponseStatus(),
                     "latency_ms", (System.nanoTime() - start) / 1_000_000.0));
         }

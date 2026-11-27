@@ -8,7 +8,6 @@ import com.danasea.backend.modules.partner.application.usecases.RejectPartnerApp
 import com.danasea.backend.modules.partner.domain.exceptions.ApplicationNotFoundException;
 import com.danasea.backend.modules.partner.domain.exceptions.CustomerHasActiveObligationsException;
 import com.danasea.backend.modules.partner.domain.models.PartnerApplicationStatus;
-import com.danasea.backend.modules.partner.presentation.dtos.AdminRejectApplicationRequest;
 import com.danasea.backend.modules.partner.presentation.dtos.PartnerApplicationResponse;
 import com.danasea.backend.modules.partner.presentation.handlers.PartnerExceptionHandler;
 import com.danasea.backend.security.authentication.infrastructure.security.JwtAuthenticationFilter;

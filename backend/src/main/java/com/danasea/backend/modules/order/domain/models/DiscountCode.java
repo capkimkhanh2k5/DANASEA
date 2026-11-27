@@ -64,4 +64,18 @@ public class DiscountCode extends BaseDomainModel {
         }
         return amount != null && amount.compareTo(minOrderAmount) >= 0;
     }
+
+    /**
+     * Hybrid stacking policy:
+     * - Vendor-funded vouchers (scope=VENDOR, sponsorType=VENDOR) can stack on top of Platform Flash Sales.
+     * - Vendor-fault compensation vouchers (VC-..., recovered from at-fault vendor settlement) can also stack.
+     * - Platform promotional vouchers (e.g., DANASEA10) and platform replacement vouchers remain blocked
+     *   to prevent double platform subsidy on a single Flash Sale item.
+     */
+    public boolean isStackableWithFlashSale() {
+        if (scope == DiscountScope.VENDOR && sponsorType == DiscountSponsorType.VENDOR) {
+            return true;
+        }
+        return compensationDisruptionId != null;
+    }
 }

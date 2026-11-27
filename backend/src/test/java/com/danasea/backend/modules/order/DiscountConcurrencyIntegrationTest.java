@@ -60,6 +60,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.mockito.Mockito;
 
 @SpringBootTest(
         properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=validate"})
@@ -89,7 +90,7 @@ class DiscountConcurrencyIntegrationTest extends BaseSecurityIntegrationTest {
 
     @BeforeEach
     void setupCommissions() {
-        org.mockito.Mockito.lenient().when(commissions.getCommissionRate(any())).thenReturn(new BigDecimal("0.10"));
+        Mockito.lenient().when(commissions.getCommissionRate(any())).thenReturn(new BigDecimal("0.10"));
     }
 
     @Test

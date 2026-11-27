@@ -2,7 +2,6 @@ package com.danasea.backend.modules.communication;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -13,8 +12,6 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,13 +37,11 @@ import com.danasea.backend.modules.communication.domain.models.EmailDeliveryStat
 import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.communication.infrastructure.email.TransactionalEmailProperties;
 import com.danasea.backend.modules.communication.infrastructure.email.TransactionalEmailWorker;
-import com.danasea.backend.modules.communication.infrastructure.email.entities.TransactionalEmailDeliveryJpaEntity;
 import com.danasea.backend.modules.communication.infrastructure.email.repositories.JpaTransactionalEmailDeliveryRepository;
 import com.danasea.backend.modules.communication.infrastructure.listeners.PaymentNotificationEventListener;
 import com.danasea.backend.modules.order.domain.events.PaymentSuccessEvent;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
-import com.danasea.backend.modules.order.domain.models.RefundReason;
 import com.danasea.backend.modules.order.domain.models.RefundStatus;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;

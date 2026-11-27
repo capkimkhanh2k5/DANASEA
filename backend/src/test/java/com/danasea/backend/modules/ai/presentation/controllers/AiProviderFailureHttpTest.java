@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.danasea.backend.modules.ai.infrastructure.cliproxy.CliProxyException;
-import com.danasea.backend.modules.ai.presentation.controllers.AiFeatureExceptionHandler;
 
 class AiProviderFailureHttpTest {
     @Test void failedProviderRecoveryIsServiceUnavailableWithoutLeakingInternalErrorOrAskingForNewChat() throws Exception {

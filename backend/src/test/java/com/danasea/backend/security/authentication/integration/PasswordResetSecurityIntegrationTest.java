@@ -78,6 +78,10 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.codec.ByteArrayCodec;
 
 import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+import io.jsonwebtoken.Jwts;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -405,7 +409,7 @@ class PasswordResetSecurityIntegrationTest extends AbstractExternalInfrastructur
         RedisClient client = RedisClient.create("redis://" + redis.getHost() + ":" + redis.getFirstMappedPort());
         try (var connection = client.connect(ByteArrayCodec.INSTANCE)) {
             var manager = LettuceBasedProxyManager.builderFor(connection)
-                    .withExpirationStrategy(ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(java.time.Duration.ofMinutes(1)))
+                    .withExpirationStrategy(ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(1)))
                     .build();
             RateLimitFilter filter = new RateLimitFilter(manager);
             String ip = "review-" + UUID.randomUUID();
@@ -457,8 +461,8 @@ class PasswordResetSecurityIntegrationTest extends AbstractExternalInfrastructur
     @Test
     void legacyJwtWithoutVersionWorksOnlyUntilFirstReset() throws Exception {
         User user = seed();
-        String legacy = io.jsonwebtoken.Jwts.builder().subject(user.getEmail())
-                .expiration(java.util.Date.from(java.time.Instant.now().plusSeconds(600)))
+        String legacy = Jwts.builder().subject(user.getEmail())
+                .expiration(Date.from(Instant.now().plusSeconds(600)))
                 .signWith(jwtProperties.secretKey()).compact();
         assertThat(authenticates(legacy)).isTrue();
         reset.execute(user.getEmail(), issue(user), "NewPassword1!");

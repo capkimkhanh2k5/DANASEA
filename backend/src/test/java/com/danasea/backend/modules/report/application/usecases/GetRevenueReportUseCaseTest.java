@@ -30,6 +30,8 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import com.danasea.backend.modules.report.ReportFinancialTestFixtures;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GetRevenueReportUseCase Financial Math & Zero-Filling Tests")
@@ -50,18 +52,18 @@ class GetRevenueReportUseCaseTest {
     void shouldZeroFillEmptyPeriodsForDailyReport() {
         TimeRange timeRange = TimeRange.of(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 3));
 
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), any()))
                 .thenReturn(Collections.emptyList());
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), any()))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findMasterOrders(eq(timeRange)))
                 .thenReturn(Collections.emptyList());
 
@@ -87,18 +89,18 @@ class GetRevenueReportUseCaseTest {
     @DisplayName("Zero-filling cho báo cáo gom nhóm theo QUARTER và YEAR")
     void shouldZeroFillQuarterlyAndYearlyReports() {
         TimeRange quarterRange = TimeRange.of(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 30));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(quarterRange), any()))
                 .thenReturn(Collections.emptyList());
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(quarterRange), any()))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findMasterOrders(eq(quarterRange)))
                 .thenReturn(Collections.emptyList());
 
@@ -110,18 +112,18 @@ class GetRevenueReportUseCaseTest {
                 .containsExactly("2026-Q1", "2026-Q2", "2026-Q3");
 
         TimeRange yearRange = TimeRange.of(LocalDate.of(2024, 1, 1), LocalDate.of(2026, 12, 31));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(yearRange), any()))
                 .thenReturn(Collections.emptyList());
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(yearRange), any()))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findMasterOrders(eq(yearRange)))
                 .thenReturn(Collections.emptyList());
 
@@ -174,18 +176,18 @@ class GetRevenueReportUseCaseTest {
                         date1,
                         date1);
 
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), eq(null)))
                 .thenReturn(List.of(subOrder1));
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, List.of(subOrder1));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), eq(null)))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findMasterOrders(eq(timeRange)))
                 .thenReturn(List.of(masterOrder));
 
@@ -250,18 +252,18 @@ class GetRevenueReportUseCaseTest {
                         dt,
                         dt);
 
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), any()))
                 .thenReturn(List.of(subOrder));
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, List.of(subOrder));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), any()))
                 .thenReturn(List.of(refund));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(List.of(refund));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findMasterOrders(eq(timeRange)))
                 .thenReturn(Collections.emptyList());
 

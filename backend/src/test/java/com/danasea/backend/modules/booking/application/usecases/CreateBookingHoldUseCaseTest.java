@@ -5,7 +5,6 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +39,10 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.danasea.backend.modules.service.domain.models.OptionStatus;
+import com.danasea.backend.modules.service.domain.models.OptionType;
+import java.util.Map;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 class CreateBookingHoldUseCaseTest {
@@ -377,7 +380,7 @@ class CreateBookingHoldUseCaseTest {
     @Test
     @DisplayName("Should invoke customer account validation with lock when port is configured")
     void testCustomerAccountValidationWithLock_WhenPortPresent() {
-        CustomerAccountPort mockPort = org.mockito.Mockito.mock(CustomerAccountPort.class);
+        CustomerAccountPort mockPort = Mockito.mock(CustomerAccountPort.class);
         useCase.setCustomerAccountPort(mockPort);
 
         UUID customerId = UUID.randomUUID();
@@ -412,7 +415,7 @@ class CreateBookingHoldUseCaseTest {
     @Test
     @DisplayName("Should reject booking creation when customer account validation fails (e.g. non-customer role)")
     void testCustomerAccountValidationFailure_RejectsBooking() {
-        CustomerAccountPort mockPort = org.mockito.Mockito.mock(CustomerAccountPort.class);
+        CustomerAccountPort mockPort = Mockito.mock(CustomerAccountPort.class);
         useCase.setCustomerAccountPort(mockPort);
 
         UUID customerId = UUID.randomUUID();
@@ -481,8 +484,8 @@ class CreateBookingHoldUseCaseTest {
         SlotValidationDetails.ServiceOptionValidationDetails optBDetails = SlotValidationDetails.ServiceOptionValidationDetails.builder()
                 .id(optionB)
                 .name("Option B")
-                .optionType(com.danasea.backend.modules.service.domain.models.OptionType.SHARED)
-                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE)
+                .optionType(OptionType.SHARED)
+                .status(OptionStatus.ACTIVE)
                 .price(new BigDecimal("50.00"))
                 .build();
 
@@ -491,7 +494,7 @@ class CreateBookingHoldUseCaseTest {
                 .serviceId(UUID.randomUUID())
                 .vendorId(UUID.randomUUID())
                 .allowedOptionIds(List.of(optionA, optionB))
-                .options(java.util.Map.of(optionB, optBDetails))
+                .options(Map.of(optionB, optBDetails))
                 .bookingDate(LocalDate.now().plusDays(1))
                 .bookingTime(LocalTime.of(10, 0))
                 .capacity(10)

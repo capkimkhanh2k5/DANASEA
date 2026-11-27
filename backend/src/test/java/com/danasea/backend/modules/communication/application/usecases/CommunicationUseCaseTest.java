@@ -22,7 +22,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -40,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import com.danasea.backend.modules.communication.application.dtos.ConversationResponse;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Communication Module Use Cases Unit Tests")
@@ -312,7 +312,7 @@ class CommunicationUseCaseTest {
             when(messageRepository.countByConversationIdAndSenderIdNotAndIsReadFalse(conversationId, customerId))
                     .thenReturn(1L);
 
-            Page<com.danasea.backend.modules.communication.application.dtos.ConversationResponse> result =
+            Page<ConversationResponse> result =
                     getConversationsUseCase.execute(customerId, PageRequest.of(0, 10));
 
             assertThat(result.getContent()).hasSize(1);
@@ -333,7 +333,7 @@ class CommunicationUseCaseTest {
             when(messageRepository.findFirstByConversationIdOrderBySequenceDesc(conversationId)).thenReturn(Optional.empty());
             when(messageRepository.countByConversationIdAndSenderIdNotAndIsReadFalse(conversationId, vendorUserId)).thenReturn(0L);
 
-            Page<com.danasea.backend.modules.communication.application.dtos.ConversationResponse> result =
+            Page<ConversationResponse> result =
                     getConversationsUseCase.execute(vendorUserId, PageRequest.of(0, 10));
 
             assertThat(result.getContent()).hasSize(1);

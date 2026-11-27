@@ -407,7 +407,11 @@ public class JpaReportDataAdapter implements ReportDataPort {
                 s.getStatus(),
                 s.getCreatedAt(),
                 s.getUpdatedAt(),
-                s.getCancellationReason());
+                s.getCancellationReason(),
+                s.getFinalAmount(),
+                s.getPlatformDiscountAmount(),
+                s.getCommissionBasisAmount(),
+                s.getVendorDiscountAmount());
     }
 
     private MasterOrderRecord toMasterOrderRecord(MasterOrderJpaEntity m) {

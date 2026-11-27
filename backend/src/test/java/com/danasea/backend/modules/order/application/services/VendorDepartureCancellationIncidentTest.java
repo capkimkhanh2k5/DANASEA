@@ -28,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import java.util.List;
+import org.springframework.jdbc.core.RowMapper;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -86,8 +88,8 @@ class VendorDepartureCancellationIncidentTest {
         ServiceSlotJpaEntity slot = buildSlot(SlotStatus.OPEN);
         when(slots.findByIdForUpdate(slotId)).thenReturn(Optional.of(slot));
         // Simulate query: a passenger has checked in
-        when(jdbc.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq(slotId)))
-                .thenReturn(java.util.List.of());
+        when(jdbc.query(anyString(), any(RowMapper.class), eq(slotId)))
+                .thenReturn(List.of());
         when(jdbc.queryForObject(contains("checked_in_at IS NOT NULL"), eq(Boolean.class), eq(slotId)))
                 .thenReturn(true);
 
@@ -103,8 +105,8 @@ class VendorDepartureCancellationIncidentTest {
     void testCancelWithIncident_AllowedWhenPassengerCheckedIn() {
         ServiceSlotJpaEntity slot = buildSlot(SlotStatus.OPEN);
         when(slots.findByIdForUpdate(slotId)).thenReturn(Optional.of(slot));
-        when(jdbc.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq(slotId)))
-                .thenReturn(java.util.List.of());
+        when(jdbc.query(anyString(), any(RowMapper.class), eq(slotId)))
+                .thenReturn(List.of());
 
         var result = cancellationService.cancelWithIncident(actor, serviceId, slotId,
                 "Boat engine failed after boarding", "TECHNICAL_FAILURE");

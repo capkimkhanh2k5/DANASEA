@@ -28,6 +28,7 @@ public class SearchServicesCriteria {
     private UUID vendorId;
     private BadgeTier badgeTier;
     private BigDecimal minRating;
+    private Boolean onSale;
     private String sortBy;
     private int page;
     private int size;

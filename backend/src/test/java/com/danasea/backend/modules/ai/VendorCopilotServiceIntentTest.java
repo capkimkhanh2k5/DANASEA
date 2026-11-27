@@ -62,6 +62,7 @@ import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.mockito.Mockito;
 
 class VendorCopilotServiceIntentTest {
 
@@ -301,7 +302,7 @@ class VendorCopilotServiceIntentTest {
         }
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(llmClient, org.mockito.Mockito.times(cases.size())).generateText(any(), any(), promptCaptor.capture());
+        verify(llmClient, Mockito.times(cases.size())).generateText(any(), any(), promptCaptor.capture());
         var prompts = promptCaptor.getAllValues();
         for (int i = 0; i < cases.size(); i++) {
             assertThat(prompts.get(i))
@@ -375,7 +376,7 @@ class VendorCopilotServiceIntentTest {
                 "Nói sơ về dịch vụ này", "SERVICE", targetServiceId, "Mô tô nước", SupportedLanguage.VI);
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(llmClient, org.mockito.Mockito.times(3)).generateText(any(), any(), promptCaptor.capture());
+        verify(llmClient, Mockito.times(3)).generateText(any(), any(), promptCaptor.capture());
         var prompts = promptCaptor.getAllValues();
         assertThat(prompts.get(0)).contains("ORDER (verified platform record)").contains("finalAmountVnd=650000");
         assertThat(prompts.get(1)).contains("VENDOR (verified platform record)").contains("businessName=Danabeach");
@@ -407,7 +408,7 @@ class VendorCopilotServiceIntentTest {
         copilot.processMessage(userId, "VENDOR", vendorId, convId, "Nói sơ về đánh giá này", "REVIEW", missingId, SupportedLanguage.VI);
 
         ArgumentCaptor<String> allPrompts = ArgumentCaptor.forClass(String.class);
-        verify(llmClient, org.mockito.Mockito.times(13)).generateText(any(), any(), allPrompts.capture());
+        verify(llmClient, Mockito.times(13)).generateText(any(), any(), allPrompts.capture());
         assertThat(allPrompts.getAllValues().get(3)).contains("ORDER " + missingId + " is NOT found in the platform database");
         assertThat(allPrompts.getAllValues().get(6)).contains("SERVICE " + missingId + " is NOT found in this vendor's shop");
     }

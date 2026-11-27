@@ -39,6 +39,8 @@ import com.danasea.backend.modules.order.presentation.dtos.DiscountCodeResponse;
 import com.danasea.backend.modules.order.presentation.dtos.UpdateDiscountCodeRequest;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
+import org.mockito.ArgumentMatcher;
+import org.mockito.ArgumentMatchers;
 
 @ExtendWith(MockitoExtension.class)
 class AdminDiscountCodeUseCaseTest {
@@ -500,7 +502,7 @@ class AdminDiscountCodeUseCaseTest {
         );
     }
 
-    private static <T> T argThat(org.mockito.ArgumentMatcher<T> matcher) {
-        return org.mockito.ArgumentMatchers.argThat(matcher);
+    private static <T> T argThat(ArgumentMatcher<T> matcher) {
+        return ArgumentMatchers.argThat(matcher);
     }
 }

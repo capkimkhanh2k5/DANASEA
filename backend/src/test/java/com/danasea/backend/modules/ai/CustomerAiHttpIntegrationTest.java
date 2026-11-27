@@ -35,6 +35,7 @@ import com.danasea.backend.modules.ai.domain.services.ChatHistoryService;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.transaction.annotation.Transactional;
 
 @AutoConfigureMockMvc
 @Transactional

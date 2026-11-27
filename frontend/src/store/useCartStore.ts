@@ -4,8 +4,11 @@ import { persist } from 'zustand/middleware';
 export interface CartItem {
   id: string; // unique cart item id
   serviceId: string;
+  vendorId?: string;
   slotId: string;
   optionId?: string;
+  flashSaleId?: string;
+  originalUnitPrice?: number;
   quantity: number;
   unitPrice: number;
   // Denormalized data for UI display
@@ -89,9 +92,13 @@ export const useCartStore = create<CartState>()(
           return state;
         }
 
-        // Check if item already exists (same service & slot)
+        // Check if item already exists (same service, slot, option & flash sale)
         const existingItem = state.items.find(
-          (item) => item.serviceId === itemData.serviceId && item.slotId === itemData.slotId
+          (item) =>
+            item.serviceId === itemData.serviceId &&
+            item.slotId === itemData.slotId &&
+            (item.optionId ?? null) === (itemData.optionId ?? null) &&
+            (item.flashSaleId ?? null) === (itemData.flashSaleId ?? null)
         );
         
         if (existingItem) {

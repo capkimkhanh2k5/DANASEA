@@ -17,6 +17,7 @@ import type { ActiveFlashSaleItem } from "../../../services/flashSaleService";
 import { Search, ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import type { ServiceSummaryDto } from "../../../types/service";
+import { resolveServicePromotion } from "../../../utils/servicePromotion";
 import { getCardThumbnailUrl, FALLBACK_CARD_IMAGE } from "../../../utils/imageOptimizer";
 import { SEOHead } from "../../../components/common/SEOHead";
 
@@ -188,9 +189,15 @@ export function Home() {
   };
 
   // Curated Featured Activities exclusively from Live Backend Catalog (Zero Mock Data)
-  const featuredActivities: ActivityCardData[] = liveServices.map((s, _idx) => {
+  const featuredActivities: ActivityCardData[] = liveServices.map((s) => {
+    const promo = resolveServicePromotion({
+      price: Number(s.price) || 0,
+      flashSales: s.flashSales,
+      vendorPromotions: s.vendorPromotions,
+    });
     return {
       id: s.id,
+      slug: s.slug,
       title: s.name,
       titleEn: s.nameEn || s.name,
       category: 'Trải nghiệm biển',
@@ -198,7 +205,12 @@ export function Home() {
       location: s.address || 'Đà Nẵng',
       duration: inferDuration(s.name, '2 giờ'),
       durationEn: inferDuration(s.name, '2 hours'),
-      price: Number(s.price) || 0,
+      price: promo.effectivePrice,
+      originalPrice: promo.strikethroughPrice,
+      flashSalePercent: promo.flashSalePercent || undefined,
+      vendorVoucherLabelVi: promo.bestVendorVoucher?.shortLabelVi ?? null,
+      vendorVoucherLabelEn: promo.bestVendorVoucher?.shortLabelEn ?? null,
+      estimatedAfterVoucherPrice: promo.bestVendorVoucher?.estimatedAfterVoucherPrice ?? null,
       rating: Number(s.averageRating) || 5.0,
       reviewCount: s.reviewCount || 0,
       imageUrl: getCardThumbnailUrl(s.primaryImageUrl || FALLBACK_CARD_IMAGE),

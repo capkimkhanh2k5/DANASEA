@@ -18,6 +18,7 @@ import com.danasea.backend.modules.settlement.domain.models.LineItemExclusionRea
 import com.danasea.backend.modules.settlement.domain.models.Settlement;
 import com.danasea.backend.modules.settlement.domain.models.SettlementLineItem;
 import com.danasea.backend.modules.settlement.domain.models.SettlementStatus;
+import com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext;
 
 @DisplayName("SettlementCalculationTest — Comprehensive Tests for EPIC-07 R4")
 class SettlementCalculationTest {
@@ -317,8 +318,8 @@ class SettlementCalculationTest {
         @DisplayName("Voucher do Vendor tài trợ: cơ sở hoa hồng và gross giảm theo mức giảm giá")
         void testVendorSponsoredVoucherSettlement() {
             UUID subOrderId = UUID.randomUUID();
-            com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext context =
-                    com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext.builder()
+            SubOrderCalculationContext context =
+                    SubOrderCalculationContext.builder()
                     .subOrderId(subOrderId)
                     .status(SubOrderStatus.COMPLETED)
                     .subtotalAmount(new BigDecimal("1000000.00"))
@@ -345,8 +346,8 @@ class SettlementCalculationTest {
         @DisplayName("Voucher do Sàn (DANASEA) tài trợ: cơ sở hoa hồng là giá gốc, vendor nhận đủ payout, sàn trợ giá")
         void testPlatformSponsoredVoucherSettlement() {
             UUID subOrderId = UUID.randomUUID();
-            com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext context =
-                    com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext.builder()
+            SubOrderCalculationContext context =
+                    SubOrderCalculationContext.builder()
                     .subOrderId(subOrderId)
                     .status(SubOrderStatus.COMPLETED)
                     .subtotalAmount(new BigDecimal("1000000.00"))
@@ -373,8 +374,8 @@ class SettlementCalculationTest {
         @DisplayName("Voucher đồng tài trợ (Vendor 50k, Sàn 50k): chỉ phần vendor tài trợ làm giảm cơ sở hoa hồng")
         void testCoFundedVoucherSettlement() {
             UUID subOrderId = UUID.randomUUID();
-            com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext context =
-                    com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext.builder()
+            SubOrderCalculationContext context =
+                    SubOrderCalculationContext.builder()
                     .subOrderId(subOrderId)
                     .status(SubOrderStatus.COMPLETED)
                     .subtotalAmount(new BigDecimal("1000000.00"))

@@ -27,10 +27,6 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Phaser;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +35,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -53,6 +48,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.danasea.backend.configs.TrackingAsyncTestExecutor;
 
 /** Real HTTP/security/persistence fixtures; every business row rolls back after its case. */
 @SpringBootTest
@@ -527,7 +523,7 @@ public abstract class BaseServiceE2ETest extends BaseSecurityIntegrationTest {
     }
 
     /** Tracks real asynchronous tasks, including tasks submitted by another tracked task. */
-    public static final class TrackingAuditExecutor extends com.danasea.backend.configs.TrackingAsyncTestExecutor {
+    public static final class TrackingAuditExecutor extends TrackingAsyncTestExecutor {
     }
 
 }

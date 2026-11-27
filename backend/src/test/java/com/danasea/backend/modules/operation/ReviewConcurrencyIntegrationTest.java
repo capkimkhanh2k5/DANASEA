@@ -57,6 +57,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+import jakarta.validation.Validator;
+import java.util.ArrayList;
+import java.util.Collections;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -108,7 +111,7 @@ class ReviewConcurrencyIntegrationTest extends AbstractExternalInfrastructureInt
     @Autowired UpdateReviewVisibilityUseCase visibility;
     @Autowired GetServiceReviewsUseCase publicReviews;
     @Autowired PlatformTransactionManager tm;
-    @Autowired jakarta.validation.Validator validator;
+    @Autowired Validator validator;
 
     record Fixture(
             UserJpaEntity user,
@@ -409,7 +412,7 @@ class ReviewConcurrencyIntegrationTest extends AbstractExternalInfrastructureInt
     void excessiveImagesInvalidSchemesBlankAndOverlongUrlsAreRejected() {
         for (List<String> images :
                 List.of(
-                        java.util.Collections.nCopies(6, "https://example.com/image.jpg"),
+                        Collections.nCopies(6, "https://example.com/image.jpg"),
                         List.of("javascript:alert(1)"),
                         List.of(" "),
                         List.of("https://example.com/" + "a".repeat(2100)))) {
@@ -449,7 +452,7 @@ class ReviewConcurrencyIntegrationTest extends AbstractExternalInfrastructureInt
     @Test
     void hidingAndRestoringReviewRecalculatesBadgeAndCounts() {
         Fixture f = seed();
-        List<UUID> reviewIds = new java.util.ArrayList<>();
+        List<UUID> reviewIds = new ArrayList<>();
         reviewIds.add(create.execute(f.sub().getId(), request(5), f.user().getId()).id());
         for (int i = 0; i < 4; i++)
             reviewIds.add(

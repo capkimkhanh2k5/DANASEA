@@ -1,8 +1,6 @@
 package com.danasea.backend.modules.communication.presentation.controllers;
 
-import com.danasea.backend.modules.communication.application.dtos.ConversationResponse;
 import com.danasea.backend.modules.communication.application.dtos.CreateConversationRequest;
-import com.danasea.backend.modules.communication.application.dtos.CreateOrGetConversationResult;
 import com.danasea.backend.modules.communication.application.dtos.MessageResponse;
 import com.danasea.backend.modules.communication.application.dtos.SendMessageRequest;
 import com.danasea.backend.modules.communication.application.usecases.CreateOrGetConversationUseCase;
@@ -10,14 +8,12 @@ import com.danasea.backend.modules.communication.application.usecases.GetConvers
 import com.danasea.backend.modules.communication.application.usecases.GetMessagesUseCase;
 import com.danasea.backend.modules.communication.application.usecases.MarkMessagesAsReadUseCase;
 import com.danasea.backend.modules.communication.application.usecases.SendMessageUseCase;
-import com.danasea.backend.modules.communication.domain.exceptions.ConversationNotFoundException;
 import com.danasea.backend.modules.communication.domain.exceptions.UnauthorizedChatAccessException;
 import com.danasea.backend.modules.communication.infrastructure.persistence.entities.ConversationJpaEntity;
 import com.danasea.backend.modules.communication.infrastructure.persistence.entities.MessageJpaEntity;
 import com.danasea.backend.modules.communication.infrastructure.persistence.repositories.JpaConversationRepository;
 import com.danasea.backend.modules.communication.infrastructure.persistence.repositories.JpaMessageRepository;
 import com.danasea.backend.modules.communication.presentation.handlers.CommunicationExceptionHandler;
-import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;

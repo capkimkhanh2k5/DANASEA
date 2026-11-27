@@ -105,6 +105,14 @@ import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.danasea.backend.modules.ai.application.usecases.PolicyChatAnswer;
+import com.danasea.backend.modules.order.application.api.AiPolicyReader;
+import com.danasea.backend.modules.order.application.usecases.GetCancellationPreviewUseCase;
+import com.danasea.backend.modules.order.domain.services.RefundPolicyEngine;
+import com.danasea.backend.shared.i18n.LocalizedMessageService;
+import java.time.temporal.ChronoUnit;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 class VendorAdminAiFeaturesTest {
 
@@ -1154,7 +1162,7 @@ class VendorAdminAiFeaturesTest {
 
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
                 new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "TOP_RATED")));
-        doReturn(new DecisionResult(
+        Mockito.doReturn(new DecisionResult(
                 true, DecisionTask.MODERATION.wireName(), "quyet", "rev1", "v1", 5.0,
                 Map.of("external_payment", new DecisionResult.Answer("noul", null, null, 0.85, null, Map.of())),
                 null, true)).when(decisionModel).decide(eq(DecisionTask.MODERATION), any());

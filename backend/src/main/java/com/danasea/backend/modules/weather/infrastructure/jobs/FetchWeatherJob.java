@@ -4,7 +4,6 @@ import com.danasea.backend.modules.weather.application.dtos.WeatherInfoDto;
 import com.danasea.backend.modules.weather.application.ports.output.WeatherCacheRepositoryPort;
 import com.danasea.backend.modules.weather.application.ports.output.WeatherProviderPort;
 import com.danasea.backend.modules.weather.domain.models.WeatherCache;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

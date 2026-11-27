@@ -1,10 +1,11 @@
 package com.danasea.backend.modules.ai.domain.services;
 
 import org.springframework.stereotype.Service;
+import java.util.regex.Pattern;
 
 @Service
 public class SanitizationService {
-    private static final java.util.regex.Pattern INJECTION_PATTERNS = java.util.regex.Pattern.compile(
+    private static final Pattern INJECTION_PATTERNS = Pattern.compile(
             "(?i)(ignore (?:all )?(?:previous|prior) instructions|"
                     + "bỏ qua (?:toàn bộ )?(?:system prompt|chỉ dẫn|quy tắc|hướng dẫn)|"
                     + "tiết lộ toàn bộ đơn hàng|reveal all orders|"

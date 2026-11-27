@@ -15,7 +15,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import com.danasea.backend.modules.account.application.api.AccountInternalApi;
-import com.danasea.backend.modules.audit.application.ports.AuditLogPort;
 import com.danasea.backend.modules.account.domain.models.Role;
 import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.admin.presentation.dtos.UserSummaryResponse;

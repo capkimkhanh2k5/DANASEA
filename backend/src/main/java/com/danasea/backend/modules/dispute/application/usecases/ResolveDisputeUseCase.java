@@ -34,14 +34,12 @@ import com.danasea.backend.modules.order.application.RefundProcessingService;
 import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
 import com.danasea.backend.modules.order.domain.models.RefundReason;
 import com.danasea.backend.modules.order.domain.models.RefundStatus;
-import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.RefundJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaRefundRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 

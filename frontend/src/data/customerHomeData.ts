@@ -23,6 +23,7 @@ export interface FlashSaleExperience {
 
 export interface ActivityCardData {
   id: string;
+  slug?: string;
   title: string;
   titleEn: string;
   category: string;
@@ -31,6 +32,11 @@ export interface ActivityCardData {
   duration: string;
   durationEn: string;
   price: number;
+  originalPrice?: number | null;
+  flashSalePercent?: number;
+  vendorVoucherLabelVi?: string | null;
+  vendorVoucherLabelEn?: string | null;
+  estimatedAfterVoucherPrice?: number | null;
   rating: number;
   reviewCount: number;
   badge?: string;

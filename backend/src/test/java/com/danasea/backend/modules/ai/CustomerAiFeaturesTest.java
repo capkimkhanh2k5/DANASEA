@@ -28,6 +28,7 @@ import com.danasea.backend.modules.ai.domain.services.TravelQueryParser;
 import com.danasea.backend.modules.operation.application.api.AiReviewReadApi.ReviewEvidence;
 import com.danasea.backend.modules.service.application.api.AiCatalogReadApi.*;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
+import java.util.Arrays;
 
 class CustomerAiFeaturesTest {
     private final TravelDataPort data = mock(TravelDataPort.class);

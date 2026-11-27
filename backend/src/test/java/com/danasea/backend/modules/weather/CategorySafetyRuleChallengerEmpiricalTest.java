@@ -18,7 +18,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.OffsetDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,6 +46,10 @@ import com.danasea.backend.modules.weather.domain.models.CategorySafetyRule;
 import com.danasea.backend.modules.weather.domain.services.CategorySafetyRuleService;
 import com.danasea.backend.modules.weather.infrastructure.persistence.entities.CategorySafetyRuleJpaEntity;
 import com.danasea.backend.modules.weather.infrastructure.persistence.repositories.JpaCategorySafetyRuleRepository;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 @SpringJUnitConfig(CategorySafetyRuleChallengerEmpiricalTest.TestCachingConfig.class)
 @DisplayName("CategorySafetyRuleChallengerEmpiricalTest — Adversarial Verification Suite")
@@ -356,8 +359,8 @@ public class CategorySafetyRuleChallengerEmpiricalTest {
         @DisplayName("Thực nghiệm chạy trực tiếp V5 SQL trên DB: Kiểm tra cú pháp, seed data, idempotency và kích hoạt CHECK constraint")
         void executeV5SqlAgainstDatabase_verifiesExecutionAndConstraintEnforcement() throws Exception {
             String jdbcUrl = "jdbc:h2:mem:v5_live_db;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE";
-            try (java.sql.Connection conn = java.sql.DriverManager.getConnection(jdbcUrl, "sa", "")) {
-                try (java.sql.Statement stmt = conn.createStatement()) {
+            try (Connection conn = DriverManager.getConnection(jdbcUrl, "sa", "")) {
+                try (Statement stmt = conn.createStatement()) {
                     // 1. Tạo baseline schema (tương đương V1)
                     stmt.execute("""
                         CREATE TABLE IF NOT EXISTS categories (
@@ -450,7 +453,7 @@ public class CategorySafetyRuleChallengerEmpiricalTest {
 
                     // 5. Kiểm tra CHECK constraint thực tế trên DB:
                     // Ràng buộc 1: caution_wave > max_wave -> Phải bị DB reject!
-                    java.sql.SQLException exWave = assertThrows(java.sql.SQLException.class, () -> {
+                    SQLException exWave = assertThrows(SQLException.class, () -> {
                         stmt.execute("""
                             INSERT INTO category_safety_rules (
                                 id, category_slug, category_name,
@@ -468,7 +471,7 @@ public class CategorySafetyRuleChallengerEmpiricalTest {
                             "DB phải từ chối insert vi phạm chk_wave_thresholds");
 
                     // Ràng buộc 2: giá trị âm -> Phải bị DB reject!
-                    java.sql.SQLException exNeg = assertThrows(java.sql.SQLException.class, () -> {
+                    SQLException exNeg = assertThrows(SQLException.class, () -> {
                         stmt.execute("""
                             INSERT INTO category_safety_rules (
                                 id, category_slug, category_name,

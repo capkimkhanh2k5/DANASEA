@@ -34,6 +34,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import com.danasea.backend.modules.report.ReportFinancialTestFixtures;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GetVendorPerformanceReportUseCase Performance & Diagnostics Tests")
@@ -98,15 +100,15 @@ class GetVendorPerformanceReportUseCaseTest {
                         SlotStatus.OPEN);
 
         when(reportDataPort.findApprovedVendors()).thenReturn(List.of(vendor));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), eq(null)))
                 .thenReturn(List.of(o1));
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, List.of(o1));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), eq(null)))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
         when(reportDataPort.findServiceSlots(eq(timeRange), eq(null))).thenReturn(List.of(slot));
@@ -158,15 +160,15 @@ class GetVendorPerformanceReportUseCaseTest {
                         SlotStatus.OPEN);
 
         when(reportDataPort.findVendorById(vendorId)).thenReturn(Optional.of(vendor));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), eq(vendorId)))
                 .thenReturn(Collections.emptyList());
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), eq(vendorId)))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
         when(reportDataPort.findServiceSlots(eq(timeRange), eq(vendorId)))
@@ -232,15 +234,15 @@ class GetVendorPerformanceReportUseCaseTest {
                         dt);
 
         when(reportDataPort.findVendorById(vendorId)).thenReturn(Optional.of(vendor));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), eq(vendorId)))
                 .thenReturn(List.of(o1, o2));
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, List.of(o1, o2));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), eq(vendorId)))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
         when(reportDataPort.findServiceSlots(eq(timeRange), eq(vendorId)))
@@ -273,15 +275,15 @@ class GetVendorPerformanceReportUseCaseTest {
                         BadgeTier.NONE);
 
         when(reportDataPort.findVendorById(vendorId)).thenReturn(Optional.of(vendor));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), eq(vendorId)))
                 .thenReturn(Collections.emptyList());
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), eq(vendorId)))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
         when(reportDataPort.findServiceSlots(eq(timeRange), eq(vendorId)))

@@ -1,7 +1,6 @@
 package com.danasea.backend.security.authentication.application.usecases;
 
 import com.danasea.backend.modules.account.application.api.AccountInternalApi;
-import com.danasea.backend.modules.audit.application.ports.AuditLogPort;
 import com.danasea.backend.modules.account.domain.models.RefreshToken;
 import com.danasea.backend.security.authentication.infrastructure.security.HashUtils;
 import org.junit.jupiter.api.BeforeEach;

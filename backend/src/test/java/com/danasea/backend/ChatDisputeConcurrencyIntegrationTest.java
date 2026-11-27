@@ -50,6 +50,7 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
+import org.springframework.dao.DuplicateKeyException;
 
 /** PostgreSQL and transactional use cases are real; spies only coordinate competing threads. */
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -141,7 +142,7 @@ class ChatDisputeConcurrencyIntegrationTest extends BaseSecurityIntegrationTest 
     @Test
     void databaseRejectsDuplicateConversation() {
         createConversation();
-        assertThrows(org.springframework.dao.DuplicateKeyException.class, () -> jdbc.update(
+        assertThrows(DuplicateKeyException.class, () -> jdbc.update(
                 "INSERT INTO conversations(id,customer_id,vendor_id,master_order_id,created_at,updated_at,last_message_sequence) VALUES (?,?,?,?,NOW(),NOW(),0)",
                 UUID.randomUUID(), customer, vendorId, order));
     }

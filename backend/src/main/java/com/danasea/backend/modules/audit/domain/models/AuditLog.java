@@ -2,7 +2,6 @@ package com.danasea.backend.modules.audit.domain.models;
 
 import java.util.UUID;
 
-import java.util.UUID;
 
 import com.danasea.backend.shared.core.domain.models.BaseDomainModel;
 import lombok.Data;

@@ -36,6 +36,10 @@ import com.danasea.backend.modules.order.application.api.AiPolicyReadApi;
 import com.danasea.backend.shared.i18n.LocalizedMessageService;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.danasea.backend.modules.ai.application.dtos.TravelRequest;
+import com.danasea.backend.modules.ai.domain.services.SanitizationService;
+import com.danasea.backend.modules.ai.domain.services.TravelQueryParser;
+import org.mockito.Mockito;
 
 class AssistantStructuredContractTest {
     private final UUID conversation = UUID.randomUUID(), actor = UUID.randomUUID();
@@ -226,7 +230,7 @@ class AssistantStructuredContractTest {
                 toolResponse("request_booking_confirmation", "{}"), answer("Hãy chọn dịch vụ để tìm hiểu thêm."));
         var result = chat.processMessage(conversation,
                 "Tôi chưa muốn đặt, chỉ tìm tour còn chỗ.", SupportedLanguage.VI, actor);
-        verify(tool, never()).execute(any(), any(ToolExecutionContext.class));
+        Mockito.verify(tool, Mockito.never()).execute(any(), any(ToolExecutionContext.class));
         assertThat(result.getCards()).noneMatch(card -> card.type().equals("BOOKING_CONFIRMATION"));
     }
 

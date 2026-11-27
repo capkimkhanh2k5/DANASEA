@@ -9,7 +9,6 @@ import com.danasea.backend.modules.admin.presentation.dtos.AdminVendorResponse;
 import com.danasea.backend.modules.vendor.domain.models.DocType;
 import com.danasea.backend.modules.vendor.presentation.dtos.VendorDocumentResponse;
 import com.danasea.backend.shared.presentation.GlobalExceptionHandler;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,11 +18,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;

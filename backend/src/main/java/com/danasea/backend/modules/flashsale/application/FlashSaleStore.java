@@ -1,9 +1,12 @@
 package com.danasea.backend.modules.flashsale.application;
 
 import com.danasea.backend.modules.flashsale.domain.FlashSale;
-import com.danasea.backend.modules.flashsale.domain.FlashSalePricing.*;
+import com.danasea.backend.modules.flashsale.domain.FlashSalePricing.Policy;
+import com.danasea.backend.modules.flashsale.domain.FlashSalePricing.Snapshot;
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 public interface FlashSaleStore {
     record Option(UUID serviceId, UUID optionId, UUID vendorId, BigDecimal price, String pricingUnit,

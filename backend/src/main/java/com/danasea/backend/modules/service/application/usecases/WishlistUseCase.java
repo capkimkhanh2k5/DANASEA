@@ -2,7 +2,6 @@ package com.danasea.backend.modules.service.application.usecases;
 
 import com.danasea.backend.modules.service.application.dtos.WishlistItemResult;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
-import com.danasea.backend.modules.service.domain.models.Service;
 import com.danasea.backend.modules.service.domain.models.Wishlist;
 import com.danasea.backend.modules.service.domain.ports.ServiceImageRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;

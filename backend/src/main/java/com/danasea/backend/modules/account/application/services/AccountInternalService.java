@@ -40,6 +40,7 @@ import com.danasea.backend.modules.account.infrastructure.persistence.entities.U
 import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaPasswordResetTokenRepository;
 import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaRefreshTokenRepository;
 import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository;
+import java.util.HashMap;
 
 @Service
 @Transactional(readOnly = true)
@@ -105,14 +106,14 @@ public class AccountInternalService implements AccountInternalApi {
     @Override
     public Map<UUID, User> findUsersByIds(Collection<UUID> ids) {
         if (ids == null || ids.isEmpty()) {
-            return new java.util.HashMap<>();
+            return new HashMap<>();
         }
         Set<UUID> nonNullIds = ids.stream().filter(Objects::nonNull).collect(Collectors.toSet());
         if (nonNullIds.isEmpty()) {
-            return new java.util.HashMap<>();
+            return new HashMap<>();
         }
         List<UserJpaEntity> entities = userRepository.findAllById(nonNullIds);
-        Map<UUID, User> map = new java.util.HashMap<>();
+        Map<UUID, User> map = new HashMap<>();
         for (UserJpaEntity entity : entities) {
             User user = userMapper.toDomain(entity);
             if (user != null && user.getId() != null) {

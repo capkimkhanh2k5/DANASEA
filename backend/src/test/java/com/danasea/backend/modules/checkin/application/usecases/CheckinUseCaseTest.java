@@ -57,6 +57,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.danasea.backend.modules.service.domain.models.SlotStatus;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CheckinUseCaseTest — Comprehensive Test Suite for EPIC-07 R3")
@@ -769,7 +770,7 @@ class CheckinUseCaseTest {
             currentSlot.setDate(date);
             currentSlot.setStartTime(LocalTime.of(16, 0));
             currentSlot.setEndTime(LocalTime.of(17, 30));
-            currentSlot.setStatus(com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN);
+            currentSlot.setStatus(SlotStatus.OPEN);
 
             // Candidate 1: 14:00 (cap: 10, booked: 2 -> avail: 8)
             ServiceSlotJpaEntity slot14 = new ServiceSlotJpaEntity();
@@ -780,7 +781,7 @@ class CheckinUseCaseTest {
             slot14.setEndTime(LocalTime.of(15, 30));
             slot14.setCapacity(10);
             slot14.setBookedCount(2);
-            slot14.setStatus(com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN);
+            slot14.setStatus(SlotStatus.OPEN);
 
             // Candidate 2: 10:00 (cap: 10, booked: 1 -> avail: 9) - EARLIEST!
             ServiceSlotJpaEntity slot10 = new ServiceSlotJpaEntity();
@@ -791,14 +792,14 @@ class CheckinUseCaseTest {
             slot10.setEndTime(LocalTime.of(11, 30));
             slot10.setCapacity(10);
             slot10.setBookedCount(1);
-            slot10.setStatus(com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN);
+            slot10.setStatus(SlotStatus.OPEN);
 
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
             when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
             when(slotRepository.findByIdForUpdate(slotId)).thenReturn(Optional.of(currentSlot));
             when(checkinTokenRepository.markAsUsedAtomic(eq(tokenId), any(), eq(staffId))).thenReturn(1);
-            when(slotRepository.findByServiceIdAndDateAndStatus(serviceId, date, com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN))
+            when(slotRepository.findByServiceIdAndDateAndStatus(serviceId, date, SlotStatus.OPEN))
                     .thenReturn(List.of(slot14, slot10));
 
             var response = verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId);
@@ -841,14 +842,14 @@ class CheckinUseCaseTest {
             currentSlot.setDate(date);
             currentSlot.setStartTime(LocalTime.of(8, 0));
             currentSlot.setEndTime(LocalTime.of(9, 30));
-            currentSlot.setStatus(com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN);
+            currentSlot.setStatus(SlotStatus.OPEN);
 
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
             when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
             when(slotRepository.findByIdForUpdate(slotId)).thenReturn(Optional.of(currentSlot));
             when(checkinTokenRepository.markAsUsedAtomic(eq(tokenId), any(), eq(staffId))).thenReturn(1);
-            when(slotRepository.findByServiceIdAndDateAndStatus(serviceId, date, com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN))
+            when(slotRepository.findByServiceIdAndDateAndStatus(serviceId, date, SlotStatus.OPEN))
                     .thenReturn(List.of(currentSlot));
 
             var response = verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId);

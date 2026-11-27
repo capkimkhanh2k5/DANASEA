@@ -1,10 +1,8 @@
 package com.danasea.backend.security.authentication.application.usecases;
 
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.danasea.backend.modules.account.application.api.AccountInternalApi;
-import com.danasea.backend.modules.account.domain.models.RefreshToken;
 import com.danasea.backend.security.authentication.infrastructure.security.HashUtils;
 
 import lombok.RequiredArgsConstructor;

@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.ArgumentMatchers;
 
 @ExtendWith(MockitoExtension.class)
 class WeatherControllerContractTest {
@@ -35,7 +36,7 @@ class WeatherControllerContractTest {
         UUID categoryId = UUID.randomUUID();
         LocalDateTime targetDateTime = LocalDateTime.of(2026, 10, 1, 9, 30);
         AdvanceBookingSafetyResponse response = AdvanceBookingSafetyResponse.builder().build();
-        when(checkAdvanceBookingSafetyUseCase.execute(org.mockito.ArgumentMatchers.any()))
+        when(checkAdvanceBookingSafetyUseCase.execute(ArgumentMatchers.any()))
                 .thenReturn(response);
 
         controller.checkAdvanceBookingSafety(

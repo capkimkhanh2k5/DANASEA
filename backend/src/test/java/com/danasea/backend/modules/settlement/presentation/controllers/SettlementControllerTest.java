@@ -1,7 +1,6 @@
 package com.danasea.backend.modules.settlement.presentation.controllers;
 
 import com.danasea.backend.modules.settlement.application.dtos.GenerateSettlementRequest;
-import com.danasea.backend.modules.settlement.application.dtos.SettlementDetailResponse;
 import com.danasea.backend.modules.settlement.application.dtos.SettlementResponse;
 import com.danasea.backend.modules.settlement.application.usecases.FinalizeSettlementUseCase;
 import com.danasea.backend.modules.settlement.application.usecases.GenerateSettlementUseCase;
@@ -10,7 +9,6 @@ import com.danasea.backend.modules.settlement.application.usecases.GetSettlement
 import com.danasea.backend.modules.settlement.domain.exceptions.InvalidSettlementPeriodException;
 import com.danasea.backend.modules.settlement.domain.exceptions.SettlementAlreadyFinalizedException;
 import com.danasea.backend.modules.settlement.domain.exceptions.SettlementNotFoundException;
-import com.danasea.backend.modules.settlement.domain.exceptions.UnauthorizedSettlementAccessException;
 import com.danasea.backend.modules.settlement.domain.models.SettlementStatus;
 import com.danasea.backend.modules.settlement.presentation.handlers.SettlementExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,8 +27,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.util.Collections;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;

@@ -33,7 +33,6 @@ import com.danasea.backend.modules.order.infrastructure.persistence.entities.Sub
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaRefundRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderDisruptionRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
-import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.settlement.application.dtos.GenerateSettlementRequest;
 import com.danasea.backend.modules.settlement.application.dtos.SettlementResponse;

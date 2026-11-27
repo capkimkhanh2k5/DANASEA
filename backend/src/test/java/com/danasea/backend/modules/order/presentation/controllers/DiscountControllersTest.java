@@ -41,6 +41,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Set;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Discount Controllers Unit Tests (Admin, Vendor, Checkout)")
@@ -77,7 +78,7 @@ class DiscountControllersTest {
                 "password",
                 List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"), new SimpleGrantedAuthority("ROLE_VENDOR"), new SimpleGrantedAuthority("ROLE_ADMIN"))
         );
-        auth.setDetails(new AuthorizationSubject(testUserId, "customer@test.com", java.util.Set.of("ROLE_CUSTOMER"), java.util.Set.of()));
+        auth.setDetails(new AuthorizationSubject(testUserId, "customer@test.com", Set.of("ROLE_CUSTOMER"), Set.of()));
         securityContext.setAuthentication(auth);
         SecurityContextHolder.setContext(securityContext);
     }

@@ -1,5 +1,34 @@
 import type { BadgeTier } from './index';
 
+export interface PublicFlashSaleOfferDto {
+  flashSaleId: string;
+  serviceId: string;
+  serviceOptionId: string;
+  serviceName: string;
+  serviceImage?: string | null;
+  originalPrice: number;
+  salePrice: number;
+  actualDiscountAmount: number;
+  actualDiscountPercent: number;
+  startsAt: string;
+  endsAt: string;
+  remainingQuota: number;
+  availability: string;
+  currency: string;
+}
+
+export interface PublicVendorPromotionDto {
+  id: string;
+  code: string;
+  vendorId: string;
+  serviceId?: string | null;
+  discountType: 'PERCENTAGE' | 'FIXED' | string;
+  discountValue: number;
+  minOrderAmount?: number | null;
+  maxDiscountAmount?: number | null;
+  validTo?: string | null;
+}
+
 export interface ServiceSummaryDto {
   id: string;
   vendorId?: string;
@@ -11,6 +40,8 @@ export interface ServiceSummaryDto {
   descriptionEn?: string;
   price: number;
   promotionalPrice?: number | null;
+  flashSales?: PublicFlashSaleOfferDto[];
+  vendorPromotions?: PublicVendorPromotionDto[];
   averageRating: number;
   reviewCount: number;
   viewCount: number;
@@ -64,6 +95,8 @@ export interface ServiceDetailDto {
   descriptionEn?: string;
   price: number;
   promotionalPrice?: number | null;
+  flashSales?: PublicFlashSaleOfferDto[];
+  vendorPromotions?: PublicVendorPromotionDto[];
   address?: string;
   latitude?: number;
   longitude?: number;

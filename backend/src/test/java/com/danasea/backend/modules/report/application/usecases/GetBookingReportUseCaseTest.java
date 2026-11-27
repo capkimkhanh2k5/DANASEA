@@ -28,6 +28,8 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import com.danasea.backend.modules.report.ReportFinancialTestFixtures;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GetBookingReportUseCase Booking Breakdown & Zero-Filling Tests")
@@ -48,15 +50,15 @@ class GetBookingReportUseCaseTest {
     void shouldZeroFillEmptyPeriodsForBookings() {
         TimeRange timeRange = TimeRange.of(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 3));
 
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), any()))
                 .thenReturn(Collections.emptyList());
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), any()))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
 
@@ -152,15 +154,15 @@ class GetBookingReportUseCaseTest {
                         dt,
                         dt);
 
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), any()))
                 .thenReturn(List.of(o1, o2, o3));
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, List.of(o1, o2, o3));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), any()))
                 .thenReturn(List.of(r1, r2));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(List.of(r1, r2));
 

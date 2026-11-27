@@ -9,6 +9,8 @@ import com.danasea.backend.modules.flashsale.domain.FlashSalePricing.Policy;
 import com.danasea.backend.modules.booking.application.usecases.ExpireBookingHoldUseCase;
 import com.danasea.backend.modules.booking.infrastructure.redis.RedisInventoryLockAdapter;
 import com.danasea.backend.modules.order.application.OrderPaymentService;
+import com.danasea.backend.modules.order.application.PaymentWebhookSigner;
+import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.ports.OrderEventPublisherPort;
 import com.danasea.backend.security.authentication.domain.models.Authentication;
 import com.danasea.backend.security.authentication.infrastructure.security.JwtTokenProvider;
@@ -21,13 +23,17 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.*;
 import org.springframework.test.context.bean.override.mockito.*;
+import java.sql.Date;
+import java.sql.Time;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
     "spring.flyway.enabled=true","spring.jpa.hibernate.ddl-auto=validate","spring.autoconfigure.exclude=",
@@ -43,10 +49,10 @@ class FlashSaleHttpIntegrationTest extends BaseFlashSaleIntegrationTest {
     @Autowired FlashSaleService sales;
     @Autowired ExpireBookingHoldUseCase expiry;
     @Autowired OrderPaymentService legacyOrders;
-    @Autowired com.danasea.backend.modules.order.application.PaymentWebhookSigner webhookSigner;
+    @Autowired PaymentWebhookSigner webhookSigner;
     @MockitoBean OrderEventPublisherPort orderEvents;
-    @MockitoBean org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
-    @MockitoBean org.springframework.mail.javamail.JavaMailSender mail;
+    @MockitoBean RabbitTemplate rabbit;
+    @MockitoBean JavaMailSender mail;
     @MockitoSpyBean RedisInventoryLockAdapter inventory;
     final ObjectMapper json=new ObjectMapper().findAndRegisterModules();
     final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -93,7 +99,7 @@ class FlashSaleHttpIntegrationTest extends BaseFlashSaleIntegrationTest {
     UUID slot(String type,int capacity) {
         UUID id=UUID.randomUUID();
         int hour=8+db.queryForObject("SELECT count(*) FROM service_slots WHERE service_id=?",Integer.class,service);
-        db.update("INSERT INTO service_slots(id,service_id,date,start_time,end_time,capacity,booked_count,status,inventory_type,created_at,updated_at) VALUES (?,?,?,?,?,?,0,'OPEN',?,now(),now())",id,service,java.sql.Date.valueOf(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(5)),java.sql.Time.valueOf(LocalTime.of(hour,0)),java.sql.Time.valueOf(LocalTime.of(hour+1,0)),capacity,type); return id;
+        db.update("INSERT INTO service_slots(id,service_id,date,start_time,end_time,capacity,booked_count,status,inventory_type,created_at,updated_at) VALUES (?,?,?,?,?,?,0,'OPEN',?,now(),now())",id,service,Date.valueOf(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(5)),Time.valueOf(LocalTime.of(hour,0)),Time.valueOf(LocalTime.of(hour+1,0)),capacity,type); return id;
     }
     Terms terms(UUID option,int quota,int budget,OffsetDateTime start,OffsetDateTime end) { return new Terms(service,option,n("30000"),start,end,quota,BigDecimal.valueOf(budget)); }
     UUID campaign(UUID option,int quota,int budget) {
@@ -189,7 +195,11 @@ class FlashSaleHttpIntegrationTest extends BaseFlashSaleIntegrationTest {
         assertThat((BigDecimal)snapshot.get("original_amount")).isEqualByComparingTo("1000000");
         assertThat((BigDecimal)snapshot.get("vendor_receivable")).isEqualByComparingTo("900000");
         assertThat((BigDecimal)snapshot.get("platform_contribution")).isEqualByComparingTo("40000");
-        assertThat(call("POST","/api/orders",customerToken,Map.of("bookingId",booking,"discountCode","ANY"),"no-stack").statusCode()).isEqualTo(422);
+        db.update("""
+                INSERT INTO discount_codes(id,code,scope,sponsor_type,discount_type,discount_value,min_order_amount,max_uses,used_count,is_active,created_at,updated_at)
+                VALUES (?,'PLAT10','PLATFORM','PLATFORM','FIXED',10000,0,10,0,true,now(),now())
+                """,UUID.randomUUID());
+        assertThat(call("POST","/api/orders",customerToken,Map.of("bookingId",booking,"discountCode","PLAT10"),"no-stack").statusCode()).isEqualTo(422);
         body(call("POST","/api/orders",customerToken,Map.of("bookingId",booking),"order"),201);
         var order=db.queryForMap("SELECT * FROM sub_orders WHERE booking_item_id=(SELECT id FROM booking_items WHERE booking_id=?)",booking);
         assertThat((BigDecimal)order.get("commission_amount")).isEqualByComparingTo("100000");
@@ -291,7 +301,7 @@ class FlashSaleHttpIntegrationTest extends BaseFlashSaleIntegrationTest {
         assertThat(refund.path("amount").decimalValue()).isEqualByComparingTo("470000");
         UUID refundId=db.queryForObject("SELECT id FROM refunds",UUID.class);
         String refundPayload=json.writeValueAsString(Map.of("eventId","test-refund-"+refundId,"refundId",refundId,"providerRefundId","test-provider-"+refundId,"status","PROCESSED","amount",470000));
-        legacyOrders.processRefundWebhook(com.danasea.backend.modules.order.domain.models.PaymentProvider.SEPAY,refundPayload,webhookSigner.sign(refundPayload));
+        legacyOrders.processRefundWebhook(PaymentProvider.SEPAY,refundPayload,webhookSigner.sign(refundPayload));
         assertThat(db.queryForObject("SELECT status FROM refunds WHERE id=?",String.class,refundId)).isEqualTo("PROCESSED");
         assertThat(state(booking)).isEqualTo("CONSUMED");
     }
@@ -324,7 +334,7 @@ class FlashSaleHttpIntegrationTest extends BaseFlashSaleIntegrationTest {
         var bad=terms(shared,1,30000,OffsetDateTime.now(),OffsetDateTime.now().minusSeconds(1));
         assertThat(call("POST","/api/admin/flash-sales",adminToken,bad,null).statusCode()).isEqualTo(422);
         UUID booking=hold(sale,1);
-        assertThat(call("POST","/api/checkout/discount-preview",customerToken,Map.of("bookingId",booking,"code","ANY"),null).statusCode()).isEqualTo(422);
+        assertThat(body(call("POST","/api/checkout/discount-preview",customerToken,Map.of("bookingId",booking,"code","ANY"),null),200).path("valid").asBoolean()).isFalse();
         UUID other=user("CUSTOMER"); String otherToken=token(other,"CUSTOMER");
         assertThat(call("DELETE","/api/bookings/hold/"+booking,otherToken,null,null).statusCode()).isEqualTo(403);
         assertThat(state(booking)).isEqualTo("RESERVED");

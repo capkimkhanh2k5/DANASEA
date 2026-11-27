@@ -12,7 +12,14 @@ export const bookingService = {
    * Hold slots for checkout (15-minute reservation window)
    * POST /api/bookings/hold
    */
-  async holdBooking(request: BookingHoldRequest): Promise<BookingHoldResponse> {
+  async holdBooking(request: BookingHoldRequest, idempotencyKey?: string): Promise<BookingHoldResponse> {
+    const hasFlashSale = request.items.some((item) => Boolean(item.flashSaleId));
+    const effectiveKey = idempotencyKey || (hasFlashSale
+      ? (typeof crypto !== 'undefined' && crypto.randomUUID
+          ? `web-fs-${crypto.randomUUID()}`
+          : `web-fs-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
+      : undefined);
+
     flowLogger.start({
       step: '03_HOLD',
       stepName: 'Giữ chỗ 15 phút (Hold Booking)',
@@ -21,7 +28,9 @@ export const bookingService = {
     });
 
     try {
-      const response = await apiClient.post<BookingHoldResponse>('/bookings/hold', request);
+      const response = await apiClient.post<BookingHoldResponse>('/bookings/hold', request, {
+        headers: effectiveKey ? { 'Idempotency-Key': effectiveKey } : undefined,
+      });
       flowLogger.success(
         {
           step: '03_HOLD',

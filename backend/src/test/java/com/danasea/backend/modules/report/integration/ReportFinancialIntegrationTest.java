@@ -30,6 +30,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 
 @Transactional
 class ReportFinancialIntegrationTest extends BaseSecurityIntegrationTest {
@@ -328,7 +329,7 @@ class ReportFinancialIntegrationTest extends BaseSecurityIntegrationTest {
         String text =
                 new String(
                         csv.exportVendorPerformanceReport(vendors.execute(day, evil), day),
-                        java.nio.charset.StandardCharsets.UTF_8);
+                        StandardCharsets.UTF_8);
         assertThat(text).contains(",' \t=1+1,").contains(",-900.00,");
     }
 

@@ -44,6 +44,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
@@ -204,8 +205,7 @@ public class CreateOrderUseCase {
             departureCheckout.requireBookable(departureCheckout.lockBooking(command.bookingId()));
         }
 
-        if(flashSale!=null && command.discountCode()!=null && !command.discountCode().isBlank() && flashSale.hasAllocation(command.bookingId()))
-            throw new FlashSaleException("FLASH_SALE_VOUCHER_STACKING_NOT_ALLOWED");
+        boolean hasFlashSale = flashSale != null && flashSale.hasAllocation(command.bookingId());
 
         // 8. Đánh giá Voucher / Discount Code (nếu có yêu cầu áp dụng)
         DiscountCodeJpaEntity appliedCodeEntity = null;
@@ -222,6 +222,10 @@ public class CreateOrderUseCase {
 
             DiscountCode discountCode = discountCodeMapper.toDomain(appliedCodeEntity);
 
+            if (hasFlashSale && !discountCode.isStackableWithFlashSale()) {
+                throw new FlashSaleException("FLASH_SALE_VOUCHER_STACKING_NOT_ALLOWED");
+            }
+
             long userUsageCount = 0;
             if (discountRedemptionRepository != null) {
                 userUsageCount = discountRedemptionRepository.countByDiscountCodeIdAndCustomerId(appliedCodeEntity.getId(), command.customerId());
@@ -229,8 +233,11 @@ public class CreateOrderUseCase {
 
             List<CandidateItem> candidateItems = new ArrayList<>();
             for (BookingOrderView.BookingItemOrderView item : booking.items()) {
-                BigDecimal rate = commissionPolicyPort != null ? commissionPolicyPort.resolveCommissionRate(item.vendorId(), item.serviceId(), null) : null;
-                if (rate == null && commissionPolicyPort != null) {
+                var promotion = flashSale != null ? flashSale.snapshot(item.bookingItemId()).orElse(null) : null;
+                BigDecimal rate = promotion != null
+                        ? promotion.commissionRate()
+                        : (commissionPolicyPort != null ? commissionPolicyPort.resolveCommissionRate(item.vendorId(), item.serviceId(), null) : null);
+                if (rate == null && promotion == null && commissionPolicyPort != null) {
                     rate = commissionPolicyPort.getCommissionRate(item.vendorId());
                 }
                 if (rate == null) {
@@ -261,6 +268,27 @@ public class CreateOrderUseCase {
             if (allocationResult.finalPayableAmount().signum() <= 0) {
                 throw new InvalidDiscountException("DISCOUNT_ZERO_PAYABLE_UNSUPPORTED",
                         "Discount must leave a positive payable amount.");
+            }
+
+            // Rào chắn K2 cho các item Flash Sale: đảm bảo vendorPayout >= 0 và tiền khách trả > 0
+            if (hasFlashSale) {
+                for (ItemAllocation alloc : allocationResult.itemAllocations()) {
+                    if (!alloc.eligible()) continue;
+                    var promotion = flashSale.snapshot(alloc.itemId()).orElse(null);
+                    if (promotion == null) continue;
+                    BigDecimal stackedVendorPayout = promotion.vendorReceivable().subtract(alloc.vendorDiscountAmount());
+                    if (stackedVendorPayout.signum() < 0) {
+                        throw new InvalidDiscountException("DISCOUNT_EXCEEDS_VENDOR_RECEIVABLE",
+                                "Vendor voucher exceeds vendor receivable amount on this Flash Sale item.");
+                    }
+                    BigDecimal stackedItemPayable = promotion.customerPayable()
+                            .subtract(alloc.vendorDiscountAmount())
+                            .subtract(alloc.platformDiscountAmount());
+                    if (stackedItemPayable.signum() <= 0) {
+                        throw new InvalidDiscountException("DISCOUNT_ZERO_PAYABLE_UNSUPPORTED",
+                                "Discount must leave a positive payable amount.");
+                    }
+                }
             }
 
             // The voucher lock serializes global and per-customer reservations.
@@ -328,17 +356,30 @@ public class CreateOrderUseCase {
                 subOrder.setFinalAmount(subtotal);
             }
 
-            if(promotion!=null) {
+            if (promotion != null) {
+                BigDecimal stackedVendorDiscount = (alloc != null && alloc.eligible())
+                        ? alloc.vendorDiscountAmount()
+                        : BigDecimal.ZERO;
+                BigDecimal stackedPlatformVoucherDiscount = (alloc != null && alloc.eligible())
+                        ? alloc.platformDiscountAmount()
+                        : BigDecimal.ZERO;
+                BigDecimal totalPlatformDiscount = promotion.subsidyAmount().add(stackedPlatformVoucherDiscount);
+                BigDecimal totalItemDiscount = stackedVendorDiscount.add(totalPlatformDiscount);
+                BigDecimal stackedFinalAmount = promotion.originalAmount().subtract(totalItemDiscount);
+                BigDecimal stackedVendorPayout = promotion.vendorReceivable().subtract(stackedVendorDiscount);
+
                 subOrder.setUnitPrice(promotion.originalUnitPrice());
                 subOrder.setSubtotalAmount(promotion.originalAmount());
+                // K2: Flash Sale preserves commission basis on originalAmount (matching flash_sale_allocations),
+                // while vendor absorbs 100% of any stacked vendor voucher from vendorReceivable.
                 subOrder.setCommissionBasisAmount(promotion.originalAmount());
                 subOrder.setCommissionRate(promotion.commissionRate());
                 subOrder.setCommissionAmount(promotion.commissionAmount());
-                subOrder.setVendorPayoutAmount(promotion.vendorReceivable());
-                subOrder.setVendorDiscountAmount(BigDecimal.ZERO);
-                subOrder.setPlatformDiscountAmount(promotion.subsidyAmount());
-                subOrder.setDiscountAmount(promotion.subsidyAmount());
-                subOrder.setFinalAmount(promotion.customerPayable());
+                subOrder.setVendorPayoutAmount(stackedVendorPayout);
+                subOrder.setVendorDiscountAmount(stackedVendorDiscount);
+                subOrder.setPlatformDiscountAmount(totalPlatformDiscount);
+                subOrder.setDiscountAmount(totalItemDiscount);
+                subOrder.setFinalAmount(stackedFinalAmount);
             }
             subOrder.setStatus(SubOrderStatus.PENDING);
             subOrder.setWaiverAccepted(false);
@@ -356,9 +397,18 @@ public class CreateOrderUseCase {
         }
         subOrders = subOrderRepository.saveAll(subOrders);
         order.setSubOrders(subOrders);
-        if(flashSale!=null && flashSale.hasAllocation(command.bookingId())) {
-            order.setDiscountAmount(subOrders.stream().map(SubOrder::getPlatformDiscountAmount).reduce(BigDecimal.ZERO,BigDecimal::add));
-            order=masterOrderRepository.save(order);
+        if (hasFlashSale) {
+            BigDecimal totalOrderDiscount = subOrders.stream()
+                    .map(SubOrder::getDiscountAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalOrderPayable = subOrders.stream()
+                    .map(SubOrder::getFinalAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            order.setDiscountAmount(totalOrderDiscount);
+            order.setTotalAmount(totalOrderPayable);
+            order = masterOrderRepository.save(order);
         }
 
         // 11. Ghi nhận Discount Redemption

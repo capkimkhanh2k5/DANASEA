@@ -40,6 +40,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collections;
+import java.util.List;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 @ExtendWith(MockitoExtension.class)
 class ReportExportControllerTest {
@@ -143,7 +146,7 @@ class ReportExportControllerTest {
                 new UsernamePasswordAuthenticationToken(
                         vendorUserId.toString(),
                         "credentials",
-                        java.util.List.of(new SimpleGrantedAuthority("ROLE_VENDOR")));
+                        List.of(new SimpleGrantedAuthority("ROLE_VENDOR")));
         SecurityContextHolder.getContext().setAuthentication(auth);
 
         Vendor vendor = new Vendor();
@@ -210,7 +213,7 @@ class ReportExportControllerTest {
                                 .param("to", "2026-05-01"))
                 .andExpect(status().isBadRequest())
                 .andExpect(
-                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        MockMvcResultMatchers.jsonPath(
                                         "$.code")
                                 .value("INVALID_INPUT"));
     }
@@ -227,7 +230,7 @@ class ReportExportControllerTest {
                                 .param("groupBy", "invalid_group"))
                 .andExpect(status().isBadRequest())
                 .andExpect(
-                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        MockMvcResultMatchers.jsonPath(
                                         "$.code")
                                 .value("INVALID_INPUT"));
     }
@@ -243,7 +246,7 @@ class ReportExportControllerTest {
                                 .param("to", "2026-05-10"))
                 .andExpect(status().isBadRequest())
                 .andExpect(
-                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        MockMvcResultMatchers.jsonPath(
                                         "$.code")
                                 .value("INVALID_INPUT"));
     }
@@ -276,7 +279,7 @@ class ReportExportControllerTest {
                                                 "attachment;"
                                                     + " filename=\"report-bookings-2026-05-01-2026-05-10.csv\"")))
                 .andExpect(
-                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        MockMvcResultMatchers.content()
                                 .bytes(fakeBookingsCsv));
 
         byte[] fakeVendorsCsv =
@@ -300,7 +303,7 @@ class ReportExportControllerTest {
                                                 "attachment;"
                                                     + " filename=\"report-vendors-2026-05-01-2026-05-10.csv\"")))
                 .andExpect(
-                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        MockMvcResultMatchers.content()
                                 .bytes(fakeVendorsCsv));
     }
 
@@ -313,7 +316,7 @@ class ReportExportControllerTest {
                 new UsernamePasswordAuthenticationToken(
                         vendorUserId.toString(),
                         "credentials",
-                        java.util.List.of(new SimpleGrantedAuthority("ROLE_VENDOR")));
+                        List.of(new SimpleGrantedAuthority("ROLE_VENDOR")));
         SecurityContextHolder.getContext().setAuthentication(auth);
 
         Vendor vendor = new Vendor();
@@ -329,7 +332,7 @@ class ReportExportControllerTest {
                                 .param("to", "2026-05-01"))
                 .andExpect(status().isBadRequest())
                 .andExpect(
-                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        MockMvcResultMatchers.jsonPath(
                                         "$.code")
                                 .value("INVALID_INPUT"));
     }
@@ -342,7 +345,7 @@ class ReportExportControllerTest {
                 new UsernamePasswordAuthenticationToken(
                         vendorUserId.toString(),
                         "credentials",
-                        java.util.List.of(new SimpleGrantedAuthority("ROLE_VENDOR")));
+                        List.of(new SimpleGrantedAuthority("ROLE_VENDOR")));
         SecurityContextHolder.getContext().setAuthentication(auth);
 
         Vendor vendor = new Vendor();
@@ -359,7 +362,7 @@ class ReportExportControllerTest {
                                 .param("groupBy", "invalid_group"))
                 .andExpect(status().isBadRequest())
                 .andExpect(
-                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        MockMvcResultMatchers.jsonPath(
                                         "$.code")
                                 .value("INVALID_INPUT"));
     }
@@ -371,7 +374,7 @@ class ReportExportControllerTest {
                 new UsernamePasswordAuthenticationToken(
                         vendorUserId.toString(),
                         "credentials",
-                        java.util.List.of(new SimpleGrantedAuthority("ROLE_VENDOR")));
+                        List.of(new SimpleGrantedAuthority("ROLE_VENDOR")));
         SecurityContextHolder.getContext().setAuthentication(auth);
 
         Vendor vendor = new Vendor();
@@ -387,7 +390,7 @@ class ReportExportControllerTest {
                                 .param("to", "2026-05-10"))
                 .andExpect(status().isBadRequest())
                 .andExpect(
-                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        MockMvcResultMatchers.jsonPath(
                                         "$.code")
                                 .value("INVALID_INPUT"));
     }
@@ -401,11 +404,11 @@ class ReportExportControllerTest {
         TimeRange range = TimeRange.of(LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 10));
 
         byte[] revenueBytes =
-                exporter.exportRevenueReport(java.util.Collections.emptyList(), range);
+                exporter.exportRevenueReport(Collections.emptyList(), range);
         byte[] bookingBytes =
-                exporter.exportBookingReport(java.util.Collections.emptyList(), range);
+                exporter.exportBookingReport(Collections.emptyList(), range);
         byte[] vendorBytes =
-                exporter.exportVendorPerformanceReport(java.util.Collections.emptyList(), range);
+                exporter.exportVendorPerformanceReport(Collections.emptyList(), range);
 
         assertThat(revenueBytes).startsWith((byte) 0xEF, (byte) 0xBB, (byte) 0xBF);
         assertThat(bookingBytes).startsWith((byte) 0xEF, (byte) 0xBB, (byte) 0xBF);

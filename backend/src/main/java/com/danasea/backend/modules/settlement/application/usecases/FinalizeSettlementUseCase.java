@@ -25,6 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
+import com.danasea.backend.modules.settlement.domain.models.LineItemExclusionReason;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -98,10 +101,10 @@ public class FinalizeSettlementUseCase {
             var items = lineItemRepository.findBySettlementId(id);
             if (items != null && !items.isEmpty()) {
                 var activeSubOrderIds = items.stream()
-                        .filter(li -> li.getExcludedReason() == null || li.getExcludedReason() == com.danasea.backend.modules.settlement.domain.models.LineItemExclusionReason.NONE)
+                        .filter(li -> li.getExcludedReason() == null || li.getExcludedReason() == LineItemExclusionReason.NONE)
                         .map(SettlementLineItemJpaEntity::getSubOrderId)
-                        .filter(java.util.Objects::nonNull)
-                        .collect(java.util.stream.Collectors.toSet());
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
                 if (!activeSubOrderIds.isEmpty()) {
                     var settledIds = lineItemRepository.findSettledSubOrderIdsByVendorId(settlement.getVendorId());
                     if (settledIds != null && !settledIds.isEmpty()) {

@@ -2,7 +2,6 @@ package com.danasea.backend.modules.operation.application.usecases;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -19,7 +18,6 @@ import com.danasea.backend.modules.communication.domain.models.NotificationChann
 import com.danasea.backend.modules.communication.infrastructure.persistence.repositories.JpaNotificationRepository;
 import com.danasea.backend.modules.operation.domain.exceptions.DuplicateReviewException;
 import com.danasea.backend.modules.operation.domain.exceptions.InvalidReviewSubOrderStateException;
-import com.danasea.backend.modules.operation.domain.exceptions.ReviewNotFoundException;
 import com.danasea.backend.modules.operation.domain.exceptions.ReviewPeriodExpiredException;
 import com.danasea.backend.modules.operation.domain.exceptions.UnauthorizedReviewAccessException;
 import com.danasea.backend.modules.operation.domain.services.ReviewRatingService;
@@ -56,7 +54,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

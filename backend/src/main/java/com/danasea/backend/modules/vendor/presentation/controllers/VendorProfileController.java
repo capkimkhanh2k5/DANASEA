@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.danasea.backend.modules.account.application.api.AccountInternalApi;
-import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.vendor.application.usecases.GetVendorDocumentsUseCase;
 import com.danasea.backend.modules.vendor.application.usecases.GetVendorProfileUseCase;
 import com.danasea.backend.modules.vendor.application.usecases.RegisterVendorProfileUseCase;

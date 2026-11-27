@@ -4,7 +4,6 @@ import com.danasea.backend.modules.booking.infrastructure.persistence.entities.B
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingItemAllocationRepository;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingItemRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
-import com.danasea.backend.modules.service.domain.models.InventoryType;
 import com.danasea.backend.modules.service.domain.models.OptionType;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;

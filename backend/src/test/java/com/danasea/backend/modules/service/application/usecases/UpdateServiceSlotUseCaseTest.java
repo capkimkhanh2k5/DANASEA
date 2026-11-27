@@ -35,6 +35,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.danasea.backend.modules.service.domain.models.OptionStatus;
+import com.danasea.backend.modules.service.domain.models.OptionType;
+import com.danasea.backend.modules.service.domain.models.ServiceOption;
 
 @ExtendWith(MockitoExtension.class)
 class UpdateServiceSlotUseCaseTest {
@@ -250,12 +253,12 @@ class UpdateServiceSlotUseCaseTest {
 
         UUID option1 = UUID.randomUUID();
         UUID option2 = UUID.randomUUID();
-        com.danasea.backend.modules.service.domain.models.ServiceOption opt1 = com.danasea.backend.modules.service.domain.models.ServiceOption.builder()
-                .id(option1).serviceId(serviceId).name("Gói Chuẩn").optionType(com.danasea.backend.modules.service.domain.models.OptionType.SHARED)
-                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE).build();
-        com.danasea.backend.modules.service.domain.models.ServiceOption opt2 = com.danasea.backend.modules.service.domain.models.ServiceOption.builder()
-                .id(option2).serviceId(serviceId).name("Gói VIP").optionType(com.danasea.backend.modules.service.domain.models.OptionType.SHARED)
-                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE).build();
+        ServiceOption opt1 = ServiceOption.builder()
+                .id(option1).serviceId(serviceId).name("Gói Chuẩn").optionType(OptionType.SHARED)
+                .status(OptionStatus.ACTIVE).build();
+        ServiceOption opt2 = ServiceOption.builder()
+                .id(option2).serviceId(serviceId).name("Gói VIP").optionType(OptionType.SHARED)
+                .status(OptionStatus.ACTIVE).build();
 
         when(serviceOptionRepository.findById(option1)).thenReturn(Optional.of(opt1));
         when(serviceOptionRepository.findById(option2)).thenReturn(Optional.of(opt2));
@@ -280,9 +283,9 @@ class UpdateServiceSlotUseCaseTest {
 
         UUID option1 = UUID.randomUUID();
         UUID option2 = UUID.randomUUID();
-        com.danasea.backend.modules.service.domain.models.ServiceOption opt1 = com.danasea.backend.modules.service.domain.models.ServiceOption.builder()
-                .id(option1).serviceId(serviceId).name("Gói Giữ Lại").optionType(com.danasea.backend.modules.service.domain.models.OptionType.SHARED)
-                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE).build();
+        ServiceOption opt1 = ServiceOption.builder()
+                .id(option1).serviceId(serviceId).name("Gói Giữ Lại").optionType(OptionType.SHARED)
+                .status(OptionStatus.ACTIVE).build();
 
         when(serviceOptionRepository.findById(option1)).thenReturn(Optional.of(opt1));
         when(serviceSlotRepository.findOptionIdsBySlotId(slotId)).thenReturn(List.of(option1, option2));
@@ -306,9 +309,9 @@ class UpdateServiceSlotUseCaseTest {
 
         UUID option1 = UUID.randomUUID();
         UUID option2 = UUID.randomUUID();
-        com.danasea.backend.modules.service.domain.models.ServiceOption opt1 = com.danasea.backend.modules.service.domain.models.ServiceOption.builder()
-                .id(option1).serviceId(serviceId).name("Gói Giữ Lại").optionType(com.danasea.backend.modules.service.domain.models.OptionType.SHARED)
-                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE).build();
+        ServiceOption opt1 = ServiceOption.builder()
+                .id(option1).serviceId(serviceId).name("Gói Giữ Lại").optionType(OptionType.SHARED)
+                .status(OptionStatus.ACTIVE).build();
 
         when(serviceOptionRepository.findById(option1)).thenReturn(Optional.of(opt1));
         when(serviceSlotRepository.findOptionIdsBySlotId(slotId)).thenReturn(List.of(option1, option2));
@@ -347,10 +350,10 @@ class UpdateServiceSlotUseCaseTest {
         when(serviceSlotRepository.findByIdForUpdate(slotId)).thenReturn(Optional.of(slot));
 
         UUID privateOptId = UUID.randomUUID();
-        com.danasea.backend.modules.service.domain.models.ServiceOption privateOpt = com.danasea.backend.modules.service.domain.models.ServiceOption.builder()
+        ServiceOption privateOpt = ServiceOption.builder()
                 .id(privateOptId).serviceId(serviceId).name("Thuê Nguyên Cano")
-                .optionType(com.danasea.backend.modules.service.domain.models.OptionType.PRIVATE)
-                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE).build();
+                .optionType(OptionType.PRIVATE)
+                .status(OptionStatus.ACTIVE).build();
 
         when(serviceOptionRepository.findById(privateOptId)).thenReturn(Optional.of(privateOpt));
 

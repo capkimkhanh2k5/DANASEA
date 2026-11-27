@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +45,7 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.web.client.ResourceAccessException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OrderPaymentService Reconciliation Unit Tests")
@@ -321,7 +321,7 @@ class OrderPaymentReconciliationTest {
         var payment = seedReviewPayment();
         payment.setExpiresAt(OffsetDateTime.now().minusMinutes(1));
         when(paymentGatewayPort.queryPayment(any(), anyString(), anyString()))
-            .thenThrow(new org.springframework.web.client.ResourceAccessException("Read timed out"));
+            .thenThrow(new ResourceAccessException("Read timed out"));
         service.reconcilePayment(payment.getId());
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(payment.getLastError()).contains("AWAITING_VERIFICATION");

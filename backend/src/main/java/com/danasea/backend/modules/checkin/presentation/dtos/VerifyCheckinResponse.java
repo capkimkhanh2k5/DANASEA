@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.List;
 
 @Data
 @Builder
@@ -29,8 +30,8 @@ public class VerifyCheckinResponse {
     private Boolean isLate;
     private String lateReason;
     private EarlyDispatchSuggestion earlyDispatchSuggestion;
-    private java.util.List<EarlyDispatchSuggestion> availableEarlySlots;
-    private java.util.List<EligibleSubOrderCandidate> eligibleCandidates;
+    private List<EarlyDispatchSuggestion> availableEarlySlots;
+    private List<EligibleSubOrderCandidate> eligibleCandidates;
 
     public record EarlyDispatchSuggestion(
             boolean available,
@@ -90,11 +91,11 @@ public class VerifyCheckinResponse {
         return earlyDispatchSuggestion;
     }
 
-    public java.util.List<EarlyDispatchSuggestion> availableEarlySlots() {
+    public List<EarlyDispatchSuggestion> availableEarlySlots() {
         return availableEarlySlots;
     }
 
-    public java.util.List<EligibleSubOrderCandidate> eligibleCandidates() {
+    public List<EligibleSubOrderCandidate> eligibleCandidates() {
         return eligibleCandidates;
     }
 }

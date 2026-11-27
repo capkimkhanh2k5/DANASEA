@@ -36,7 +36,6 @@ import com.danasea.backend.modules.settlement.infrastructure.persistence.reposit
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import com.danasea.backend.security.authorization.domain.models.AuthorizationSubject;
-import com.danasea.backend.security.infrastructure.SecurityUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,14 +43,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -70,6 +63,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("SettlementUseCaseTest — Application Layer Unit Tests for EPIC-07 R4")
@@ -164,7 +160,7 @@ class SettlementUseCaseTest {
 
     @AfterEach
     void tearDown() {
-        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        SecurityContextHolder.clearContext();
     }
 
     @Nested
@@ -221,7 +217,7 @@ class SettlementUseCaseTest {
             assertThat(response.safetyRebateQualified()).isFalse();
             assertThat(response.safetyRebateAmount()).isEqualByComparingTo("0.00");
             assertThat(response.netPayableAmount()).isEqualByComparingTo("2250000.00");
-            verify(lineItemRepository, org.mockito.Mockito.times(2)).save(any());
+            verify(lineItemRepository, Mockito.times(2)).save(any());
         }
 
         @Test
@@ -238,7 +234,7 @@ class SettlementUseCaseTest {
 
             Vendor qualifiedVendor = new Vendor();
             qualifiedVendor.setId(vendorId);
-            qualifiedVendor.setBadgeTier(com.danasea.backend.modules.vendor.domain.models.BadgeTier.TOP_RATED);
+            qualifiedVendor.setBadgeTier(BadgeTier.TOP_RATED);
             qualifiedVendor.setRatingAvg(new BigDecimal("4.90"));
             qualifiedVendor.setRatingCount(10);
 
@@ -280,7 +276,7 @@ class SettlementUseCaseTest {
 
             Vendor verifiedVendor = new Vendor();
             verifiedVendor.setId(vendorId);
-            verifiedVendor.setBadgeTier(com.danasea.backend.modules.vendor.domain.models.BadgeTier.VERIFIED);
+            verifiedVendor.setBadgeTier(BadgeTier.VERIFIED);
             verifiedVendor.setRatingAvg(new BigDecimal("4.90"));
             verifiedVendor.setRatingCount(10);
 
@@ -864,12 +860,12 @@ class SettlementUseCaseTest {
             UUID userId = UUID.randomUUID();
             AuthorizationSubject subject =
                     new AuthorizationSubject(
-                            userId, "vendor@example.com", java.util.Set.of("VENDOR"), java.util.Set.of("READ")
+                            userId, "vendor@example.com", Set.of("VENDOR"), Set.of("READ")
                     );
-            org.springframework.security.authentication.UsernamePasswordAuthenticationToken auth =
-                    new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(subject.email(), null, Collections.emptyList());
+            UsernamePasswordAuthenticationToken auth =
+                    new UsernamePasswordAuthenticationToken(subject.email(), null, Collections.emptyList());
             auth.setDetails(subject);
-            org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+            SecurityContextHolder.getContext().setAuthentication(auth);
 
             when(vendorLookupPort.findVendorIdByUserId(userId)).thenReturn(Optional.of(vendorId));
 
@@ -895,12 +891,12 @@ class SettlementUseCaseTest {
             UUID userId = UUID.randomUUID();
             AuthorizationSubject subject =
                     new AuthorizationSubject(
-                            userId, "vendorA@example.com", java.util.Set.of("VENDOR"), java.util.Set.of("READ")
+                            userId, "vendorA@example.com", Set.of("VENDOR"), Set.of("READ")
                     );
-            org.springframework.security.authentication.UsernamePasswordAuthenticationToken auth =
-                    new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(subject.email(), null, Collections.emptyList());
+            UsernamePasswordAuthenticationToken auth =
+                    new UsernamePasswordAuthenticationToken(subject.email(), null, Collections.emptyList());
             auth.setDetails(subject);
-            org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+            SecurityContextHolder.getContext().setAuthentication(auth);
 
             UUID vendorAId = UUID.randomUUID();
             UUID vendorBId = UUID.randomUUID();

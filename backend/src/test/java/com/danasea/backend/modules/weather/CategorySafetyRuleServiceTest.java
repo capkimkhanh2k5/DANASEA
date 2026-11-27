@@ -35,6 +35,13 @@ import com.danasea.backend.modules.weather.domain.models.CategorySafetyRule;
 import com.danasea.backend.modules.weather.domain.services.CategorySafetyRuleService;
 import com.danasea.backend.modules.weather.infrastructure.persistence.entities.CategorySafetyRuleJpaEntity;
 import com.danasea.backend.modules.weather.infrastructure.persistence.repositories.JpaCategorySafetyRuleRepository;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CategorySafetyRuleService Tests")
@@ -289,38 +296,38 @@ class CategorySafetyRuleServiceTest {
         }
     }
 
-    @org.springframework.context.annotation.Configuration
-    @org.springframework.cache.annotation.EnableCaching
+    @Configuration
+    @EnableCaching
     static class CacheTestConfig {
-        @org.springframework.context.annotation.Bean
-        public org.springframework.cache.CacheManager cacheManager() {
-            return new org.springframework.cache.concurrent.ConcurrentMapCacheManager("categorySafetyRules");
+        @Bean
+        public CacheManager cacheManager() {
+            return new ConcurrentMapCacheManager("categorySafetyRules");
         }
 
-        @org.springframework.context.annotation.Bean
+        @Bean
         public CategorySafetyRuleService cachedCategoryService(JpaCategorySafetyRuleRepository repo) {
             return new CategorySafetyRuleService(repo);
         }
 
-        @org.springframework.context.annotation.Bean
+        @Bean
         public JpaCategorySafetyRuleRepository mockRepository() {
-            return org.mockito.Mockito.mock(JpaCategorySafetyRuleRepository.class);
+            return Mockito.mock(JpaCategorySafetyRuleRepository.class);
         }
     }
 
-    @org.springframework.test.context.junit.jupiter.SpringJUnitConfig(CacheTestConfig.class)
+    @SpringJUnitConfig(CacheTestConfig.class)
     @Nested
     @DisplayName("Spring Cache Caching & Eviction Tests")
     class SpringCacheTests {
 
-        @org.springframework.beans.factory.annotation.Autowired
+        @Autowired
         private CategorySafetyRuleService cachedCategoryService;
 
-        @org.springframework.beans.factory.annotation.Autowired
+        @Autowired
         private JpaCategorySafetyRuleRepository mockRepository;
 
-        @org.springframework.beans.factory.annotation.Autowired
-        private org.springframework.cache.CacheManager testCacheManager;
+        @Autowired
+        private CacheManager testCacheManager;
 
         @BeforeEach
         void clearCache() {
@@ -328,7 +335,7 @@ class CategorySafetyRuleServiceTest {
             if (cache != null) {
                 cache.clear();
             }
-            org.mockito.Mockito.reset(mockRepository);
+            Mockito.reset(mockRepository);
         }
 
         @Test

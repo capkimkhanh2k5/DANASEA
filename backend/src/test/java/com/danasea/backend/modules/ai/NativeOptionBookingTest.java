@@ -29,6 +29,7 @@ import com.danasea.backend.modules.booking.domain.models.BookingStatus;
 import com.danasea.backend.modules.service.application.api.AiCatalogReadApi;
 import com.danasea.backend.modules.service.application.api.AiCatalogReadApi.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.security.access.AccessDeniedException;
 
 class NativeOptionBookingTest {
     private final ConfirmationCardStorePort store = mock(ConfirmationCardStorePort.class);
@@ -94,7 +95,7 @@ class NativeOptionBookingTest {
         assertThat(retry).isEqualTo(first);
         verify(holds, times(1)).execute(any());
         assertThatThrownBy(() -> confirm.execute("card", UUID.randomUUID(), "session", conversation))
-                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                .isInstanceOf(AccessDeniedException.class);
     }
     @Test void legacyCardWithoutOptionCannotHoldInventoryInProductionPath() {
         stored(); card.setOptionId(null);

@@ -11,7 +11,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.danasea.backend.modules.service.domain.exceptions.InvalidDocumentStateException;
-import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.UnauthorizedServiceAccessException;
 import com.danasea.backend.modules.service.domain.models.DocStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;

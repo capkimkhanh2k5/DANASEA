@@ -1,7 +1,6 @@
 package com.danasea.backend.modules.order.application.usecases;
 
 import com.danasea.backend.modules.account.application.api.AccountInternalApi;
-import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingItemRepository;
 import com.danasea.backend.modules.communication.application.dtos.NotificationCommand;
@@ -44,6 +43,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -320,7 +320,7 @@ public class AutoCompleteSubOrdersUseCase {
                     continue;
                 }
 
-                if (slot.getStatus() == com.danasea.backend.modules.service.domain.models.SlotStatus.CANCELLED) {
+                if (slot.getStatus() == SlotStatus.CANCELLED) {
                     // Ca bị hủy bởi nhà cung cấp/hệ thống (thời tiết xấu, sự cố) -> Tuyệt đối không đánh dấu NO_SHOW
                     continue;
                 }
@@ -515,7 +515,7 @@ public class AutoCompleteSubOrdersUseCase {
                                     notification.getUserId(),
                                     notification.getTitle(),
                                     notification.getBody(),
-                                    java.util.Map.of("type", "OVERDUE_CHECKIN", "subOrderId", subOrderId.toString(), "vendorContact", vendorContact)
+                                    Map.of("type", "OVERDUE_CHECKIN", "subOrderId", subOrderId.toString(), "vendorContact", vendorContact)
                             );
                         } catch (Exception pushEx) {
                             log.warn("Failed to deliver push for overdue checkin notification {}", notification.getId(), pushEx);
@@ -676,7 +676,7 @@ public class AutoCompleteSubOrdersUseCase {
                                     notification.getUserId(),
                                     notification.getTitle(),
                                     notification.getBody(),
-                                    java.util.Map.of("type", "PRIVATE_LATE_REMINDER", "subOrderId", subOrderId.toString(), "vendorContact", vendorContact)
+                                    Map.of("type", "PRIVATE_LATE_REMINDER", "subOrderId", subOrderId.toString(), "vendorContact", vendorContact)
                             );
                         } catch (Exception pushEx) {
                             log.warn("Failed to deliver push for private late reminder notification {}", notification.getId(), pushEx);

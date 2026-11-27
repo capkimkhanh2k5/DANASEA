@@ -42,6 +42,8 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Arrays;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Empirical Challenge & Stress Test Suite: RefundPolicyEngine & OrderController")
@@ -74,7 +76,7 @@ public class RefundPolicyEngineEmpiricalChallengeTest {
     }
 
     private void mockSecurityUser(UUID userId, String... roles) {
-        var authorities = java.util.Arrays.stream(roles)
+        var authorities = Arrays.stream(roles)
                 .map(SimpleGrantedAuthority::new)
                 .toList();
         var auth = new UsernamePasswordAuthenticationToken(userId.toString(), "credentials", authorities);
@@ -493,7 +495,7 @@ public class RefundPolicyEngineEmpiricalChallengeTest {
 
         @BeforeEach
         void init() {
-            org.mockito.Mockito.reset(masterOrderRepository, subOrderRepository, serviceSlotRepository);
+            Mockito.reset(masterOrderRepository, subOrderRepository, serviceSlotRepository);
             customerId = UUID.randomUUID();
             masterOrderId = UUID.randomUUID();
 

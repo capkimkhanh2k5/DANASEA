@@ -15,6 +15,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import java.sql.SQLException;
 
 @Testcontainers(disabledWithoutDocker = true)
 class ChatMigrationIntegrationTest {
@@ -79,9 +80,9 @@ class ChatMigrationIntegrationTest {
                 assertTrue(rows.next()); assertEquals(3, rows.getLong(1));
                 assertEquals(OffsetDateTime.parse("2026-10-02T00:00:00Z").toInstant(), rows.getObject(2, OffsetDateTime.class).toInstant());
             }
-            assertThrows(java.sql.SQLException.class, () -> statement.executeUpdate("INSERT INTO conversations(id,customer_id,vendor_id,master_order_id,created_at,updated_at) VALUES ('"
+            assertThrows(SQLException.class, () -> statement.executeUpdate("INSERT INTO conversations(id,customer_id,vendor_id,master_order_id,created_at,updated_at) VALUES ('"
                     + UUID.randomUUID() + "','" + customer + "','" + vendor + "','" + order + "',NOW(),NOW())"));
-            assertThrows(java.sql.SQLException.class, () -> statement.executeUpdate("INSERT INTO messages(id,conversation_id,message_sequence,created_at,updated_at) VALUES ('"
+            assertThrows(SQLException.class, () -> statement.executeUpdate("INSERT INTO messages(id,conversation_id,message_sequence,created_at,updated_at) VALUES ('"
                     + UUID.randomUUID() + "','" + first + "',3,NOW(),NOW())"));
         }
     }

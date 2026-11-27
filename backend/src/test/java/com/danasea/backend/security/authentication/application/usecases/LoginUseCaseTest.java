@@ -14,7 +14,6 @@ import com.danasea.backend.modules.account.application.api.AccountInternalApi;
 import com.danasea.backend.modules.account.domain.models.RefreshToken;
 import com.danasea.backend.modules.account.domain.models.Role;
 import com.danasea.backend.modules.account.domain.models.User;
-import com.danasea.backend.modules.audit.application.ports.AuditLogPort;
 import com.danasea.backend.security.authentication.application.ports.PasswordHasher;
 import com.danasea.backend.security.authentication.application.ports.TokenProvider;
 import com.danasea.backend.security.authentication.application.results.LoginResult;

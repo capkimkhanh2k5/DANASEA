@@ -1,9 +1,7 @@
 package com.danasea.backend.modules.service.application.usecases;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,7 +13,6 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,6 +27,8 @@ import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 class EquipmentAssignmentConcurrencyTest {
@@ -161,8 +160,8 @@ class EquipmentAssignmentConcurrencyTest {
     @DisplayName("C.5 Detach: Đơn vị đang có active Redis HOLD -> chặn với 409 CONFLICT")
     @SuppressWarnings("unchecked")
     void detach_withActiveRedisHold_throwsConflict() {
-        StringRedisTemplate redisTemplate = org.mockito.Mockito.mock(StringRedisTemplate.class);
-        HashOperations<String, Object, Object> hashOps = org.mockito.Mockito.mock(HashOperations.class);
+        StringRedisTemplate redisTemplate = Mockito.mock(StringRedisTemplate.class);
+        HashOperations<String, Object, Object> hashOps = Mockito.mock(HashOperations.class);
         when(redisTemplate.opsForHash()).thenReturn(hashOps);
         when(hashOps.entries("inventory:slot:" + slot2Id + ":holds"))
                 .thenReturn(Map.of("hold-1", (System.currentTimeMillis() + 60_000L) + "|UNITS:1:2:0"));
@@ -181,7 +180,7 @@ class EquipmentAssignmentConcurrencyTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("active hold");
 
-        org.mockito.Mockito.verify(store, org.mockito.Mockito.never()).unbind(any());
+        Mockito.verify(store, Mockito.never()).unbind(any());
     }
 
     @Test
@@ -207,9 +206,9 @@ class EquipmentAssignmentConcurrencyTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("committed booking");
 
-        org.mockito.Mockito.verify(store, org.mockito.Mockito.never()).unbind(any());
-        org.mockito.Mockito.verify(store, org.mockito.Mockito.never())
-                .replaceUnitEquipment(any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyBoolean());
+        Mockito.verify(store, Mockito.never()).unbind(any());
+        Mockito.verify(store, Mockito.never())
+                .replaceUnitEquipment(any(), any(), any(), ArgumentMatchers.anyInt(), ArgumentMatchers.anyBoolean());
     }
 
     @Test
@@ -255,8 +254,8 @@ class EquipmentAssignmentConcurrencyTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("private option maximum capacity");
 
-        org.mockito.Mockito.verify(store, org.mockito.Mockito.never())
-                .replaceUnitEquipment(any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyBoolean());
+        Mockito.verify(store, Mockito.never())
+                .replaceUnitEquipment(any(), any(), any(), ArgumentMatchers.anyInt(), ArgumentMatchers.anyBoolean());
     }
 
     @Test
@@ -278,7 +277,7 @@ class EquipmentAssignmentConcurrencyTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("overlapping slot");
 
-        org.mockito.Mockito.verify(store, org.mockito.Mockito.never())
-                .replaceUnitEquipment(any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyBoolean());
+        Mockito.verify(store, Mockito.never())
+                .replaceUnitEquipment(any(), any(), any(), ArgumentMatchers.anyInt(), ArgumentMatchers.anyBoolean());
     }
 }

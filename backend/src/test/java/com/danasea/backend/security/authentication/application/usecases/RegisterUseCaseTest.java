@@ -1,7 +1,6 @@
 package com.danasea.backend.security.authentication.application.usecases;
 
 import com.danasea.backend.modules.account.application.api.AccountInternalApi;
-import com.danasea.backend.modules.audit.application.ports.AuditLogPort;
 import com.danasea.backend.modules.account.domain.models.RefreshToken;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -22,6 +21,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import java.util.Optional;
 
 class RegisterUseCaseTest {
 
@@ -107,7 +107,7 @@ class RegisterUseCaseTest {
         Authentication existing = new Authentication(userId, normalizedEmail, "old-hash", "CUSTOMER", true, false);
 
         when(userAccountPort.existsByEmail(normalizedEmail)).thenReturn(true);
-        when(userAccountPort.findByEmail(normalizedEmail)).thenReturn(java.util.Optional.of(existing));
+        when(userAccountPort.findByEmail(normalizedEmail)).thenReturn(Optional.of(existing));
         when(passwordHasher.hash("NewPassword1!")).thenReturn("new-hash");
 
         Authentication updated = new Authentication(userId, normalizedEmail, "new-hash", "CUSTOMER", true, false);

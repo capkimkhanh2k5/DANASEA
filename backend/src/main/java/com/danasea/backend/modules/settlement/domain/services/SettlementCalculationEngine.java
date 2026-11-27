@@ -168,14 +168,22 @@ public class SettlementCalculationEngine {
         if (basis == null || basis.compareTo(BigDecimal.ZERO) < 0) {
             basis = BigDecimal.ZERO;
         }
+        BigDecimal vendorNetRevenue = context.getEffectiveVendorNetRevenue();
+        if (vendorNetRevenue == null || vendorNetRevenue.compareTo(BigDecimal.ZERO) < 0) {
+            vendorNetRevenue = BigDecimal.ZERO;
+        }
 
         // 4. Hoàn tiền một phần (Partial Refund Net Calculation)
         if (status == SubOrderStatus.PARTIALLY_REFUNDED || refund.compareTo(BigDecimal.ZERO) > 0) {
-            // Reverse platform funding in the same proportion as refunded customer cash.
+            // Reverse platform funding and vendor discount in the same proportion as refunded customer cash.
             BigDecimal reversedBasis = customerPaid.signum() > 0
                     ? basis.multiply(refund).divide(customerPaid, SCALE, ROUNDING)
                     : basis;
             BigDecimal netAfterRefund = basis.subtract(reversedBasis).max(BigDecimal.ZERO);
+            BigDecimal reversedVendorNet = customerPaid.signum() > 0
+                    ? vendorNetRevenue.multiply(refund).divide(customerPaid, SCALE, ROUNDING)
+                    : vendorNetRevenue;
+            BigDecimal vendorNetAfterRefund = vendorNetRevenue.subtract(reversedVendorNet).max(BigDecimal.ZERO);
             if (netAfterRefund.compareTo(BigDecimal.ZERO) <= 0) {
                 return SettlementLineItem.builder()
                         .id(UUID.randomUUID())
@@ -191,7 +199,7 @@ public class SettlementCalculationEngine {
 
             BigDecimal grossAmount = netAfterRefund.setScale(SCALE, ROUNDING);
             BigDecimal commissionAmount = netAfterRefund.multiply(rate).setScale(SCALE, ROUNDING);
-            BigDecimal netAmount = netAfterRefund.subtract(commissionAmount).setScale(SCALE, ROUNDING);
+            BigDecimal netAmount = vendorNetAfterRefund.subtract(commissionAmount).max(BigDecimal.ZERO).setScale(SCALE, ROUNDING);
 
             return SettlementLineItem.builder()
                     .id(UUID.randomUUID())
@@ -208,7 +216,7 @@ public class SettlementCalculationEngine {
         // 5. Đơn hoàn tất chuẩn không có hoàn tiền (COMPLETED / CHECKED_IN)
         BigDecimal grossAmount = basis.setScale(SCALE, ROUNDING);
         BigDecimal commissionAmount = basis.multiply(rate).setScale(SCALE, ROUNDING);
-        BigDecimal netAmount = basis.subtract(commissionAmount).setScale(SCALE, ROUNDING);
+        BigDecimal netAmount = vendorNetRevenue.subtract(commissionAmount).max(BigDecimal.ZERO).setScale(SCALE, ROUNDING);
 
         return SettlementLineItem.builder()
                 .id(UUID.randomUUID())

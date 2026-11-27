@@ -20,7 +20,6 @@ import com.danasea.backend.modules.order.application.dtos.GetCancellationPreview
 import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
 import com.danasea.backend.modules.order.domain.models.MasterOrder;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
-import com.danasea.backend.modules.order.domain.models.RefundReason;
 import com.danasea.backend.modules.order.domain.models.SubOrder;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.domain.ports.MasterOrderRepositoryPort;
@@ -30,8 +29,8 @@ import com.danasea.backend.modules.order.domain.services.RefundPolicyEngine;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GetCancellationPreviewUseCase Unit Tests")
@@ -203,6 +202,6 @@ class GetCancellationPreviewUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(
                 new GetCancellationPreviewQuery(otherCustomerId, subOrderId, false, UUID.randomUUID())))
                 .isInstanceOf(AccessDeniedException.class);
-        org.mockito.Mockito.verifyNoInteractions(masterOrderRepository);
+        Mockito.verifyNoInteractions(masterOrderRepository);
     }
 }

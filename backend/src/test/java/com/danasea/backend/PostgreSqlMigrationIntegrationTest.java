@@ -24,6 +24,8 @@ import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Objects;
+import java.math.BigDecimal;
+import java.util.UUID;
 
 @Testcontainers(disabledWithoutDocker = true)
 class PostgreSqlMigrationIntegrationTest {
@@ -116,7 +118,7 @@ class PostgreSqlMigrationIntegrationTest {
         String schema = "coordinate_upgrade";
         Flyway.configure().dataSource(url, "migration_user", "migration_password")
                 .schemas(schema).defaultSchema(schema).target("44").load().migrate();
-        java.util.UUID id = java.util.UUID.randomUUID();
+        UUID id = UUID.randomUUID();
         try (var connection = DriverManager.getConnection(url, "migration_user", "migration_password");
                 var insert = connection.prepareStatement("INSERT INTO " + schema
                         + ".services(id,latitude,longitude,created_at,updated_at) VALUES (?,16.12,108.26,now(),now())")) {
@@ -129,14 +131,14 @@ class PostgreSqlMigrationIntegrationTest {
                 var statement = connection.createStatement()) {
             try (var row = statement.executeQuery("SELECT latitude,longitude FROM " + schema + ".services")) {
                 assertTrue(row.next());
-                assertEquals(0, row.getBigDecimal(1).compareTo(new java.math.BigDecimal("16.12")));
-                assertEquals(0, row.getBigDecimal(2).compareTo(new java.math.BigDecimal("108.26")));
+                assertEquals(0, row.getBigDecimal(1).compareTo(new BigDecimal("16.12")));
+                assertEquals(0, row.getBigDecimal(2).compareTo(new BigDecimal("108.26")));
             }
             statement.executeUpdate("UPDATE " + schema + ".services SET latitude=16.0025123456,longitude=108.2635123456");
             try (var row = statement.executeQuery("SELECT latitude,longitude FROM " + schema + ".services")) {
                 assertTrue(row.next());
-                assertEquals(new java.math.BigDecimal("16.0025123456"), row.getBigDecimal(1));
-                assertEquals(new java.math.BigDecimal("108.2635123456"), row.getBigDecimal(2));
+                assertEquals(new BigDecimal("16.0025123456"), row.getBigDecimal(1));
+                assertEquals(new BigDecimal("108.2635123456"), row.getBigDecimal(2));
             }
         }
     }
@@ -219,7 +221,7 @@ class PostgreSqlMigrationIntegrationTest {
                         .target("17")
                         .load();
         legacy.migrate();
-        java.util.UUID legacyPayment = java.util.UUID.randomUUID();
+        UUID legacyPayment = UUID.randomUUID();
         try (var connection =
                         DriverManager.getConnection(
                                 jdbcUrl, "migration_user", "migration_password");
@@ -424,7 +426,7 @@ WHERE id = '10000000-0000-0000-0000-000000000002'
         }
     }
 
-    private boolean tableExists(java.sql.Statement statement, String tableName) throws Exception {
+    private boolean tableExists(Statement statement, String tableName) throws Exception {
         try (var resultSet =
                 statement.executeQuery(
                         "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
@@ -497,7 +499,7 @@ INSERT INTO sub_order_reschedule_proposals(id,sub_order_id,vendor_id,proposed_sl
                 assertTrue(row.next());
                 assertEquals("LEGACY_TIERED_V1", row.getString(1));
                 assertEquals(
-                        0, row.getBigDecimal(2).compareTo(java.math.BigDecimal.valueOf(12345)));
+                        0, row.getBigDecimal(2).compareTo(BigDecimal.valueOf(12345)));
                 assertEquals("CONFIRMED", row.getString(3));
             }
             try (var row =

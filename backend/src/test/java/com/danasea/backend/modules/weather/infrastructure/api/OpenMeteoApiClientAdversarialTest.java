@@ -15,7 +15,6 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -37,7 +36,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
+import java.util.function.Supplier;
 
 @SpringJUnitConfig(OpenMeteoApiClientAdversarialTest.AdversarialCachingConfig.class)
 @DisplayName("OpenMeteoApiClient Adversarial Stress & Resilience Verification Suite")
@@ -520,11 +519,11 @@ public class OpenMeteoApiClientAdversarialTest {
 
             WeatherForecastCacheService mockCache = new WeatherForecastCacheService() {
                 @Override
-                public OpenMeteoWeatherResponse getOrFetchWeather(double lat, double lon, java.util.function.Supplier<OpenMeteoWeatherResponse> fetcher) {
+                public OpenMeteoWeatherResponse getOrFetchWeather(double lat, double lon, Supplier<OpenMeteoWeatherResponse> fetcher) {
                     return weatherResp;
                 }
                 @Override
-                public OpenMeteoMarineResponse getOrFetchMarine(double lat, double lon, java.util.function.Supplier<OpenMeteoMarineResponse> fetcher) {
+                public OpenMeteoMarineResponse getOrFetchMarine(double lat, double lon, Supplier<OpenMeteoMarineResponse> fetcher) {
                     return null;
                 }
             };

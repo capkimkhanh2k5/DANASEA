@@ -3,7 +3,9 @@ package com.danasea.backend.modules.order.infrastructure.persistence.entities;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 
 import com.danasea.backend.shared.core.infrastructure.persistence.entities.BaseJpaEntity;
 
