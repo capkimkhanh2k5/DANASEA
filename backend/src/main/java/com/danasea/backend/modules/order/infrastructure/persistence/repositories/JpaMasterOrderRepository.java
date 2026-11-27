@@ -1,6 +1,7 @@
 package com.danasea.backend.modules.order.infrastructure.persistence.repositories;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,6 +25,12 @@ import jakarta.persistence.LockModeType;
 public interface JpaMasterOrderRepository extends JpaRepository<MasterOrderJpaEntity, UUID>, JpaSpecificationExecutor<MasterOrderJpaEntity> {
 
     Optional<MasterOrderJpaEntity> findByBookingId(UUID bookingId);
+
+    Optional<MasterOrderJpaEntity> findByOrderCodeIgnoreCase(String orderCode);
+
+    Optional<MasterOrderJpaEntity> findByCustomerIdAndOrderCodeIgnoreCase(UUID customerId, String orderCode);
+
+    List<MasterOrderJpaEntity> findByCustomerIdOrderByCreatedAtDesc(UUID customerId, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM MasterOrderJpaEntity o WHERE o.bookingId = :bookingId")

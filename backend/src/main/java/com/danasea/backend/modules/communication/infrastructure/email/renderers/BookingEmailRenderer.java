@@ -6,7 +6,6 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -25,7 +24,6 @@ import com.danasea.backend.modules.communication.domain.exceptions.SupersededEma
 import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.communication.infrastructure.email.TransactionalEmailProperties;
 import com.danasea.backend.modules.communication.infrastructure.email.entities.TransactionalEmailDeliveryJpaEntity;
-import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
 import com.danasea.backend.modules.order.domain.models.RefundStatus;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
@@ -40,6 +38,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.shared.i18n.LocalizedMessageService;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
+import com.danasea.backend.shared.util.DisplayCodeFormatter;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -109,7 +108,9 @@ public class BookingEmailRenderer implements TransactionalEmailRenderer {
         // 2. Check if partially confirmed
         boolean isPartial = subOrders.stream().anyMatch(so -> !isValidActiveSubOrder(so));
 
-        String orderCode = "ORD-" + masterOrder.getId().toString().substring(0, 8).toUpperCase();
+        String orderCode = (masterOrder.getOrderCode() != null && !masterOrder.getOrderCode().isBlank())
+                ? masterOrder.getOrderCode()
+                : DisplayCodeFormatter.format(masterOrder.getId(), "ORD");
         String subjectKey = isPartial ? "email.booking.partial.subject" : "email.booking.confirmed.subject";
         String subject = messages.get(subjectKey, language, orderCode);
 
@@ -200,7 +201,9 @@ public class BookingEmailRenderer implements TransactionalEmailRenderer {
                 }
             }
 
-            String subCode = "SUB-" + so.getId().toString().substring(0, 6).toUpperCase();
+            String subCode = (so.getSubOrderCode() != null && !so.getSubOrderCode().isBlank())
+                    ? so.getSubOrderCode()
+                    : DisplayCodeFormatter.format(so.getId(), "SUB");
             String qtyLabel = (so.getQuantity() != null ? so.getQuantity() : 1)
                     + (language == SupportedLanguage.EN ? " pax" : " vé");
 
@@ -317,7 +320,9 @@ public class BookingEmailRenderer implements TransactionalEmailRenderer {
             );
         }
 
-        String orderCode = "ORD-" + masterOrder.getId().toString().substring(0, 8).toUpperCase();
+        String orderCode = (masterOrder.getOrderCode() != null && !masterOrder.getOrderCode().isBlank())
+                ? masterOrder.getOrderCode()
+                : DisplayCodeFormatter.format(masterOrder.getId(), "ORD");
         String subject = messages.get("email.booking.vendor.subject", language, orderCode);
 
         StringBuilder sb = new StringBuilder();

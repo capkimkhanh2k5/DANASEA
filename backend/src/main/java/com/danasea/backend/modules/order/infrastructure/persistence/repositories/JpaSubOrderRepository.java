@@ -34,8 +34,10 @@ public interface JpaSubOrderRepository
 
     List<SubOrderJpaEntity> findByMasterOrderId(UUID masterOrderId);
     List<SubOrderJpaEntity> findByMasterOrderIdIn(Collection<UUID> masterOrderIds);
+    Optional<SubOrderJpaEntity> findBySubOrderCodeIgnoreCase(String subOrderCode);
     List<SubOrderJpaEntity> findByVendorId(UUID vendorId);
     Page<SubOrderJpaEntity> findByVendorId(UUID vendorId, Pageable pageable);
+    List<SubOrderJpaEntity> findByVendorIdOrderByCreatedAtDesc(UUID vendorId, Pageable pageable);
     List<SubOrderJpaEntity> findByVendorIdAndStatusIn(UUID vendorId, Collection<SubOrderStatus> statuses);
     List<SubOrderJpaEntity> findByVendorIdAndCreatedAtBetween(UUID vendorId, OffsetDateTime startDateTime, OffsetDateTime endDateTime);
     Optional<SubOrderJpaEntity> findByBookingItemId(UUID bookingItemId);

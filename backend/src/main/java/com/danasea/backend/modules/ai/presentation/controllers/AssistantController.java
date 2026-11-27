@@ -42,6 +42,7 @@ public class AssistantController {
 
     private static final String DEFAULT_CLIENT_IP = "127.0.0.1";
     private static final String DEFAULT_SESSION_PREFIX = "session-";
+    public static final int GUEST_FREE_MESSAGE_LIMIT = 5;
 
     private final ChatHistoryService chatHistoryService;
     private final ChatUseCase chatUseCase;
@@ -73,7 +74,7 @@ public class AssistantController {
         }
 
         String key = httpRequest == null ? null : httpRequest.getHeader("Idempotency-Key");
-        ChatIdempotencyService.Claim claim = key == null || chatIdempotency == null ? null
+        ChatIdempotencyService.Claim claim = (userId == null || key == null || chatIdempotency == null) ? null
                 : chatIdempotency.begin(userId, key, request.conversationId(), request.message(), language);
         if (claim != null && claim.replay()) return ResponseEntity.ok(claim.response());
         try {
@@ -83,9 +84,19 @@ public class AssistantController {
                     .fromTag(conversation.getLocale()).orElse(SupportedLanguage.VI);
             if (conversationLanguage != language) throw new AiConversationLocaleMismatchException();
             UUID conversationId = conversation.getId();
+            long priorGuestTurns = 0;
+            if (userId == null) {
+                priorGuestTurns = chatHistoryService.countUserMessages(conversationId);
+                if (priorGuestTurns >= GUEST_FREE_MESSAGE_LIMIT) {
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                            .body(new ErrorResponse("GUEST_CHAT_LIMIT_REACHED",
+                                    messages.get("ai.guest.limit_reached", conversationLanguage)));
+                }
+            }
             chatHistoryService.autoGenerateTitleIfEmpty(conversationId, request.message());
-            if (chatIdempotency != null) chatIdempotency.bind(claim, conversationId);
-            var response = chatUseCase.processMessage(conversationId, request.message(), conversationLanguage, userId);
+            if (chatIdempotency != null && claim != null) chatIdempotency.bind(claim, conversationId);
+            var response = chatUseCase.processMessage(conversationId, request.message(), conversationLanguage,
+                    userId, request.contextType(), request.contextId());
             auditLogService.logChatAction(conversationId, userId, request.message(), response.getContent(), response.getKeyMasked());
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("status", "success"); body.put("conversationId", conversationId.toString());
@@ -95,10 +106,15 @@ public class AssistantController {
             body.put("actions", response.getCards().stream().flatMap(card -> card.actions().stream()).toList());
             body.put("requiredInputs", response.getRequiredInputs()); body.put("context", response.getConversationContext());
             body.put("generatedTextVerified", false);
-            if (chatIdempotency != null) chatIdempotency.complete(claim, body);
+            if (userId == null) {
+                int remaining = Math.max(0, GUEST_FREE_MESSAGE_LIMIT - (int) (priorGuestTurns + 1));
+                body.put("guestRemainingTurns", remaining);
+                body.put("guestLimit", GUEST_FREE_MESSAGE_LIMIT);
+            }
+            if (chatIdempotency != null && claim != null) chatIdempotency.complete(claim, body);
             return ResponseEntity.ok(body);
         } catch (RuntimeException exception) {
-            if (chatIdempotency != null) chatIdempotency.fail(claim);
+            if (chatIdempotency != null && claim != null) chatIdempotency.fail(claim);
             throw exception;
         }
     }
@@ -133,6 +149,15 @@ public class AssistantController {
                 result.toString());
 
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/conversations/{id}/claim")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AiConversationJpaEntity> claimGuestConversation(@PathVariable UUID id) {
+        UUID userId = SecurityUtils.getCurrentUserId().orElseThrow(() -> new IllegalStateException("User not authenticated"));
+        return chatHistoryService.claimGuestConversation(id, userId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/conversations/{id}")

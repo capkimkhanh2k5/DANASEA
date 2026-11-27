@@ -83,6 +83,7 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.GET, "/api/vendors", "/api/vendors/**").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/flash-sales/active", "/api/flash-sales/*").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/recently-viewed").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/assistant/chat").permitAll()
 						.requestMatchers("/api/admin/**").hasRole("ADMIN")
 						.anyRequest()
 						.authenticated())

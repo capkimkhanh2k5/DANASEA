@@ -11,9 +11,13 @@ String formatDisplayCode(String id, {String prefix = 'ORD'}) {
 
   final isSeed = clean.startsWith('00010000') ||
       clean.startsWith('00020000') ||
-      clean.startsWith('b0020000') ||
+      clean.startsWith('00040000') ||
+      clean.startsWith('00050000') ||
       clean.startsWith('00060000') ||
+      clean.startsWith('00080000') ||
       clean.startsWith('00090000') ||
+      clean.startsWith('b0010000') ||
+      clean.startsWith('b0020000') ||
       clean.startsWith('00000000') ||
       (clean.length >= 8 && clean.substring(0, 8).split('').toSet().length <= 2);
 

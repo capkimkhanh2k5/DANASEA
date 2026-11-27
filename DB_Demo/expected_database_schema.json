@@ -1,5 +1,5 @@
 {
-  "reviewedMigrations": "V1-V62",
+  "reviewedMigrations": "V1-V63",
   "classification": {
     "ai_assessment_cases": "replace",
     "ai_chat_requests": "replace",
@@ -3026,6 +3026,12 @@
             "character varying(50)",
             true,
             ""
+          ],
+          [
+            "order_code",
+            "character varying(24)",
+            false,
+            ""
           ]
         ]
       },
@@ -5400,6 +5406,12 @@
           [
             "late_checkin_reason",
             "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "sub_order_code",
+            "character varying(24)",
             false,
             ""
           ]

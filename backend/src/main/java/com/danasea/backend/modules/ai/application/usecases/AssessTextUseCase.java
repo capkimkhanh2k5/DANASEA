@@ -5,12 +5,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 
 import com.danasea.backend.modules.ai.application.ports.AssessmentCaseStorePort;
 import com.danasea.backend.modules.ai.application.ports.DecisionModelPort;
+import com.danasea.backend.modules.ai.application.services.AiEntityReferenceResolver;
 import com.danasea.backend.modules.ai.domain.models.AssessmentCase;
 import com.danasea.backend.modules.ai.domain.models.DecisionResult;
 import com.danasea.backend.modules.ai.domain.models.DecisionTask;
@@ -21,7 +24,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class AssessTextUseCase {
-    private static final Pattern CONTACT = Pattern.compile("(?<!\\d)(?:\\+84|0)(?:[ .-]?\\d){9}(?!\\d)|https?://[^\\s<>]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+    private static final Pattern PHONE = Pattern.compile("(?<![a-zA-Z0-9])(?:\\+84|0)(?:[ .-]?\\d){9}(?![a-zA-Z0-9])");
+    private static final Pattern EXTERNAL_LINK_OR_EMAIL = Pattern.compile("https?://[^\\s<>]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
     private static final Pattern PAYMENT_WARNING_ONLY = Pattern.compile(
             "^(?:(?:vui long |xin )?(?:khong|khong nen|tuyet doi khong|dung) "
                     + "(?:chuyen tien|chuyen khoan|thanh toan|tra tien) (?:ben )?ngoai (?:nen tang )?danasea"
@@ -38,7 +42,11 @@ public class AssessTextUseCase {
         }
         DecisionResult category = model.decide(DecisionTask.SERVICE_CATEGORY, Map.of("content", text));
         DecisionResult moderation = model.decide(DecisionTask.MODERATION, Map.of("content", text));
-        List<String> contacts = CONTACT.matcher(text).results().map(result -> result.group()).distinct().toList();
+        String uuidStripped = AiEntityReferenceResolver.stripUuids(text);
+        List<String> contacts = Stream.concat(
+                PHONE.matcher(uuidStripped).results().map(MatchResult::group),
+                EXTERNAL_LINK_OR_EMAIL.matcher(text).results().map(MatchResult::group)
+        ).distinct().toList();
         List<String> reasons = new ArrayList<>();
         if (!contacts.isEmpty()) reasons.add("EXTERNAL_CONTACT_DETECTED");
         boolean warningOnly = contacts.isEmpty() && PAYMENT_WARNING_ONLY.matcher(

@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useAiModalStore } from '../../store/useAiModalStore';
 import { refreshAccessToken, TOKEN_REFRESH_SKEW_MS } from '../../services/apiClient';
 import { expireSession, getTokenExpiryMs, registerSessionNavigator } from '../../services/sessionEvents';
 import { syncProfile } from '../../services/sessionService';
@@ -19,6 +20,17 @@ export function SessionBridge() {
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const wasAuthenticatedRef = useRef(isAuthenticated && Boolean(accessToken));
+
+  useEffect(() => {
+    const loggedIn = isAuthenticated && Boolean(accessToken);
+    if (loggedIn) {
+      void useAiModalStore.getState().syncAfterLogin();
+    } else if (wasAuthenticatedRef.current) {
+      useAiModalStore.getState().resetForLogout();
+    }
+    wasAuthenticatedRef.current = loggedIn;
+  }, [isAuthenticated, accessToken]);
 
   useEffect(() => {
     registerSessionNavigator((to, options) => navigate(to, options));

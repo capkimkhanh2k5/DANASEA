@@ -4,7 +4,7 @@ import {
   getTokenExpiryMs,
   isProtectedPath,
   resolveSafeReturnTo,
-} from '../sessionEvents';
+} from '../sessionEvents.ts';
 
 function makeJwt(payload: Record<string, unknown>): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
