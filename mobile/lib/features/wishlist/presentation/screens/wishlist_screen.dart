@@ -258,15 +258,15 @@ class _WishlistScreenState extends State<WishlistScreen> {
                       '(${item.ratingCount})',
                       style: AppTypography.bodySm(color: AppColors.outline),
                     ),
-                    const Spacer(),
-                    LocalizedText(
-                      item.durationMinutes > 0
-                          ? (item.durationMinutes >= 60
-                              ? '${item.durationMinutes ~/ 60}h${item.durationMinutes % 60 > 0 ? '${item.durationMinutes % 60}p' : ''}'
-                              : '${item.durationMinutes}p')
-                          : 'Theo ca',
-                      style: AppTypography.labelSm(color: AppColors.secondary),
-                    ),
+                    if (item.durationMinutes > 0) ...[
+                      const Spacer(),
+                      LocalizedText(
+                        item.durationMinutes >= 60
+                            ? '${item.durationMinutes ~/ 60}h${item.durationMinutes % 60 > 0 ? '${item.durationMinutes % 60}p' : ''}'
+                            : '${item.durationMinutes}p',
+                        style: AppTypography.labelSm(color: AppColors.secondary),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 4),

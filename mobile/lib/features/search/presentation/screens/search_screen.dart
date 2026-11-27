@@ -1342,22 +1342,23 @@ class _SearchScreenState extends State<SearchScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: LocalizedText(
-                          srv.availableSlots.isNotEmpty
-                              ? 'Khởi hành ${srv.availableSlots.first}'
-                              : (srv.catalogSlots.isNotEmpty
-                                  ? 'Khởi hành ${srv.catalogSlots.first.startTime}'
-                                  : 'Mở theo ca'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.labelSm(
-                            color: AppColors.secondary,
-                            fontWeight: FontWeight.w600,
+                      if (srv.availableSlots.isNotEmpty ||
+                          srv.catalogSlots.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: LocalizedText(
+                            srv.availableSlots.isNotEmpty
+                                ? 'Khởi hành ${srv.availableSlots.first}'
+                                : 'Khởi hành ${srv.catalogSlots.first.startTime}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.labelSm(
+                              color: AppColors.secondary,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -1390,23 +1391,23 @@ class _SearchScreenState extends State<SearchScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.schedule,
-                        size: 14,
-                        color: AppColors.tertiary,
-                      ),
-                      const SizedBox(width: 4),
-                      LocalizedText(
-                        srv.durationMinutes > 0
-                            ? (srv.durationMinutes >= 60
-                                ? '${srv.durationMinutes ~/ 60}h${srv.durationMinutes % 60 > 0 ? '${srv.durationMinutes % 60}p' : ''}'
-                                : '${srv.durationMinutes}p')
-                            : 'Theo ca',
-                        style: AppTypography.bodySm(
-                          color: AppColors.onSurfaceVariant,
+                      if (srv.durationMinutes > 0) ...[
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.schedule,
+                          size: 14,
+                          color: AppColors.tertiary,
                         ),
-                      ),
+                        const SizedBox(width: 4),
+                        LocalizedText(
+                          srv.durationMinutes >= 60
+                              ? '${srv.durationMinutes ~/ 60}h${srv.durationMinutes % 60 > 0 ? '${srv.durationMinutes % 60}p' : ''}'
+                              : '${srv.durationMinutes}p',
+                          style: AppTypography.bodySm(
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 8),

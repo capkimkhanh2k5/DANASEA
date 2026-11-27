@@ -144,7 +144,9 @@ class ExperienceCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: LocalizedText(
-                          '${item.location} • ${item.duration}',
+                          item.duration.isNotEmpty
+                              ? '${item.location} • ${item.duration}'
+                              : item.location,
                           style: AppTypography.bodySm(
                             color: AppColors.onSurfaceVariant,
                           ),

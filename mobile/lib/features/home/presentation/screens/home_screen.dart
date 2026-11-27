@@ -48,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isScrolled = false;
 
   String _formatDuration(int minutes) {
-    if (minutes <= 0) return '2 giờ';
+    if (minutes <= 0) return '';
     if (minutes >= 60 && minutes % 60 == 0) {
       return '${minutes ~/ 60} giờ';
     }
