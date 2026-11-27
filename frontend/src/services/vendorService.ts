@@ -115,6 +115,26 @@ export const vendorService = {
     return res.data;
   },
 
+  async withdrawSafetyDocument(serviceId: string, documentId: string): Promise<SafetyDocumentDto> {
+    const res = await apiClient.post<SafetyDocumentDto>(`/vendor/services/${serviceId}/safety-documents/${documentId}/withdraw`);
+    return res.data;
+  },
+
+  async replaceSafetyDocument(serviceId: string, documentId: string, file: File): Promise<SafetyDocumentDto> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await apiClient.post<SafetyDocumentDto>(`/vendor/services/${serviceId}/safety-documents/${documentId}/replace`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return res.data;
+  },
+
+  async deleteSafetyDocument(serviceId: string, documentId: string): Promise<void> {
+    await apiClient.delete(`/vendor/services/${serviceId}/safety-documents/${documentId}`);
+  },
+
   // 5. SERVICE SLOTS / SCHEDULE (V08, V09)
   async getSlots(serviceId: string): Promise<VendorServiceSlotDto[]> {
     const res = await apiClient.get<VendorServiceSlotDto[]>(`/vendor/services/${serviceId}/slots`);

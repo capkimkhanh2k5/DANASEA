@@ -726,4 +726,48 @@ class CreateServiceSlotUseCaseTest {
                 .isInstanceOf(ServiceSlotCreationException.class)
                 .satisfies(e -> assertThat(((ServiceSlotCreationException) e).getErrorCode()).isEqualTo("SLOT_ALREADY_EXISTS"));
     }
+
+    @Test
+    void createBatchAttachesUnitEquipmentTransactionallyAndPropagatesConflicts() {
+        EquipmentAssignmentService equipmentService = org.mockito.Mockito.mock(EquipmentAssignmentService.class);
+        CreateServiceSlotUseCase withEquipment = new CreateServiceSlotUseCase(
+                services, slots, vendors, scheduleStore, optionsPort, equipmentService);
+        authorize();
+        when(slots.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        UUID eqId = UUID.randomUUID();
+
+        var req = new CreateServiceSlotRequest(
+                tomorrow, LocalTime.of(9, 0), LocalTime.of(11, 0),
+                InventoryType.SHARED_CAPACITY_UNITS, null,
+                List.of(new CreateSlotUnitRequest(1, 8, eqId)),
+                defaultOptionId);
+
+        var res = withEquipment.createBatch(userId, serviceId, List.of(req));
+        assertThat(res).hasSize(1);
+        assertThat(res.get(0).units()).hasSize(1);
+        assertThat(res.get(0).units().get(0).equipmentId()).isEqualTo(eqId);
+        verify(equipmentService).attachGenerated(eq(vendorId), eq(res.get(0).id()), eq(java.util.Map.of(1, eqId)));
+
+        org.mockito.Mockito.doThrow(EquipmentAssignmentService.conflict("overlap"))
+                .when(equipmentService).attachGenerated(any(), any(), any());
+        assertThatThrownBy(() -> withEquipment.createBatch(userId, serviceId, List.of(req)))
+                .isInstanceOf(com.danasea.backend.shared.presentation.ApiConflictException.class)
+                .hasMessageContaining("overlap");
+    }
+
+    @Test
+    void createSlotRejectsDuplicateEquipmentInsideSameSlot() {
+        authorize();
+        UUID eqId = UUID.randomUUID();
+        var req = new CreateServiceSlotRequest(
+                tomorrow, LocalTime.of(9, 0), LocalTime.of(11, 0),
+                InventoryType.SHARED_CAPACITY_UNITS, null,
+                List.of(new CreateSlotUnitRequest(1, 6, eqId), new CreateSlotUnitRequest(2, 6, eqId)),
+                defaultOptionId);
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("once in a slot");
+        verify(slots, never()).save(any());
+    }
 }

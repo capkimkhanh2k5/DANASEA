@@ -11,7 +11,7 @@ export type PricingUnit = 'PER_PERSON' | 'PER_PACKAGE';
 export type OptionStatus = 'ACTIVE' | 'INACTIVE';
 export type InventoryType = 'PERSON_LIMIT' | 'SHARED_CAPACITY_UNITS';
 export type SlotStatus = 'OPEN' | 'CLOSED' | 'BLOCKED' | 'CANCELLED';
-export type SafetyDocStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type SafetyDocStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN' | 'SUPERSEDED';
 
 export interface ServiceImageDto {
   id: string;
@@ -138,17 +138,30 @@ export interface SafetyDocumentDto {
   createdAt: string;
 }
 
+export interface ServiceSlotOptionSummaryDto {
+  id: string;
+  name: string;
+  optionType: OptionType;
+  pricingUnit: PricingUnit;
+  price: number;
+  maxPaxPerPackage?: number | null;
+}
+
 export interface SlotUnitDto {
   id: string;
   unitNumber: number;
   capacity: number;
   bookedCount: number;
   availableCapacity: number;
+  equipmentId?: string | null;
+  equipmentBlocked?: boolean;
 }
 
 export interface CreateSlotUnitRequest {
   unitNumber: number;
   capacity: number;
+  equipmentId?: string | null;
+  detachEquipment?: boolean;
 }
 
 export interface VendorServiceSlotDto {
@@ -163,6 +176,12 @@ export interface VendorServiceSlotDto {
   bookedCount: number;
   availableCapacity: number;
   units?: SlotUnitDto[];
+  options?: ServiceSlotOptionSummaryDto[];
+  optionBindingMode?: string | null;
+  legacyCompatibleOptions?: ServiceSlotOptionSummaryDto[];
+  optionId?: string | null;
+  optionName?: string | null;
+  optionType?: OptionType | null;
 }
 
 export interface CreateServiceSlotRequest {
@@ -172,12 +191,15 @@ export interface CreateServiceSlotRequest {
   inventoryType: InventoryType;
   capacity?: number;
   units?: CreateSlotUnitRequest[];
+  optionId?: string;
+  optionIds: string[];
 }
 
 export interface UpdateServiceSlotRequest {
   status?: SlotStatus;
   capacity?: number;
   units?: CreateSlotUnitRequest[];
+  optionIds?: string[];
 }
 
 export interface SlotTemplateRequest {
@@ -186,6 +208,7 @@ export interface SlotTemplateRequest {
   inventoryType: InventoryType;
   capacity?: number | null;
   units?: CreateSlotUnitRequest[] | null;
+  optionIds: string[];
 }
 
 export type BatchCreateServiceSlotsRequest = (
@@ -207,6 +230,7 @@ export interface OperatingScheduleWeeklyRuleDto {
   inventoryType: InventoryType;
   capacity?: number | null;
   units?: { unitNumber: number; capacity: number; equipmentId?: string | null }[] | null;
+  optionIds: string[];
 }
 
 export interface OperatingScheduleDto {

@@ -102,6 +102,37 @@ public class EquipmentStore {
                 """, equipmentId, blocked, unitId);
     }
 
+    public void unbind(UUID unitId) {
+        jdbc.update("""
+                UPDATE service_slot_units SET equipment_id=NULL, equipment_blocked=FALSE, updated_at=now()
+                WHERE id=?
+                """, unitId);
+    }
+
+    public void replaceUnitEquipment(UUID slotId, UUID unitId, UUID equipmentId, int capacity, boolean blocked) {
+        jdbc.update("""
+                UPDATE service_slot_units SET equipment_id=?, equipment_blocked=?, capacity=?, updated_at=now()
+                WHERE id=?
+                """, equipmentId, blocked, capacity, unitId);
+        jdbc.update("""
+                UPDATE service_slots
+                SET capacity=(SELECT COALESCE(SUM(capacity), 0) FROM service_slot_units WHERE slot_id=?),
+                    updated_at=now()
+                WHERE id=?
+                """, slotId, slotId);
+    }
+
+    public int maxPrivateOptionPax(UUID slotId) {
+        Integer maxPax = jdbc.queryForObject("""
+                SELECT COALESCE(MAX(GREATEST(COALESCE(o.max_pax_per_package, 1), 1)), 0)
+                FROM service_options o
+                WHERE o.option_type = 'PRIVATE'
+                  AND (o.id IN (SELECT option_id FROM service_slot_options WHERE slot_id = ?)
+                       OR o.id = (SELECT option_id FROM service_slots WHERE id = ?))
+                """, Integer.class, slotId, slotId);
+        return maxPax == null ? 0 : maxPax;
+    }
+
     public List<UUID> affectedSlots(UUID equipmentId, LocalDateTime start, LocalDateTime end, LocalDateTime now) {
         return jdbc.query("""
                 SELECT s.id

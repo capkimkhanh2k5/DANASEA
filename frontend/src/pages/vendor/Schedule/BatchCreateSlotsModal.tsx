@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import {
   X,
   Plus,
@@ -9,8 +10,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Sparkles,
+  Check,
 } from 'lucide-react';
 import { vendorService } from '../../../services/vendorService';
+import { vendorEquipmentService, type BackendEquipment } from '../../../services/vendorEquipmentService';
 import { toast } from '../../../store/useToastStore';
 import { extractErrorMessage } from '../../../utils/errorHandler';
 import type {
@@ -19,6 +22,7 @@ import type {
   SlotTemplateRequest,
   OperatingScheduleDto,
   OperatingScheduleWeeklyRuleDto,
+  VendorServiceOptionDto,
 } from '../../../types/vendorService';
 
 interface BatchCreateSlotsModalProps {
@@ -27,6 +31,7 @@ interface BatchCreateSlotsModalProps {
   serviceId: string;
   serviceName: string;
   capacityPerSlot?: number;
+  serviceStatus?: string;
   onSuccess: (count: number) => void;
 }
 
@@ -36,7 +41,8 @@ interface TemplateItem {
   endTime: string;
   inventoryType: InventoryType;
   capacity: number;
-  units: CreateSlotUnitRequest[];
+  units: Array<CreateSlotUnitRequest & { equipmentId?: string }>;
+  optionIds: string[];
 }
 
 const MAX_BATCH_DATES = 31;
@@ -62,6 +68,7 @@ export function BatchCreateSlotsModal({
   serviceId,
   serviceName,
   capacityPerSlot,
+  serviceStatus,
   onSuccess,
 }: BatchCreateSlotsModalProps) {
   const todayStr = dateInVietnam.format(new Date());
@@ -70,6 +77,11 @@ export function BatchCreateSlotsModal({
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [dateToAdd, setDateToAdd] = useState('');
   const usesExplicitDates = applyMode === 'ONE_TIME' && dateMode === 'DATES';
+
+  // Active Options & Equipment
+  const [options, setOptions] = useState<VendorServiceOptionDto[]>([]);
+  const [isLoadingOptions, setIsLoadingOptions] = useState<boolean>(false);
+  const [equipmentList, setEquipmentList] = useState<BackendEquipment[]>([]);
 
   // 1. Templates State
   const [templates, setTemplates] = useState<TemplateItem[]>([
@@ -83,6 +95,7 @@ export function BatchCreateSlotsModal({
         { unitNumber: 1, capacity: 5 },
         { unitNumber: 2, capacity: 5 },
       ],
+      optionIds: [],
     },
     {
       id: 't-2',
@@ -94,6 +107,7 @@ export function BatchCreateSlotsModal({
         { unitNumber: 1, capacity: 5 },
         { unitNumber: 2, capacity: 5 },
       ],
+      optionIds: [],
     },
   ]);
 
@@ -119,13 +133,35 @@ export function BatchCreateSlotsModal({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Fetch current operating schedule when opening modal or switching to RECURRING_90_DAYS
+  // Fetch current operating schedule, active options & equipment when opening modal
   useEffect(() => {
     if (!isOpen || !serviceId) return;
     vendorService
       .getOperatingSchedule(serviceId)
       .then((data) => setExistingSchedule(data))
       .catch(() => setExistingSchedule(null));
+
+    setIsLoadingOptions(true);
+    vendorService
+      .getOptions(serviceId)
+      .then((data) => {
+        const active = (data || []).filter((o) => o.status === 'ACTIVE');
+        setOptions(active);
+        // Only retain previously selected active options; NEVER auto-select all
+        setTemplates((prev) =>
+          prev.map((t) => ({
+            ...t,
+            optionIds: (t.optionIds || []).filter((id) => active.some((o) => o.id === id)),
+          }))
+        );
+      })
+      .catch(() => setOptions([]))
+      .finally(() => setIsLoadingOptions(false));
+
+    vendorEquipmentService
+      .getEquipment()
+      .then((data) => setEquipmentList(data || []))
+      .catch(() => setEquipmentList([]));
   }, [isOpen, serviceId]);
 
   // Reset error when user changes inputs
@@ -170,8 +206,51 @@ export function BatchCreateSlotsModal({
           { unitNumber: 1, capacity: 5 },
           { unitNumber: 2, capacity: 5 },
         ],
+        optionIds: [],
       },
     ]);
+  };
+
+  const handleToggleTemplateOption = (templateId: string, optionId: string) => {
+    setTemplates((prev) =>
+      prev.map((t) => {
+        if (t.id !== templateId) return t;
+        const exists = t.optionIds.includes(optionId);
+        const nextOptionIds = exists
+          ? t.optionIds.filter((id) => id !== optionId)
+          : Array.from(new Set([...t.optionIds, optionId]));
+        const selectedOpts = options.filter((o) => nextOptionIds.includes(o.id));
+        const hasPrivate = selectedOpts.some((o) => o.optionType === 'PRIVATE');
+        return {
+          ...t,
+          optionIds: nextOptionIds,
+          inventoryType: hasPrivate ? 'SHARED_CAPACITY_UNITS' : t.inventoryType,
+        };
+      })
+    );
+  };
+
+  const handleUpdateUnitEquipment = (templateId: string, uIdx: number, equipmentId: string) => {
+    setTemplates((prev) =>
+      prev.map((t) => {
+        if (t.id !== templateId) return t;
+        const eq = equipmentList.find((e) => e.id === equipmentId);
+        return {
+          ...t,
+          units: t.units.map((u, idx) => {
+            if (idx !== uIdx) return u;
+            if (!equipmentId) {
+              return { ...u, equipmentId: undefined };
+            }
+            return {
+              ...u,
+              equipmentId,
+              capacity: eq ? eq.capacity : u.capacity,
+            };
+          }),
+        };
+      })
+    );
   };
 
   const handleRemoveTemplate = (templateId: string) => {
@@ -273,6 +352,11 @@ export function BatchCreateSlotsModal({
     setErrorMessage(null);
 
     // Validation 1: Templates
+    if (serviceStatus && serviceStatus !== 'PUBLISHED') {
+      setErrorMessage(`Dịch vụ hiện ở trạng thái "${serviceStatus}". Chỉ dịch vụ đang mở bán (PUBLISHED) mới có thể tạo ca.`);
+      return;
+    }
+
     if (templates.length === 0) {
       setErrorMessage('Cần ít nhất một ca mẫu.');
       return;
@@ -293,6 +377,17 @@ export function BatchCreateSlotsModal({
       }
       startTimesSet.add(t.startTime);
 
+      if (!t.optionIds || t.optionIds.length === 0) {
+        setErrorMessage(`Ca lúc ${t.startTime}: Bắt buộc phải chọn ít nhất một gói bán.`);
+        return;
+      }
+      const templateOptions = options.filter((o) => t.optionIds.includes(o.id));
+      const hasPrivate = templateOptions.some((o) => o.optionType === 'PRIVATE');
+      if (hasPrivate && t.inventoryType !== 'SHARED_CAPACITY_UNITS') {
+        setErrorMessage(`Ca lúc ${t.startTime}: Chứa gói thuê riêng nên bắt buộc cấu hình theo đơn vị tài nguyên.`);
+        return;
+      }
+
       if (t.inventoryType === 'PERSON_LIMIT') {
         if (!t.capacity || t.capacity <= 0) {
           setErrorMessage(`Ca lúc ${t.startTime}: Sức chứa phải lớn hơn 0.`);
@@ -300,12 +395,20 @@ export function BatchCreateSlotsModal({
         }
       } else {
         if (!t.units || t.units.length === 0) {
-          setErrorMessage(`Ca lúc ${t.startTime}: Cần ít nhất 1 phương tiện điều phối.`);
+          setErrorMessage(`Ca lúc ${t.startTime}: Cần ít nhất 1 đơn vị tài nguyên.`);
           return;
         }
         for (const u of t.units) {
           if (!u.capacity || u.capacity <= 0) {
-            setErrorMessage(`Ca lúc ${t.startTime}, cano #${u.unitNumber}: Sức chứa phải lớn hơn 0.`);
+            setErrorMessage(`Ca lúc ${t.startTime}, đơn vị #${u.unitNumber}: Sức chứa phải lớn hơn 0.`);
+            return;
+          }
+        }
+        const privateOpts = templateOptions.filter((o) => o.optionType === 'PRIVATE');
+        if (privateOpts.length > 0) {
+          const maxPax = Math.max(...privateOpts.map((o) => o.maxPaxPerPackage || 1));
+          if (!t.units.some((u) => (u.capacity || 0) >= maxPax)) {
+            setErrorMessage(`Ca lúc ${t.startTime}: Gói thuê riêng yêu cầu tối đa ${maxPax} khách. Cần ít nhất 1 đơn vị có sức chứa từ ${maxPax} chỗ trở lên.`);
             return;
           }
         }
@@ -350,6 +453,9 @@ export function BatchCreateSlotsModal({
     setIsSubmitting(true);
     try {
       if (applyMode === 'ONE_TIME') {
+        const hadSelectedEquipment = templates.some(
+          (t) => t.inventoryType === 'SHARED_CAPACITY_UNITS' && t.units.some((u) => Boolean(u.equipmentId))
+        );
         const slotTemplatesPayload: SlotTemplateRequest[] = templates.map((t) => ({
           startTime: `${t.startTime}:00`,
           endTime: `${t.endTime}:00`,
@@ -357,15 +463,31 @@ export function BatchCreateSlotsModal({
           capacity: t.inventoryType === 'PERSON_LIMIT' ? t.capacity : null,
           units:
             t.inventoryType === 'SHARED_CAPACITY_UNITS'
-              ? t.units.map((u) => ({ unitNumber: u.unitNumber, capacity: u.capacity }))
+              ? t.units.map((u) => ({
+                  unitNumber: u.unitNumber,
+                  capacity: u.capacity,
+                  ...(u.equipmentId ? { equipmentId: u.equipmentId } : {}),
+                }))
               : null,
+          optionIds: Array.from(new Set(t.optionIds)),
         }));
 
         const res = await vendorService.batchCreateSlots(serviceId, usesExplicitDates
           ? { dates: selectedDates, slotTemplates: slotTemplatesPayload }
           : { startDate, endDate, daysOfWeek: selectedDays, slotTemplates: slotTemplatesPayload });
 
-        toast.success(`Đã tạo thành công ${res.totalCreated} ca khởi hành!`);
+        const linkedPersisted =
+          !hadSelectedEquipment ||
+          (res.slots &&
+            res.slots.some((slot) => slot.units && slot.units.some((unit) => Boolean(unit.equipmentId))));
+
+        if (!linkedPersisted) {
+          toast.warning(
+            `Đã tạo ${res.totalCreated} ca nhưng Backend đang chạy (V61) chưa lưu thiết bị liên kết trong Tạo hàng loạt. Vui lòng gắn thiết bị ở mục Sửa ca hoặc nâng cấp Backend.`
+          );
+        } else {
+          toast.success(`Đã tạo thành công ${res.totalCreated} ca khởi hành!`);
+        }
         onSuccess(res.totalCreated);
         onClose();
       } else {
@@ -394,8 +516,9 @@ export function BatchCreateSlotsModal({
               capacity: t.inventoryType === 'PERSON_LIMIT' ? t.capacity : null,
               units:
                 t.inventoryType === 'SHARED_CAPACITY_UNITS'
-                  ? t.units.map((u) => ({ unitNumber: u.unitNumber, capacity: u.capacity, equipmentId: null }))
+                  ? t.units.map((u) => ({ unitNumber: u.unitNumber, capacity: u.capacity, equipmentId: u.equipmentId || null }))
                   : [],
+              optionIds: Array.from(new Set(t.optionIds)),
             });
           }
         }
@@ -534,6 +657,9 @@ export function BatchCreateSlotsModal({
             <div className="space-y-3">
               {templates.map((tpl, tIndex) => {
                 const totalUnitsCapacity = tpl.units.reduce((acc, u) => acc + (u.capacity || 0), 0);
+                const hasPrivate = options
+                  .filter((o) => tpl.optionIds.includes(o.id))
+                  .some((o) => o.optionType === 'PRIVATE');
                 return (
                   <div
                     key={tpl.id}
@@ -558,6 +684,71 @@ export function BatchCreateSlotsModal({
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                      )}
+                    </div>
+
+                    {/* Option Selection FIRST so it guides inventory & capacity configuration */}
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
+                      <span className="text-xs font-semibold text-slate-700 block">
+                        Gói bán áp dụng cho ca này: <span className="text-rose-500">*</span>
+                      </span>
+                      {isLoadingOptions ? (
+                        <p className="text-xs text-slate-400">Đang tải danh sách gói bán...</p>
+                      ) : options.length === 0 ? (
+                        <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs">
+                          Dịch vụ chưa có gói bán nào đang mở (ACTIVE). Vui lòng vào{' '}
+                          <Link
+                            to={`/vendor/services/${serviceId}/edit?tab=OPTIONS`}
+                            onClick={onClose}
+                            className="font-bold underline text-teal-800 hover:text-teal-900"
+                          >
+                            3. Lựa chọn bán
+                          </Link>{' '}
+                          để tạo gói trước khi lên lịch ca.
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {options.map((opt) => {
+                            const isChecked = tpl.optionIds.includes(opt.id);
+                            const unitSuffix = opt.pricingUnit === 'PER_PACKAGE' ? '/gói' : '/người';
+                            return (
+                              <label
+                                key={opt.id}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${
+                                  isChecked
+                                    ? 'bg-teal-50 border-teal-300 text-teal-950 font-semibold'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => handleToggleTemplateOption(tpl.id, opt.id)}
+                                  className="rounded border-slate-300 text-teal-800 w-3.5 h-3.5"
+                                />
+                                <span>{opt.name}</span>
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                    opt.optionType === 'PRIVATE'
+                                      ? 'bg-teal-100 text-teal-800'
+                                      : 'bg-sky-100 text-sky-800'
+                                  }`}
+                                >
+                                  {opt.optionType}
+                                </span>
+                                <span className="font-mono text-[11px] text-slate-600">
+                                  {opt.price.toLocaleString('vi-VN')} VNĐ{unitSuffix}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {hasPrivate && (
+                        <p className="text-[11px] text-teal-800 flex items-center gap-1 pt-0.5">
+                          <Check className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                          <span>Ca có gói thuê riêng PRIVATE tự động chia sức chứa theo từng đơn vị tài nguyên.</span>
+                        </p>
                       )}
                     </div>
 
@@ -592,13 +783,14 @@ export function BatchCreateSlotsModal({
                         </label>
                         <select
                           value={tpl.inventoryType}
+                          disabled={hasPrivate}
                           onChange={(e) =>
                             handleUpdateTemplate(tpl.id, { inventoryType: e.target.value as InventoryType })
                           }
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 cursor-pointer"
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 cursor-pointer disabled:bg-slate-100 disabled:text-slate-600"
                         >
                           <option value="PERSON_LIMIT">Giới hạn theo đầu người</option>
-                          <option value="SHARED_CAPACITY_UNITS">Chia theo từng cano / phương tiện</option>
+                          <option value="SHARED_CAPACITY_UNITS">Chia theo đơn vị tài nguyên</option>
                         </select>
                       </div>
                     </div>
@@ -614,7 +806,7 @@ export function BatchCreateSlotsModal({
                           required
                           value={tpl.capacity}
                           onChange={(e) =>
-                            handleUpdateTemplate(tpl.id, { capacity: Number(e.target.value) })
+                            handleUpdateTemplate(tpl.id, { capacity: Math.max(1, Number(e.target.value) || 1) })
                           }
                           className="w-28 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900"
                           placeholder="Số khách"
@@ -625,36 +817,55 @@ export function BatchCreateSlotsModal({
                       <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-semibold text-slate-800">
-                            Danh sách cano / phương tiện:
+                            Danh sách đơn vị tài nguyên:
                           </span>
                           <button
                             type="button"
                             onClick={() => handleAddUnit(tpl.id)}
                             className="text-xs font-bold text-teal-700 hover:text-teal-800 hover:underline cursor-pointer"
                           >
-                            + Thêm cano
+                            + Thêm đơn vị
                           </button>
                         </div>
-                        <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                        <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                           {tpl.units.map((unit, uIdx) => (
-                            <div key={uIdx} className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-slate-600 w-12 shrink-0">
+                            <div key={uIdx} className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-medium text-slate-600 w-10 shrink-0">
                                 #{unit.unitNumber}
                               </span>
+                              {equipmentList.length > 0 && (
+                                <select
+                                  value={unit.equipmentId || ''}
+                                  onChange={(e) => handleUpdateUnitEquipment(tpl.id, uIdx, e.target.value)}
+                                  className="h-7 px-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 max-w-[205px] truncate"
+                                  title="Liên kết thiết bị (tùy chọn)"
+                                >
+                                  <option value="">-- Tự cấu hình (chưa liên kết) --</option>
+                                  {equipmentList.map((eq) => {
+                                    const isUsedElsewhere = tpl.units.some((other, oIdx) => oIdx !== uIdx && other.equipmentId === eq.id);
+                                    return (
+                                      <option key={eq.id} value={eq.id} disabled={isUsedElsewhere}>
+                                        {eq.name} ({eq.capacity} chỗ)
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                              )}
                               <input
                                 type="number"
                                 min={1}
                                 required
+                                disabled={Boolean(unit.equipmentId)}
                                 value={unit.capacity}
                                 onChange={(e) =>
                                   handleUpdateUnitCapacity(tpl.id, uIdx, Number(e.target.value))
                                 }
-                                className="w-24 px-2 py-1 border border-slate-300 rounded-lg text-xs bg-slate-50/50"
+                                className="w-24 px-2 py-1 border border-slate-300 rounded-lg text-xs bg-slate-50/50 disabled:bg-slate-100 disabled:text-slate-500"
                                 placeholder="Sức chứa"
                               />
                               <span className="text-xs text-slate-500">khách</span>
 
-                              {/* Nút xóa cano */}
+                              {/* Nút xóa đơn vị */}
                               <button
                                 type="button"
                                 disabled={tpl.units.length <= 1}
@@ -666,8 +877,8 @@ export function BatchCreateSlotsModal({
                                 }`}
                                 title={
                                   tpl.units.length <= 1
-                                    ? 'Cần tối thiểu 1 phương tiện'
-                                    : 'Xóa phương tiện này'
+                                    ? 'Cần tối thiểu 1 đơn vị'
+                                    : 'Xóa đơn vị này'
                                 }
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -679,7 +890,7 @@ export function BatchCreateSlotsModal({
                           <span>
                             Tổng sức chứa: <strong className="text-slate-900">{totalUnitsCapacity}</strong> khách
                           </span>
-                          <span>({tpl.units.length} cano/phương tiện)</span>
+                          <span>({tpl.units.length} đơn vị)</span>
                         </div>
                       </div>
                     )}

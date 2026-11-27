@@ -1,5 +1,7 @@
 package com.danasea.backend.modules.service.presentation.dtos;
 
+import java.util.UUID;
+
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
@@ -10,5 +12,17 @@ public record CreateSlotUnitRequest(
 
         @NotNull(message = "{validation.service.unit.capacity.required}")
         @Min(value = 1, message = "{validation.service.unit.capacity.min}")
-        Integer capacity
-) {}
+        Integer capacity,
+
+        UUID equipmentId,
+
+        Boolean detachEquipment
+) {
+    public CreateSlotUnitRequest(Integer unitNumber, Integer capacity) {
+        this(unitNumber, capacity, null, null);
+    }
+
+    public CreateSlotUnitRequest(Integer unitNumber, Integer capacity, UUID equipmentId) {
+        this(unitNumber, capacity, equipmentId, null);
+    }
+}

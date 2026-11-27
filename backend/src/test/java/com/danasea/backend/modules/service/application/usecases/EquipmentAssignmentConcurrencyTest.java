@@ -26,6 +26,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -135,5 +138,147 @@ class EquipmentAssignmentConcurrencyTest {
         service.attach(userId, slot2Id, 1, equipment1Id);
 
         verify(store).bind(unitId, equipment1Id, false);
+    }
+
+    @Test
+    @DisplayName("C.5 Detach: Gỡ thiết bị khỏi đơn vị chưa có khách/HOLD -> gọi store.unbind")
+    void detach_emptyUncommittedUnit_unbindsEquipment() {
+        Slot slot2 = new Slot(slot2Id, tomorrow.atTime(9, 0), tomorrow.atTime(11, 0), "OPEN");
+        Equipment eq1 = new Equipment(equipment1Id, "Cano A", "cano-6", 6);
+        UUID unitId = UUID.randomUUID();
+
+        when(store.equipment(vendorId, equipment1Id, true)).thenReturn(Optional.of(eq1));
+        when(store.lockSlot(vendorId, slot2Id)).thenReturn(Optional.of(slot2));
+        when(store.units(slot2Id)).thenReturn(List.of(new Unit(unitId, 1, equipment1Id, "cano-6", 6, 0, false)));
+        when(store.commitments(slot2Id)).thenReturn(List.of());
+
+        service.detach(userId, slot2Id, 1, equipment1Id);
+
+        verify(store).unbind(unitId);
+    }
+
+    @Test
+    @DisplayName("C.5 Detach: Đơn vị đang có active Redis HOLD -> chặn với 409 CONFLICT")
+    @SuppressWarnings("unchecked")
+    void detach_withActiveRedisHold_throwsConflict() {
+        StringRedisTemplate redisTemplate = org.mockito.Mockito.mock(StringRedisTemplate.class);
+        HashOperations<String, Object, Object> hashOps = org.mockito.Mockito.mock(HashOperations.class);
+        when(redisTemplate.opsForHash()).thenReturn(hashOps);
+        when(hashOps.entries("inventory:slot:" + slot2Id + ":holds"))
+                .thenReturn(Map.of("hold-1", (System.currentTimeMillis() + 60_000L) + "|UNITS:1:2:0"));
+        ReflectionTestUtils.setField(service, "redisTemplate", redisTemplate);
+
+        Slot slot2 = new Slot(slot2Id, tomorrow.atTime(9, 0), tomorrow.atTime(11, 0), "OPEN");
+        Equipment eq1 = new Equipment(equipment1Id, "Cano A", "cano-6", 6);
+        UUID unitId = UUID.randomUUID();
+
+        when(store.equipment(vendorId, equipment1Id, true)).thenReturn(Optional.of(eq1));
+        when(store.lockSlot(vendorId, slot2Id)).thenReturn(Optional.of(slot2));
+        when(store.units(slot2Id)).thenReturn(List.of(new Unit(unitId, 1, equipment1Id, "cano-6", 6, 0, false)));
+        when(store.commitments(slot2Id)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.detach(userId, slot2Id, 1, equipment1Id))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("active hold");
+
+        org.mockito.Mockito.verify(store, org.mockito.Mockito.never()).unbind(any());
+    }
+
+    @Test
+    @DisplayName("C.5 Detach & Replace: Đơn vị đã có khách đặt (booked > 0 hoặc CONFIRMED commitment) -> chặn 409")
+    void detachAndReplace_withConfirmedBooking_throwsConflict() {
+        Slot slot2 = new Slot(slot2Id, tomorrow.atTime(9, 0), tomorrow.atTime(11, 0), "OPEN");
+        Equipment eq1 = new Equipment(equipment1Id, "Cano A", "cano-6", 6);
+        Equipment eq2 = new Equipment(equipment2Id, "Cano B", "cano-8", 8);
+        UUID unitId = UUID.randomUUID();
+        var confirmedCommitment = new EquipmentStore.Commitment(
+                UUID.randomUUID(), UUID.randomUUID(), 1, 2, 2, false, false, false);
+
+        when(store.equipment(vendorId, equipment1Id, true)).thenReturn(Optional.of(eq1));
+        when(store.equipment(vendorId, equipment2Id, true)).thenReturn(Optional.of(eq2));
+        when(store.lockSlot(vendorId, slot2Id)).thenReturn(Optional.of(slot2));
+        when(store.units(slot2Id)).thenReturn(List.of(new Unit(unitId, 1, equipment1Id, "cano-6", 6, 2, false)));
+        when(store.commitments(slot2Id)).thenReturn(List.of(confirmedCommitment));
+
+        assertThatThrownBy(() -> service.detach(userId, slot2Id, 1, equipment1Id))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("committed booking");
+        assertThatThrownBy(() -> service.attach(userId, slot2Id, 1, equipment2Id))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("committed booking");
+
+        org.mockito.Mockito.verify(store, org.mockito.Mockito.never()).unbind(any());
+        org.mockito.Mockito.verify(store, org.mockito.Mockito.never())
+                .replaceUnitEquipment(any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
+    @Test
+    @DisplayName("C.5 Replace: Đổi thiết bị khác sức chứa (6 -> 8) trên đơn vị trống -> replaceUnitEquipment atomic")
+    void attach_replaceUncommittedUnit_differentCapacity_replacesAtomically() {
+        LocalDateTime start = tomorrow.atTime(9, 0);
+        LocalDateTime end = tomorrow.atTime(11, 0);
+        Slot slot2 = new Slot(slot2Id, start, end, "OPEN");
+        Equipment eq2 = new Equipment(equipment2Id, "Cano 8", "cano-8", 8);
+        UUID unitId = UUID.randomUUID();
+
+        when(store.equipment(vendorId, equipment2Id, true)).thenReturn(Optional.of(eq2));
+        when(store.lockSlot(vendorId, slot2Id)).thenReturn(Optional.of(slot2));
+        when(store.units(slot2Id)).thenReturn(List.of(new Unit(unitId, 1, equipment1Id, "cano-6", 6, 0, false)));
+        when(store.commitments(slot2Id)).thenReturn(List.of());
+        when(store.alreadyAssignedDuring(equipment2Id, slot2)).thenReturn(false);
+        when(store.maintenanceOverlaps(equipment2Id, start, end)).thenReturn(false);
+        when(store.maxPrivateOptionPax(slot2Id)).thenReturn(0);
+
+        service.attach(userId, slot2Id, 1, equipment2Id);
+
+        verify(store).replaceUnitEquipment(slot2Id, unitId, equipment2Id, 8, false);
+    }
+
+    @Test
+    @DisplayName("C.5 Replace: Đổi sang thiết bị nhỏ hơn mức tối đa của gói PRIVATE -> chặn, giữ nguyên thiết bị cũ")
+    void attach_replaceSmallerThanPrivateOption_throwsAndPreservesOriginal() {
+        LocalDateTime start = tomorrow.atTime(9, 0);
+        LocalDateTime end = tomorrow.atTime(11, 0);
+        Slot slot2 = new Slot(slot2Id, start, end, "OPEN");
+        Equipment smallEq = new Equipment(equipment2Id, "Kayak 2", "kayak-2", 2);
+        UUID unitId = UUID.randomUUID();
+
+        when(store.equipment(vendorId, equipment2Id, true)).thenReturn(Optional.of(smallEq));
+        when(store.lockSlot(vendorId, slot2Id)).thenReturn(Optional.of(slot2));
+        when(store.units(slot2Id)).thenReturn(List.of(new Unit(unitId, 1, equipment1Id, "cano-6", 6, 0, false)));
+        when(store.commitments(slot2Id)).thenReturn(List.of());
+        when(store.alreadyAssignedDuring(equipment2Id, slot2)).thenReturn(false);
+        when(store.maintenanceOverlaps(equipment2Id, start, end)).thenReturn(false);
+        when(store.maxPrivateOptionPax(slot2Id)).thenReturn(6);
+
+        assertThatThrownBy(() -> service.attach(userId, slot2Id, 1, equipment2Id))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("private option maximum capacity");
+
+        org.mockito.Mockito.verify(store, org.mockito.Mockito.never())
+                .replaceUnitEquipment(any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
+    @Test
+    @DisplayName("C.5 Replace: Đổi sang thiết bị đang trùng ca khác -> chặn với EQUIPMENT_CONFLICT, không mất thiết bị cũ")
+    void attach_replaceOverlappingTargetEquipment_throwsAndPreservesOriginal() {
+        LocalDateTime start = tomorrow.atTime(9, 0);
+        LocalDateTime end = tomorrow.atTime(11, 0);
+        Slot slot2 = new Slot(slot2Id, start, end, "OPEN");
+        Equipment eq2 = new Equipment(equipment2Id, "Cano B", "cano-8", 8);
+        UUID unitId = UUID.randomUUID();
+
+        when(store.equipment(vendorId, equipment2Id, true)).thenReturn(Optional.of(eq2));
+        when(store.lockSlot(vendorId, slot2Id)).thenReturn(Optional.of(slot2));
+        when(store.units(slot2Id)).thenReturn(List.of(new Unit(unitId, 1, equipment1Id, "cano-6", 6, 0, false)));
+        when(store.commitments(slot2Id)).thenReturn(List.of());
+        when(store.alreadyAssignedDuring(equipment2Id, slot2)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.attach(userId, slot2Id, 1, equipment2Id))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("overlapping slot");
+
+        org.mockito.Mockito.verify(store, org.mockito.Mockito.never())
+                .replaceUnitEquipment(any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 }

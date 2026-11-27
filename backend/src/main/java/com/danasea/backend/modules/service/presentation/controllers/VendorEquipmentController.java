@@ -20,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -60,6 +61,12 @@ public class VendorEquipmentController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void attach(@PathVariable UUID equipmentId, @PathVariable UUID slotId, @PathVariable int unitNumber) {
         assignments.attach(userId(), slotId, unitNumber, equipmentId);
+    }
+
+    @DeleteMapping("/{equipmentId}/slots/{slotId}/units/{unitNumber}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void detach(@PathVariable UUID equipmentId, @PathVariable UUID slotId, @PathVariable int unitNumber) {
+        assignments.detach(userId(), slotId, unitNumber, equipmentId);
     }
 
     @PutMapping("/{equipmentId}/maintenance/{maintenanceId}")
