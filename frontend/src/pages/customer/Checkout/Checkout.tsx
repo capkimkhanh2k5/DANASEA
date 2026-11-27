@@ -6,7 +6,9 @@ import { useLanguageStore } from "../../../store/useLanguageStore";
 import { bookingService } from "../../../services/bookingService";
 import { orderService } from "../../../services/orderService";
 import { customerDiscountService } from "../../../services/customerDiscountService";
+import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import type { DiscountCodeResponse } from "../../../types/adminDiscountCode";
+import type { PublicVendorPromotionDto } from "../../../types/service";
 import { paymentService } from "../../../services/paymentService";
 import type { BookingHoldResponse } from "../../../types/booking";
 import type { DiscountPreviewResponse, OrderPaymentStatusResponse, PaymentProviderType } from "../../../types/order";
@@ -156,6 +158,7 @@ export function Checkout() {
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [isApplyingPromo, setIsApplyingPromo] = useState<boolean>(false);
   const [availableVouchers, setAvailableVouchers] = useState<DiscountCodeResponse[]>([]);
+  const [vendorVouchers, setVendorVouchers] = useState<PublicVendorPromotionDto[]>([]);
   const [isLoadingVouchers, setIsLoadingVouchers] = useState<boolean>(false);
 
   // Payment processing state
@@ -191,6 +194,7 @@ export function Checkout() {
       optionId: i.optionId,
       participantsCount: i.quantity,
       allowSplit: false,
+      ...(i.flashSaleId ? { flashSaleId: i.flashSaleId } : {}),
     }));
 
     if (!items.every((item) => VALID_UUID_REGEX.test(item.slotId) && VALID_UUID_REGEX.test(item.serviceId))) {
@@ -229,23 +233,51 @@ export function Checkout() {
   };
 
   // Promo Code Handler
-  // Load real available vouchers for customer
+  // Load real available personal vouchers + shop vouchers for services currently in cart
   useEffect(() => {
     if (!isVoucherModalOpen) return;
     let isMounted = true;
     setIsLoadingVouchers(true);
-    customerDiscountService
+
+    const uniqueServiceIds = Array.from(new Set(items.map((item) => item.serviceId).filter(Boolean)));
+    const personalPromise = customerDiscountService
       .getMyDiscountCodes({ size: 50 })
-      .then((res) => {
-        if (isMounted) {
-          setAvailableVouchers(res.content || []);
+      .then((res) => res.content || [])
+      .catch(() => [] as DiscountCodeResponse[]);
+
+    const vendorPromise = Promise.all(
+      uniqueServiceIds.map((serviceId) =>
+        serviceCatalogService
+          .getServiceDetail(serviceId, { silent: true })
+          .then((detail) => detail.vendorPromotions || [])
+          .catch(() => [] as PublicVendorPromotionDto[])
+      )
+    ).then((lists) => {
+      const seen = new Set<string>();
+      const merged: PublicVendorPromotionDto[] = [];
+      for (const list of lists) {
+        for (const promo of list) {
+          if (promo.code && !seen.has(promo.code)) {
+            seen.add(promo.code);
+            merged.push(promo);
+          }
         }
-      })
-      .catch((err) => {
-        console.warn('[Checkout] Lỗi tải danh sách voucher thực tế:', err);
-        if (isMounted) {
-          setAvailableVouchers([]);
-        }
+      }
+      return merged;
+    });
+
+    Promise.all([personalPromise, vendorPromise])
+      .then(([personal, shopPromos]) => {
+        if (!isMounted) return;
+        const nowMs = Date.now();
+        const usablePersonal = personal.filter((v) => {
+          if (v.isActive === false) return false;
+          if (v.maxUses != null && (v.usedCount ?? 0) >= v.maxUses) return false;
+          if (v.validTo && new Date(v.validTo).getTime() <= nowMs) return false;
+          return true;
+        });
+        setAvailableVouchers(usablePersonal);
+        setVendorVouchers(shopPromos);
       })
       .finally(() => {
         if (isMounted) {
@@ -256,11 +288,11 @@ export function Checkout() {
     return () => {
       isMounted = false;
     };
-  }, [isVoucherModalOpen]);
+  }, [isVoucherModalOpen, items]);
 
-  const handleApplyPromo = async () => {
+  const applyPromoCode = async (rawCode: string) => {
     setPromoError("");
-    const code = promoInput.trim().toUpperCase();
+    const code = rawCode.trim().toUpperCase();
     if (!code) return;
 
     setIsApplyingPromo(true);
@@ -290,6 +322,8 @@ export function Checkout() {
     }
   };
 
+  const handleApplyPromo = () => applyPromoCode(promoInput);
+
   const handleRemovePromo = () => {
     setDiscountPreview(null);
     setAppliedPromoCode(null);
@@ -297,8 +331,8 @@ export function Checkout() {
     setPromoError("");
   };
 
-  // Calculate final total
-  const rawTotal = getTotalPrice();
+  // Calculate final total (authoritative from bookingHold when available so Flash Sale pricing matches backend)
+  const rawTotal = bookingHold?.totalAmount != null ? Number(bookingHold.totalAmount) : getTotalPrice();
   const discountAmount = discountPreview?.totalDiscountAmount || 0;
   const finalTotal = Math.max(0, rawTotal - discountAmount);
 
@@ -342,6 +376,7 @@ export function Checkout() {
               optionId: item.optionId,
               participantsCount: item.quantity,
               allowSplit: false,
+              ...(item.flashSaleId ? { flashSaleId: item.flashSaleId } : {}),
             })) });
             setBookingHold(activeHold);
           }
@@ -829,41 +864,97 @@ export function Checkout() {
                 <div className="p-8 text-center text-xs text-slate-500">
                   {isEn ? "Checking available vouchers..." : "Đang kiểm tra mã ưu đãi khả dụng..."}
                 </div>
-              ) : availableVouchers.length > 0 ? (
-                availableVouchers.map((voucher) => (
-                  <div
-                    key={voucher.id}
-                    className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100 transition-all flex items-center justify-between gap-3"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-800 font-mono font-bold text-xs">
-                          {voucher.code}
-                        </span>
-                        <span className="text-xs font-bold text-[#991b1b]">
-                          {voucher.discountType === 'PERCENTAGE'
-                            ? (isEn ? `${voucher.discountValue}% OFF` : `Giảm ${voucher.discountValue}%`)
-                            : (isEn ? `${voucher.discountValue.toLocaleString('vi-VN')}₫ OFF` : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}₫`)}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                        {voucher.minOrderAmount
-                          ? (isEn ? `Min order ${voucher.minOrderAmount.toLocaleString('vi-VN')}₫` : `Đơn tối thiểu ${voucher.minOrderAmount.toLocaleString('vi-VN')}₫`)
-                          : (isEn ? 'Valid for all marine activities' : 'Áp dụng cho đơn dịch vụ biển')}
+              ) : (vendorVouchers.length > 0 || availableVouchers.length > 0) ? (
+                <>
+                  {vendorVouchers.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-amber-800 px-0.5">
+                        {isEn ? "Shop Vouchers (Stackable with Flash Sale)" : "Mã ưu đãi của Đối tác (Cộng dồn được với Flash Sale)"}
                       </p>
+                      {vendorVouchers.map((voucher) => (
+                        <div
+                          key={voucher.id}
+                          className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 hover:bg-amber-50 transition-all flex items-center justify-between gap-3"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="px-2 py-0.5 rounded-md bg-amber-100 border border-amber-300 text-amber-900 font-mono font-bold text-xs">
+                                {voucher.code}
+                              </span>
+                              <span className="text-xs font-bold text-[#991b1b]">
+                                {voucher.discountType === 'PERCENTAGE'
+                                  ? (isEn ? `${voucher.discountValue}% OFF` : `Giảm ${voucher.discountValue}%`)
+                                  : (isEn ? `${Number(voucher.discountValue).toLocaleString('vi-VN')}₫ OFF` : `Giảm ${Number(voucher.discountValue).toLocaleString('vi-VN')}₫`)}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 line-clamp-1 mt-0.5">
+                              {voucher.minOrderAmount
+                                ? (isEn ? `Min order ${Number(voucher.minOrderAmount).toLocaleString('vi-VN')}₫` : `Đơn tối thiểu ${Number(voucher.minOrderAmount).toLocaleString('vi-VN')}₫`)
+                                : (isEn ? 'Applies to eligible services from this partner' : 'Áp dụng cho dịch vụ của đối tác này')}
+                              {voucher.maxDiscountAmount
+                                ? (isEn ? ` • Max ${Number(voucher.maxDiscountAmount).toLocaleString('vi-VN')}₫` : ` • Tối đa ${Number(voucher.maxDiscountAmount).toLocaleString('vi-VN')}₫`)
+                                : ''}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPromoInput(voucher.code);
+                              setIsVoucherModalOpen(false);
+                              void applyPromoCode(voucher.code);
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors shadow-xs"
+                          >
+                            {isEn ? "Apply" : "Áp dụng"}
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPromoInput(voucher.code);
-                        setIsVoucherModalOpen(false);
-                      }}
-                      className="px-3 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors shadow-xs"
-                    >
-                      {isEn ? "Apply" : "Áp dụng"}
-                    </button>
-                  </div>
-                ))
+                  )}
+
+                  {availableVouchers.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 px-0.5">
+                        {isEn ? "Personal & Compensation Vouchers" : "Voucher cá nhân & bồi thường"}
+                      </p>
+                      {availableVouchers.map((voucher) => (
+                        <div
+                          key={voucher.id}
+                          className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 transition-all flex items-center justify-between gap-3"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-mono font-bold text-xs">
+                                {voucher.code}
+                              </span>
+                              <span className="text-xs font-bold text-[#991b1b]">
+                                {voucher.discountType === 'PERCENTAGE'
+                                  ? (isEn ? `${voucher.discountValue}% OFF` : `Giảm ${voucher.discountValue}%`)
+                                  : (isEn ? `${voucher.discountValue.toLocaleString('vi-VN')}₫ OFF` : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}₫`)}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 line-clamp-1 mt-0.5">
+                              {voucher.minOrderAmount
+                                ? (isEn ? `Min order ${voucher.minOrderAmount.toLocaleString('vi-VN')}₫` : `Đơn tối thiểu ${voucher.minOrderAmount.toLocaleString('vi-VN')}₫`)
+                                : (isEn ? 'Valid for all marine activities' : 'Áp dụng cho đơn dịch vụ biển')}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPromoInput(voucher.code);
+                              setIsVoucherModalOpen(false);
+                              void applyPromoCode(voucher.code);
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors shadow-xs"
+                          >
+                            {isEn ? "Apply" : "Áp dụng"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="p-8 text-center flex flex-col items-center justify-center space-y-2.5">
                   <div className="w-10 h-10 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">

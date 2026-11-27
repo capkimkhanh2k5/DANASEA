@@ -16,9 +16,10 @@ import {
   FALLBACK_HERO_IMAGE,
   FALLBACK_CARD_IMAGE,
 } from '../../../utils/imageOptimizer';
-import { Star, ArrowRight, ChevronLeft, ChevronRight, MapPin, Clock } from 'lucide-react';
+import { Star, ArrowRight, ChevronLeft, ChevronRight, MapPin, Clock, Zap, Tag } from 'lucide-react';
 import { SEOHead } from '../../../components/common/SEOHead';
 import { getTourUrl } from '../../../utils/seo';
+import { resolveServicePromotion } from '../../../utils/servicePromotion';
 
 interface HeroFeaturedSpot {
   id: string;
@@ -253,12 +254,21 @@ export function Explore() {
         if (spot.id === 'hero-4') return name.includes('mô tô') || name.includes('jetski') || name.includes('cano');
         return false;
       });
+      const promo = matchedService
+        ? resolveServicePromotion({
+            price: Number(matchedService.price) || 0,
+            flashSales: matchedService.flashSales,
+            vendorPromotions: matchedService.vendorPromotions,
+          })
+        : null;
 
       return {
         ...spot,
         targetServiceId: matchedService ? matchedService.id : spot.id,
         imageUrl: spot.imageUrl,
-        price: matchedService ? formatPrice(matchedService.price, spot.price) : spot.price,
+        price: promo ? formatPrice(promo.effectivePrice, spot.price) : spot.price,
+        originalPrice: promo?.strikethroughPrice ? formatPrice(promo.strikethroughPrice) : null,
+        flashSalePercent: promo?.flashSalePercent || 0,
         rating: matchedService ? formatRating(matchedService.averageRating, spot.rating) : spot.rating,
         reviewCount: matchedService?.reviewCount || spot.reviewCount,
         link: matchedService ? getTourUrl(matchedService) : `/search?category=${spot.searchFilter}`,
@@ -276,6 +286,10 @@ export function Explore() {
         rating: s.rating,
         reviewCount: s.reviewCount,
         price: s.price,
+        originalPrice: null as string | null,
+        flashSalePercent: 0,
+        voucherLabelVi: null as string | null,
+        voucherLabelEn: null as string | null,
         imageUrl: s.imageUrl,
         link: '/search',
       }));
@@ -291,28 +305,52 @@ export function Explore() {
       return 0;
     }).slice(0, 10);
 
-    return featuredServices.map((svc) => ({
-      id: svc.id,
-      name: svc.name,
-      nameEn: svc.nameEn || svc.name,
-      location: svc.address || 'Đà Nẵng',
-      rating: formatRating(svc.averageRating, 4.9),
-      reviewCount: svc.reviewCount || 24,
-      price: formatPrice(svc.price, '400.000 ₫'),
-      imageUrl: getStageCardImageUrl(svc.primaryImageUrl || FALLBACK_HERO_IMAGE),
-      link: getTourUrl(svc),
-    }));
+    return featuredServices.map((svc) => {
+      const promo = resolveServicePromotion({
+        price: Number(svc.price) || 0,
+        flashSales: svc.flashSales,
+        vendorPromotions: svc.vendorPromotions,
+      });
+      return {
+        id: svc.id,
+        name: svc.name,
+        nameEn: svc.nameEn || svc.name,
+        location: svc.address || 'Đà Nẵng',
+        rating: formatRating(svc.averageRating, 4.9),
+        reviewCount: svc.reviewCount || 24,
+        price: formatPrice(promo.effectivePrice, '400.000 ₫'),
+        originalPrice: promo.strikethroughPrice ? formatPrice(promo.strikethroughPrice) : null,
+        flashSalePercent: promo.flashSalePercent,
+        voucherLabelVi: promo.bestVendorVoucher?.shortLabelVi ?? null,
+        voucherLabelEn: promo.bestVendorVoucher?.shortLabelEn ?? null,
+        imageUrl: getStageCardImageUrl(svc.primaryImageUrl || FALLBACK_HERO_IMAGE),
+        link: getTourUrl(svc),
+      };
+    });
   }, [liveServices]);
 
   // Derived curated lists for section decks
   const topVisitedList = useMemo(() => {
-    if (liveServices.length === 0) return TOP_VISITED_EXPERIENCES;
+    if (liveServices.length === 0) {
+      return TOP_VISITED_EXPERIENCES.map((item) => ({
+        ...item,
+        originalPrice: null as string | null,
+        flashSalePercent: 0,
+        voucherLabelVi: null as string | null,
+        voucherLabelEn: null as string | null,
+      }));
+    }
     return [...liveServices]
       .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
       .slice(0, 8)
       .map((s, idx) => {
         const fallback = TOP_VISITED_EXPERIENCES[idx % TOP_VISITED_EXPERIENCES.length];
         const views = s.viewCount && s.viewCount > 0 ? s.viewCount : 450 + idx * 170;
+        const promo = resolveServicePromotion({
+          price: Number(s.price) || 0,
+          flashSales: s.flashSales,
+          vendorPromotions: s.vendorPromotions,
+        });
         return {
           id: s.id,
           name: s.name,
@@ -321,7 +359,11 @@ export function Explore() {
           visitorsText: `${views}+ du khách quan tâm`,
           visitorsTextEn: `${views}+ travelers viewed`,
           rating: formatRating(s.averageRating, fallback.rating),
-          price: formatPrice(s.price, fallback.price),
+          price: formatPrice(promo.effectivePrice, fallback.price),
+          originalPrice: promo.strikethroughPrice ? formatPrice(promo.strikethroughPrice) : null,
+          flashSalePercent: promo.flashSalePercent,
+          voucherLabelVi: promo.bestVendorVoucher?.shortLabelVi ?? null,
+          voucherLabelEn: promo.bestVendorVoucher?.shortLabelEn ?? null,
           imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallback.imageUrl),
           searchFilter: fallback.searchFilter,
           link: getTourUrl(s),
@@ -330,7 +372,15 @@ export function Explore() {
   }, [liveServices]);
 
   const weatherRecommendedList = useMemo(() => {
-    if (liveServices.length === 0) return WEATHER_RECOMMENDED_EXPERIENCES;
+    if (liveServices.length === 0) {
+      return WEATHER_RECOMMENDED_EXPERIENCES.map((item) => ({
+        ...item,
+        originalPrice: null as string | null,
+        flashSalePercent: 0,
+        voucherLabelVi: null as string | null,
+        voucherLabelEn: null as string | null,
+      }));
+    }
     const filtered = liveServices.filter((s) => {
       const n = s.name.toLowerCase();
       return n.includes('san hô') || n.includes('sup') || n.includes('kayak') || n.includes('lặn') || n.includes('biển');
@@ -338,6 +388,11 @@ export function Explore() {
     const pool = filtered.length > 0 ? filtered : liveServices;
     return pool.slice(0, 8).map((s, idx) => {
       const fallback = WEATHER_RECOMMENDED_EXPERIENCES[idx % WEATHER_RECOMMENDED_EXPERIENCES.length];
+      const promo = resolveServicePromotion({
+        price: Number(s.price) || 0,
+        flashSales: s.flashSales,
+        vendorPromotions: s.vendorPromotions,
+      });
       return {
         id: s.id,
         name: s.name,
@@ -346,7 +401,11 @@ export function Explore() {
         conditionReason: fallback.conditionReason,
         conditionReasonEn: fallback.conditionReasonEn,
         rating: formatRating(s.averageRating, fallback.rating),
-        price: formatPrice(s.price, fallback.price),
+        price: formatPrice(promo.effectivePrice, fallback.price),
+        originalPrice: promo.strikethroughPrice ? formatPrice(promo.strikethroughPrice) : null,
+        flashSalePercent: promo.flashSalePercent,
+        voucherLabelVi: promo.bestVendorVoucher?.shortLabelVi ?? null,
+        voucherLabelEn: promo.bestVendorVoucher?.shortLabelEn ?? null,
         imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallback.imageUrl),
         searchFilter: fallback.searchFilter,
         link: getTourUrl(s),
@@ -730,9 +789,16 @@ export function Explore() {
                 </div>
 
                 {/* Top Right Tag */}
-                <div className="absolute top-4 right-4 sm:top-5 sm:right-5 px-3 py-1.5 rounded-xl bg-sky-950/60 backdrop-blur-md border border-sky-400/30 text-sky-200 text-[11px] font-semibold tracking-wide uppercase">
-                  Đà Nẵng
-                </div>
+                {item.flashSalePercent > 0 ? (
+                  <div className="absolute top-4 right-4 sm:top-5 sm:right-5 px-3 py-1.5 rounded-xl bg-rose-600/95 backdrop-blur-md border border-rose-300/40 text-white text-[11px] font-extrabold tracking-wide inline-flex items-center gap-1 shadow-md">
+                    <Zap className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+                    <span>Flash Sale -{item.flashSalePercent}%</span>
+                  </div>
+                ) : (
+                  <div className="absolute top-4 right-4 sm:top-5 sm:right-5 px-3 py-1.5 rounded-xl bg-sky-950/60 backdrop-blur-md border border-sky-400/30 text-sky-200 text-[11px] font-semibold tracking-wide uppercase">
+                    Đà Nẵng
+                  </div>
+                )}
 
                 {/* Embedded Bottom Information Box */}
                 <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 z-10 text-white flex flex-col justify-end">
@@ -745,14 +811,27 @@ export function Explore() {
                     {language === 'en' ? item.nameEn : item.name}
                   </h3>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-white/15">
-                    <div>
+                  <div className="flex items-center justify-between pt-3 border-t border-white/15 gap-2">
+                    <div className="min-w-0">
                       <span className="text-[11px] uppercase tracking-wider text-white/70 block font-semibold">
                         {language === 'en' ? 'Starting From' : 'Chi phí từ'}
                       </span>
-                      <span className="text-lg sm:text-2xl font-black text-amber-300 font-mono tabular-nums drop-shadow-sm">
-                        {item.price}
-                      </span>
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="text-lg sm:text-2xl font-black text-amber-300 font-mono tabular-nums drop-shadow-sm">
+                          {item.price}
+                        </span>
+                        {item.originalPrice && (
+                          <span className="text-xs text-white/60 line-through tabular-nums">
+                            {item.originalPrice}
+                          </span>
+                        )}
+                      </div>
+                      {(item.voucherLabelVi || item.voucherLabelEn) && (
+                        <span className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-400/20 border border-amber-300/40 text-amber-200 text-[11px] font-semibold">
+                          <Tag className="w-3 h-3 shrink-0" />
+                          <span>{language === 'en' ? item.voucherLabelEn : item.voucherLabelVi}</span>
+                        </span>
+                      )}
                     </div>
 
                     {isCenter ? (
@@ -868,6 +947,12 @@ export function Explore() {
                 }}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
               />
+              {item.flashSalePercent > 0 && (
+                <span className="absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-600/95 text-white text-[11px] font-extrabold shadow-xs">
+                  <Zap className="w-3 h-3 fill-amber-300 text-amber-300" />
+                  -{item.flashSalePercent}%
+                </span>
+              )}
             </div>
             <div className="p-3.5 flex-1 flex flex-col justify-between">
               <div>
@@ -877,13 +962,26 @@ export function Explore() {
                 <p className="text-[13px] text-slate-500 mt-1 line-clamp-1">
                   {item.location} • <span className="text-emerald-700 font-semibold">{language === 'en' ? item.visitorsTextEn : item.visitorsText}</span>
                 </p>
+                {(item.voucherLabelVi || item.voucherLabelEn) && (
+                  <span className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold">
+                    <Tag className="w-3 h-3 text-amber-600 shrink-0" />
+                    <span className="truncate">{language === 'en' ? item.voucherLabelEn : item.voucherLabelVi}</span>
+                  </span>
+                )}
               </div>
-              <div className="mt-3 pt-2 border-t border-slate-200/50 flex items-center justify-between">
+              <div className="mt-3 pt-2 border-t border-slate-200/50 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1 text-[13px] font-bold text-slate-800">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                   <span>{item.rating.toFixed(1)}</span>
                 </div>
-                <span className="text-[13px] font-bold text-sky-700">{item.price}</span>
+                <div className="text-right">
+                  {item.originalPrice && (
+                    <span className="block text-[11px] text-slate-400 line-through tabular-nums leading-none">
+                      {item.originalPrice}
+                    </span>
+                  )}
+                  <span className="text-[13px] font-bold text-[#991b1b] tabular-nums">{item.price}</span>
+                </div>
               </div>
             </div>
           </Link>
@@ -915,6 +1013,12 @@ export function Explore() {
                 }}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
               />
+              {item.flashSalePercent > 0 && (
+                <span className="absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-600/95 text-white text-[11px] font-extrabold shadow-xs">
+                  <Zap className="w-3 h-3 fill-amber-300 text-amber-300" />
+                  -{item.flashSalePercent}%
+                </span>
+              )}
             </div>
             <div className="p-3.5 flex-1 flex flex-col justify-between">
               <div>
@@ -924,13 +1028,26 @@ export function Explore() {
                 <p className="text-[13px] text-sky-700 font-medium mt-1 line-clamp-1">
                   {language === 'en' ? item.conditionReasonEn : item.conditionReason}
                 </p>
+                {(item.voucherLabelVi || item.voucherLabelEn) && (
+                  <span className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold">
+                    <Tag className="w-3 h-3 text-amber-600 shrink-0" />
+                    <span className="truncate">{language === 'en' ? item.voucherLabelEn : item.voucherLabelVi}</span>
+                  </span>
+                )}
               </div>
-              <div className="mt-3 pt-2 border-t border-slate-200/50 flex items-center justify-between">
+              <div className="mt-3 pt-2 border-t border-slate-200/50 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1 text-[13px] font-bold text-slate-800">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                   <span>{item.rating.toFixed(1)}</span>
                 </div>
-                <span className="text-[13px] font-bold text-sky-700">{item.price}</span>
+                <div className="text-right">
+                  {item.originalPrice && (
+                    <span className="block text-[11px] text-slate-400 line-through tabular-nums leading-none">
+                      {item.originalPrice}
+                    </span>
+                  )}
+                  <span className="text-[13px] font-bold text-[#991b1b] tabular-nums">{item.price}</span>
+                </div>
               </div>
             </div>
           </Link>

@@ -9,6 +9,7 @@ export interface ServiceQueryParams {
   categoryId?: string;
   keyword?: string;
   badgeTier?: BadgeTier;
+  onSale?: boolean;
   sortBy?: 'recommended' | 'newest' | 'price_asc' | 'price_desc' | 'rating_desc' | 'views_desc';
   minPrice?: number;
   maxPrice?: number;
@@ -42,6 +43,7 @@ export const serviceCatalogService = {
       ...(params.categoryId ? { categoryId: params.categoryId } : {}),
       ...(params.keyword ? { keyword: params.keyword } : {}),
       ...(params.badgeTier ? { badgeTier: params.badgeTier } : {}),
+      ...(params.onSale ? { onSale: true } : {}),
       ...(params.sortBy ? { sortBy: params.sortBy } : {}),
       ...(params.minPrice !== undefined ? { minPrice: params.minPrice } : {}),
       ...(params.maxPrice !== undefined ? { maxPrice: params.maxPrice } : {}),

@@ -4,6 +4,7 @@ export interface BookingHoldItemRequest {
   optionId?: string;
   participantsCount?: number;
   allowSplit?: boolean;
+  flashSaleId?: string;
 }
 
 export interface BookingHoldRequest {

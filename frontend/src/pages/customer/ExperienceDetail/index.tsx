@@ -18,6 +18,8 @@ import {
   MessageSquare,
   MessageCircle,
   User,
+  Zap,
+  Tag,
 } from 'lucide-react';
 import { useCartStore } from '../../../store/useCartStore';
 import { useWishlistStore } from '../../../store/useWishlistStore';
@@ -27,6 +29,7 @@ import { reviewService, type ReviewResponse } from '../../../services/reviewServ
 import { SEOHead } from '../../../components/common/SEOHead';
 import { getBadgeTierLabel, isPublicBadgeVisible, normalizeBadgeTier } from '../../../utils/badgeTier';
 import { getSiteOrigin } from '../../../utils/seo';
+import { resolveBestFlashSale, resolveServicePromotion } from '../../../utils/servicePromotion';
 import type { ServiceDetailDto, ServiceOptionDto, StructuredSlotDto } from '../../../types/service';
 
 export function ExperienceDetail() {
@@ -350,8 +353,19 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
     return 60;
   }, [activeSlot, service]);
 
-  // Pricing calculation
-  const unitPrice = selectedOption ? selectedOption.price : (service?.price || 0);
+  // Pricing & promotion calculation (supports option-specific Flash Sale + stackable Shop Voucher)
+  const baseUnitPrice = selectedOption ? selectedOption.price : (service?.price || 0);
+  const activePromotion = useMemo(
+    () =>
+      resolveServicePromotion({
+        price: baseUnitPrice,
+        flashSales: service?.flashSales,
+        vendorPromotions: service?.vendorPromotions,
+        optionId: selectedOption?.id ?? null,
+      }),
+    [baseUnitPrice, service?.flashSales, service?.vendorPromotions, selectedOption?.id]
+  );
+  const unitPrice = activePromotion.effectivePrice;
   const totalPrice = qty * unitPrice;
 
   // Capacity validation & In-Cart Tracking
@@ -499,8 +513,11 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
     setTimeout(() => {
       if (editingCartItem) {
         updateCartItem(editingCartItem.id, {
+          vendorId: service.vendorId,
           slotId: activeSlot.slotId,
           optionId: selectedOption?.id || activeSlot.optionId,
+          flashSaleId: activePromotion.flashSale?.flashSaleId,
+          originalUnitPrice: activePromotion.strikethroughPrice ?? undefined,
           quantity: qty,
           unitPrice: unitPrice,
           serviceName: `${service.name}${selectedOption ? ` (${selectedOption.name})` : ''}`,
@@ -516,8 +533,11 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
 
       addItem({
         serviceId: service.id,
+        vendorId: service.vendorId,
         slotId: activeSlot.slotId,
         optionId: selectedOption?.id || activeSlot.optionId,
+        flashSaleId: activePromotion.flashSale?.flashSaleId,
+        originalUnitPrice: activePromotion.strikethroughPrice ?? undefined,
         locationName: 'Đà Nẵng',
         vendorName: service.businessName || 'DANASEA Official Partner',
         quantity: qty,
@@ -896,6 +916,18 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                   <div className="grid grid-cols-1 gap-2.5">
                     {service.options.map((opt) => {
                       const isSelected = selectedOptionId === opt.id;
+                      const optFlashSale = resolveBestFlashSale(service.flashSales, opt.id);
+                      const optDisplayPrice = optFlashSale ? optFlashSale.salePrice : opt.price;
+                      const optDiscountPct = optFlashSale
+                        ? Math.max(
+                            1,
+                            Math.round(
+                              optFlashSale.actualDiscountPercent > 0
+                                ? optFlashSale.actualDiscountPercent
+                                : ((optFlashSale.originalPrice - optFlashSale.salePrice) / optFlashSale.originalPrice) * 100
+                            )
+                          )
+                        : 0;
                       return (
                         <div
                           key={opt.id}
@@ -907,23 +939,36 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                           }`}
                         >
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <span className="font-bold text-slate-900 text-sm sm:text-base">{opt.name}</span>
                               <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[13px] font-semibold text-slate-700">
                                 {opt.optionType === 'PRIVATE' ? 'Bao trọn gói' : 'Vé ghép'}
                               </span>
+                              {optFlashSale && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-600 text-white text-[11px] font-extrabold">
+                                  <Zap className="w-3 h-3 fill-amber-300 text-amber-300" />
+                                  Flash Sale -{optDiscountPct}%
+                                </span>
+                              )}
                             </div>
                             {opt.benefits && (
                               <p className="text-base text-slate-700 leading-relaxed max-w-[60ch]">{opt.benefits}</p>
                             )}
                           </div>
-                          <div className="flex items-baseline gap-1.5 sm:justify-end shrink-0 whitespace-nowrap">
-                            <span className="font-black text-lg text-[#991b1b] tabular-nums">
-                              {opt.price.toLocaleString('vi-VN')}₫
-                            </span>
-                            <span className="text-[13px] text-slate-500 font-medium">
-                              {opt.pricingUnit === 'PER_PERSON' ? '/ người' : '/ gói'}
-                            </span>
+                          <div className="flex flex-col sm:items-end shrink-0 whitespace-nowrap">
+                            {optFlashSale && (
+                              <span className="text-xs text-slate-400 line-through tabular-nums">
+                                {optFlashSale.originalPrice.toLocaleString('vi-VN')}₫
+                              </span>
+                            )}
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="font-black text-lg text-[#991b1b] tabular-nums">
+                                {optDisplayPrice.toLocaleString('vi-VN')}₫
+                              </span>
+                              <span className="text-[13px] text-slate-500 font-medium">
+                                {opt.pricingUnit === 'PER_PERSON' ? '/ người' : '/ gói'}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       );
@@ -939,14 +984,66 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                 
                 {/* Upper Booking Configuration */}
                 <div className="flex flex-col gap-4">
-                  {/* Price Display */}
-                  <div className="border-b border-slate-100 pb-3 flex items-baseline gap-1.5 flex-wrap">
-                    <span className="text-3xl font-black text-[#991b1b] tabular-nums tracking-tight">
-                      {unitPrice.toLocaleString('vi-VN')}₫
-                    </span>
-                    <span className="text-[13px] text-slate-500 font-medium whitespace-nowrap">
-                      {selectedOption?.pricingUnit === 'PER_PACKAGE' ? '/ gói' : '/ người'}
-                    </span>
+                  {/* Price Display (Flash Sale + Stackable Shop Voucher) */}
+                  <div className="border-b border-slate-100 pb-3 space-y-2">
+                    {activePromotion.hasFlashSale && activePromotion.flashSale && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-rose-600 text-white text-xs font-extrabold">
+                          <Zap className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+                          <span>Flash Sale -{activePromotion.flashSalePercent}%</span>
+                        </span>
+                        <span className="text-xs font-semibold text-rose-700 tabular-nums">
+                          {language === 'en'
+                            ? `${activePromotion.flashSale.remainingQuota} deals left`
+                            : `Còn ${activePromotion.flashSale.remainingQuota} suất`}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="text-3xl font-black text-[#991b1b] tabular-nums tracking-tight">
+                        {unitPrice.toLocaleString('vi-VN')}₫
+                      </span>
+                      {activePromotion.strikethroughPrice && activePromotion.strikethroughPrice > unitPrice && (
+                        <span className="text-sm text-slate-400 line-through tabular-nums font-medium">
+                          {activePromotion.strikethroughPrice.toLocaleString('vi-VN')}₫
+                        </span>
+                      )}
+                      <span className="text-[13px] text-slate-500 font-medium whitespace-nowrap">
+                        {selectedOption?.pricingUnit === 'PER_PACKAGE' ? '/ gói' : '/ người'}
+                      </span>
+                    </div>
+                    {activePromotion.bestVendorVoucher && (
+                      <div className="p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/90 flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                            <Tag className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span>
+                              {language === 'en'
+                                ? activePromotion.bestVendorVoucher.shortLabelEn
+                                : activePromotion.bestVendorVoucher.shortLabelVi}
+                            </span>
+                          </span>
+                          {activePromotion.hasFlashSale && (
+                            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                              {language === 'en' ? 'Stackable' : 'Dùng chung Flash Sale'}
+                            </span>
+                          )}
+                        </div>
+                        {activePromotion.bestVendorVoucher.estimatedAfterVoucherPrice != null ? (
+                          <p className="text-xs text-emerald-800 font-semibold tabular-nums">
+                            {language === 'en'
+                              ? `Est. ${activePromotion.bestVendorVoucher.estimatedAfterVoucherPrice.toLocaleString('vi-VN')}₫/unit at checkout`
+                              : `Còn ~${activePromotion.bestVendorVoucher.estimatedAfterVoucherPrice.toLocaleString('vi-VN')}₫ khi áp mã ở bước thanh toán`}
+                          </p>
+                        ) : activePromotion.bestVendorVoucher.conditionLabelVi ? (
+                          <p className="text-xs text-amber-800 font-medium">
+                            {language === 'en'
+                              ? `Applies on orders ${activePromotion.bestVendorVoucher.conditionLabelEn}`
+                              : `Áp dụng cho ${activePromotion.bestVendorVoucher.conditionLabelVi} ở bước thanh toán`}
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
 
                   {/* Date Selection */}

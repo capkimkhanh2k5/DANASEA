@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { ActivityCardData } from '../../data/customerHomeData';
 import { useWishlistStore } from '../../store/useWishlistStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
-import { ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Star, Tag, Zap } from 'lucide-react';
 import { getTourUrl } from '../../utils/seo';
 
 interface CategoryExperienceCarouselProps {
@@ -201,6 +201,14 @@ export function CategoryExperienceCarousel({
                         loading="lazy"
                       />
 
+                      {/* Single clean Flash Sale badge on image */}
+                      {item.flashSalePercent && item.flashSalePercent > 0 && (
+                        <div className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-600/95 text-white text-[11px] font-extrabold tracking-tight shadow-sm backdrop-blur-xs">
+                          <Zap className="w-3 h-3 fill-amber-300 text-amber-300 shrink-0" />
+                          <span>Flash Sale -{item.flashSalePercent}%</span>
+                        </div>
+                      )}
+
                       {/* Top-right Wishlist Button */}
                       <button
                         type="button"
@@ -240,22 +248,50 @@ export function CategoryExperienceCarousel({
                       </div>
 
                       {/* Price & Rating (Bottom Row) */}
-                      <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-bold text-base text-[#991b1b] tabular-nums">
-                            {item.price.toLocaleString('vi-VN')}₫
-                          </span>
-                          <span className="text-[13px] text-slate-500">
-                            / {t.sections.perGuest}
-                          </span>
+                      <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-1.5">
+                        <div className="flex items-end justify-between gap-2">
+                          <div className="min-w-0">
+                            {item.originalPrice && item.originalPrice > item.price && (
+                              <p className="text-[11px] text-slate-400 line-through tabular-nums leading-none mb-0.5">
+                                {item.originalPrice.toLocaleString('vi-VN')}₫
+                              </p>
+                            )}
+                            <div className="flex items-baseline gap-1">
+                              <span className="font-bold text-base text-[#991b1b] tabular-nums">
+                                {item.price.toLocaleString('vi-VN')}₫
+                              </span>
+                              <span className="text-[12px] text-slate-500 whitespace-nowrap">
+                                / {t.sections.perGuest}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Pro-grade Rating Badge */}
+                          <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200/60 text-amber-900 text-[12px] font-bold tabular-nums shrink-0">
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500 shrink-0" />
+                            <span>{item.rating.toFixed(2)}</span>
+                            <span className="text-amber-950 font-medium text-[12px]">({item.reviewCount})</span>
+                          </div>
                         </div>
 
-                        {/* Pro-grade Rating Badge */}
-                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200/60 text-amber-900 text-[13px] font-bold tabular-nums">
-                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500 shrink-0" />
-                          <span>{item.rating.toFixed(2)}</span>
-                          <span className="text-amber-950 font-medium text-[13px]">({item.reviewCount})</span>
-                        </div>
+                        {/* Tasteful Shop Voucher ticket pill */}
+                        {(item.vendorVoucherLabelVi || item.vendorVoucherLabelEn) && (
+                          <div className="flex items-center justify-between gap-1.5 pt-0.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/90 text-amber-800 text-[11px] font-semibold truncate">
+                              <Tag className="w-3 h-3 text-amber-600 shrink-0" />
+                              <span className="truncate">
+                                {language === 'en' ? item.vendorVoucherLabelEn : item.vendorVoucherLabelVi}
+                              </span>
+                            </span>
+                            {item.estimatedAfterVoucherPrice && item.estimatedAfterVoucherPrice < item.price && (
+                              <span className="text-[11px] text-emerald-700 font-semibold tabular-nums whitespace-nowrap shrink-0">
+                                {language === 'en'
+                                  ? `~${item.estimatedAfterVoucherPrice.toLocaleString('vi-VN')}₫`
+                                  : `~${item.estimatedAfterVoucherPrice.toLocaleString('vi-VN')}₫`}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </Link>

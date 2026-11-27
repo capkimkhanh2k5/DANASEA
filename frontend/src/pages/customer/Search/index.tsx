@@ -19,17 +19,27 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
+  Zap,
+  Tag,
+  Gift,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useWishlistStore } from '../../../store/useWishlistStore';
+import { useAuthStore } from '../../../store/useAuthStore';
 import { useLanguageStore } from '../../../store/useLanguageStore';
 import { TRANSLATIONS } from '../../../i18n/translations';
 
 import { serviceCatalogService, type ServiceQueryParams } from '../../../services/serviceCatalogService';
+import { flashSaleService, type ActiveFlashSaleItem } from '../../../services/flashSaleService';
+import { customerDiscountService } from '../../../services/customerDiscountService';
 import { categoryService } from '../../../services/categoryService';
 import type { BadgeTier } from '../../../types';
+import type { DiscountCodeResponse } from '../../../types/adminDiscountCode';
 import type { CategoryDto } from '../../../types/category';
 import { getBadgeTierLabel, isPublicBadgeVisible, normalizeBadgeTier } from '../../../utils/badgeTier';
 import { getCardThumbnailUrl, FALLBACK_CARD_IMAGE } from '../../../utils/imageOptimizer';
+import { resolveServicePromotion, type ResolvedVendorVoucher } from '../../../utils/servicePromotion';
 import { SEOHead } from '../../../components/common/SEOHead';
 import { getTourUrl } from '../../../utils/seo';
 
@@ -41,7 +51,12 @@ interface DisplayExperience {
   slug?: string;
   description: string;
   price: number;
-  promotionalPrice?: number | null;
+  effectivePrice: number;
+  strikethroughPrice: number | null;
+  hasFlashSale: boolean;
+  flashSalePercent: number;
+  bestVendorVoucher: ResolvedVendorVoucher | null;
+  hasAnyPromotion: boolean;
   rating: number;
   reviewCount: number;
   location: string;
@@ -63,6 +78,7 @@ export function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { toggleWishlist, isInWishlist } = useWishlistStore();
+  const { isAuthenticated } = useAuthStore();
   const { language } = useLanguageStore();
   const t = TRANSLATIONS[language].searchPage;
   const isEn = language === 'en';
@@ -70,10 +86,14 @@ export function Search() {
   const categoryParam = searchParams.get('category');
   const keywordParam = searchParams.get('q') || '';
   const badgeTierParam = searchParams.get('badgeTier');
+  const onSaleParam = searchParams.get('onSale');
 
   // Data states
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [services, setServices] = useState<DisplayExperience[]>([]);
+  const [activeFlashSales, setActiveFlashSales] = useState<ActiveFlashSaleItem[]>([]);
+  const [personalVouchers, setPersonalVouchers] = useState<DiscountCodeResponse[]>([]);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Search input state
@@ -85,6 +105,9 @@ export function Search() {
   const [popTopRated, setPopTopRated] = useState<boolean>(false);
   const [onlyTopRatedVendors, setOnlyTopRatedVendors] = useState<boolean>(
     badgeTierParam?.toUpperCase() === 'TOP_RATED'
+  );
+  const [onlyOnSale, setOnlyOnSale] = useState<boolean>(
+    onSaleParam === 'true' || onSaleParam === '1'
   );
   const [popUnder500k, setPopUnder500k] = useState<boolean>(false);
   const [popHasCoach, setPopHasCoach] = useState<boolean>(false);
@@ -134,6 +157,7 @@ export function Search() {
     popFreeCancel,
     popTopRated,
     onlyTopRatedVendors,
+    onlyOnSale,
     popUnder500k,
     popHasCoach,
     popHasPhotos,
@@ -157,6 +181,61 @@ export function Search() {
     return () => { isMounted = false; };
   }, []);
 
+  // 1b. Fetch active Flash Sales for top Merchandising Strip
+  useEffect(() => {
+    let isMounted = true;
+    flashSaleService
+      .getActiveFlashSales()
+      .then((items) => {
+        if (isMounted) setActiveFlashSales(items || []);
+      })
+      .catch(() => {
+        if (isMounted) setActiveFlashSales([]);
+      });
+    return () => { isMounted = false; };
+  }, []);
+
+  // 1c. Fetch logged-in customer's active personal/compensation vouchers for subtle reminder strip
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setPersonalVouchers([]);
+      return;
+    }
+    let isMounted = true;
+    const nowMs = Date.now();
+    customerDiscountService
+      .getMyDiscountCodes({ size: 20 })
+      .then((res) => {
+        if (!isMounted) return;
+        const usable = (res.content || []).filter((v) => {
+          if (v.isActive === false) return false;
+          if (v.maxUses != null && (v.usedCount ?? 0) >= v.maxUses) return false;
+          if (v.validTo && new Date(v.validTo).getTime() <= nowMs) return false;
+          if (v.validFrom && new Date(v.validFrom).getTime() > nowMs) return false;
+          return true;
+        });
+        setPersonalVouchers(usable);
+      })
+      .catch(() => {
+        if (isMounted) setPersonalVouchers([]);
+      });
+    return () => { isMounted = false; };
+  }, [isAuthenticated]);
+
+  const handleCopyCode = (code: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(code).catch(() => {});
+    }
+    setCopiedCode(code);
+    setTimeout(() => {
+      setCopiedCode((prev) => (prev === code ? null : prev));
+    }, 2200);
+  };
+
   // Reset category selection when navigation changes the URL category.
   const [previousCategoryParam, setPreviousCategoryParam] = useState(categoryParam);
   if (previousCategoryParam !== categoryParam) {
@@ -174,6 +253,7 @@ export function Search() {
         const queryParams: ServiceQueryParams = {
           size: 40,
           ...(onlyTopRatedVendors ? { badgeTier: 'TOP_RATED' } : {}),
+          ...(onlyOnSale ? { onSale: true } : {}),
           ...(sortBy === 'newest' || sortBy === 'price_asc' || sortBy === 'price_desc' || sortBy === 'rating_desc' ? { sortBy } : {}),
         };
 
@@ -186,6 +266,11 @@ export function Search() {
                 'Sơn Trà', 'Mỹ Khê', 'Bãi Rạng', 'Non Nước'
               ];
               const determinedArea = areaOptions[idx % 4];
+              const promo = resolveServicePromotion({
+                price: Number(item.price) || 0,
+                flashSales: item.flashSales,
+                vendorPromotions: item.vendorPromotions,
+              });
 
               return {
                 id: item.id,
@@ -195,8 +280,13 @@ export function Search() {
                 description: (language === 'en' && 'shortDescriptionEn' in item && typeof item.shortDescriptionEn === 'string')
                   ? (item.shortDescriptionEn as string)
                   : item.shortDescription || (language === 'en' ? 'Standard maritime safety experience in Da Nang Bay, equipped with SOLAS life vests and 1:1 local instructor.' : 'Trải nghiệm thể thao biển chuẩn an toàn hàng hải tại vịnh Đà Nẵng, trang bị áo phao SOLAS và hướng dẫn viên 1:1.'),
-                price: item.price,
-                promotionalPrice: item.promotionalPrice,
+                price: promo.basePrice,
+                effectivePrice: promo.effectivePrice,
+                strikethroughPrice: promo.strikethroughPrice,
+                hasFlashSale: promo.hasFlashSale,
+                flashSalePercent: promo.flashSalePercent,
+                bestVendorVoucher: promo.bestVendorVoucher,
+                hasAnyPromotion: promo.hasAnyPromotion,
                 rating: item.averageRating || 4.9,
                 reviewCount: item.reviewCount || 128,
                 location: item.address ? item.address.split(',')[0] : (language === 'en' ? `${determinedArea} Beach` : `Bán đảo ${determinedArea}`),
@@ -228,7 +318,7 @@ export function Search() {
 
     fetchServices();
     return () => { isMounted = false; };
-  }, [sortBy, onlyTopRatedVendors, language]);
+  }, [sortBy, onlyTopRatedVendors, onlyOnSale, language]);
 
   // Toggle helpers for Traveloka Multi-Checkboxes
   const toggleArea = (area: string) => {
@@ -269,7 +359,7 @@ export function Search() {
       result = result.filter((s) => s.rating >= 4.8);
     }
     if (popUnder500k) {
-      result = result.filter((s) => s.price <= 500000);
+      result = result.filter((s) => s.effectivePrice <= 500000);
     }
     if (popHasCoach) {
       result = result.filter((s) => s.hasCoach);
@@ -291,9 +381,9 @@ export function Search() {
       });
     }
 
-    // Price Max filter
+    // Price Max filter (effectivePrice = Flash Sale price when active)
     if (priceMax < 2500000) {
-      result = result.filter((s) => s.price <= priceMax);
+      result = result.filter((s) => s.effectivePrice <= priceMax);
     }
 
     // Min Rating filter
@@ -301,11 +391,11 @@ export function Search() {
       result = result.filter((s) => s.rating >= minRating);
     }
 
-    // Sorting
+    // Sorting (price sort uses effectivePrice; default 'popular' preserves backend Composite Recommended order)
     if (sortBy === 'price_asc') {
-      result.sort((a, b) => a.price - b.price);
+      result.sort((a, b) => a.effectivePrice - b.effectivePrice);
     } else if (sortBy === 'price_desc') {
-      result.sort((a, b) => b.price - a.price);
+      result.sort((a, b) => b.effectivePrice - a.effectivePrice);
     } else if (sortBy === 'rating_desc') {
       result.sort((a, b) => b.rating - a.rating);
     }
@@ -345,6 +435,7 @@ export function Search() {
     setPopFreeCancel(false);
     setPopTopRated(false);
     setOnlyTopRatedVendors(false);
+    setOnlyOnSale(false);
     setPopUnder500k(false);
     setPopHasCoach(false);
     setPopHasPhotos(false);
@@ -361,6 +452,7 @@ export function Search() {
     popFreeCancel ||
     popTopRated ||
     onlyTopRatedVendors ||
+    onlyOnSale ||
     popUnder500k ||
     popHasCoach ||
     popHasPhotos ||
@@ -735,10 +827,60 @@ export function Search() {
               RIGHT COLUMN: TRAVELOKA-STYLE RESULTS CARDS
              ===================================================================== */}
           <main className="lg:col-span-8 xl:col-span-9 space-y-4">
-            
+
+            {/* Personal Compensation / Reward Voucher Reminder Strip (logged-in customers only) */}
+            {personalVouchers.length > 0 && (
+              <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <Gift className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 text-[13px] text-emerald-950 leading-snug">
+                    <span className="font-bold">
+                      {isEn
+                        ? `You have ${personalVouchers.length} personal voucher${personalVouchers.length > 1 ? 's' : ''}:`
+                        : `Bạn đang có ${personalVouchers.length} voucher cá nhân toàn sàn:`}
+                    </span>{' '}
+                    <span className="font-mono font-bold text-emerald-800">{personalVouchers[0].code}</span>{' '}
+                    <span>
+                      (
+                      {personalVouchers[0].discountType === 'PERCENTAGE'
+                        ? isEn
+                          ? `Save ${personalVouchers[0].discountValue}%`
+                          : `Giảm ${personalVouchers[0].discountValue}%`
+                        : isEn
+                          ? `Save ${Number(personalVouchers[0].discountValue).toLocaleString('vi-VN')}₫`
+                          : `Giảm ${Number(personalVouchers[0].discountValue).toLocaleString('vi-VN')}₫`}
+                      {personalVouchers[0].validTo
+                        ? ` • ${isEn ? 'Exp' : 'HSD'} ${new Date(personalVouchers[0].validTo).toLocaleDateString('vi-VN')}`
+                        : ''}
+                      )
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopyCode(personalVouchers[0].code)}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-colors shrink-0 cursor-pointer"
+                >
+                  {copiedCode === personalVouchers[0].code ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{isEn ? 'Copied' : 'Đã sao chép'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{isEn ? 'Copy code' : 'Sao chép mã'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
             {/* Header: Kết quả tìm kiếm & Thanh sắp xếp */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 flex flex-col gap-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
                   {selectedAreas.length > 0
                     ? `${t.pageTitleAreaPrefix} ${selectedAreas.map((a) => ({
@@ -749,13 +891,25 @@ export function Search() {
                       }[a] || a)).join(', ')}`
                     : t.pageTitle}
                 </h1>
-                <p className="text-[13px] text-slate-600 mt-1">
+                <p className="text-[13px] text-slate-600">
                   {t.foundCount} <strong className="text-sky-700 tabular-nums font-bold">{filteredServices.length}</strong> {t.availableCount}
                 </p>
               </div>
 
-              {/* Sort Pills & Top-Rated Partner Filter */}
-              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+              {/* Sort Pills & Quick Deal / Top-Rated Filters */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setOnlyOnSale((prev) => !prev)}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[13px] font-bold transition-all shrink-0 cursor-pointer border ${
+                    onlyOnSale
+                      ? 'bg-rose-50 border-rose-300 text-rose-800'
+                      : 'bg-white border-slate-200 hover:border-rose-300 text-slate-700'
+                  }`}
+                >
+                  <Zap className={`w-3.5 h-3.5 ${onlyOnSale ? 'fill-rose-500 text-rose-600' : 'text-rose-500'}`} />
+                  <span>{isEn ? 'On Sale' : 'Đang ưu đãi'}</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setOnlyTopRatedVendors((prev) => !prev)}
@@ -790,6 +944,84 @@ export function Search() {
                 ))}
               </div>
             </div>
+
+            {/* Compact Active Flash Sale Merchandising Strip (shown when browsing broadly) */}
+            {!keyword.trim() && activeFlashSales.length > 0 && (
+              <section className="bg-gradient-to-r from-rose-50 via-amber-50/60 to-sky-50/70 rounded-2xl border border-rose-200/70 p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-rose-600 text-white">
+                      <Zap className="w-4 h-4 fill-amber-300 text-amber-300" />
+                    </span>
+                    <div>
+                      <h2 className="text-sm sm:text-base font-extrabold text-slate-900 leading-tight">
+                        {isEn ? 'Live Flash Sales & Deals' : 'Ưu đãi & Flash Sale đang diễn ra'}
+                      </h2>
+                      <p className="text-xs text-slate-600">
+                        {isEn
+                          ? 'Direct platform-subsidized prices — stackable with shop vouchers at checkout'
+                          : 'Giảm trực tiếp vào giá vé — có thể cộng dồn thêm mã giảm giá của đối tác khi thanh toán'}
+                      </p>
+                    </div>
+                  </div>
+                  {!onlyOnSale && (
+                    <button
+                      type="button"
+                      onClick={() => setOnlyOnSale(true)}
+                      className="text-xs font-bold text-rose-700 hover:text-rose-800 whitespace-nowrap cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <span>{isEn ? 'View all deals' : 'Lọc ưu đãi'}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {activeFlashSales.slice(0, 4).map((fs) => (
+                    <div
+                      key={fs.flashSaleId}
+                      onClick={() => navigate(`/tour/${fs.serviceId}`)}
+                      className="group bg-white rounded-xl border border-rose-200/70 hover:border-rose-400 p-2.5 flex items-center gap-3 cursor-pointer transition-all hover:shadow-sm"
+                    >
+                      <div className="relative w-20 h-16 rounded-lg overflow-hidden bg-slate-100 shrink-0">
+                        <img
+                          src={getCardThumbnailUrl(fs.imageUrl || FALLBACK_CARD_IMAGE)}
+                          alt={fs.serviceName}
+                          onError={(e) => {
+                            e.currentTarget.src = FALLBACK_CARD_IMAGE;
+                          }}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        {fs.discountPercentage > 0 && (
+                          <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-extrabold tabular-nums">
+                            -{fs.discountPercentage}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-bold text-slate-900 group-hover:text-sky-700 truncate">
+                          {fs.serviceName}
+                        </p>
+                        <div className="flex items-baseline gap-1.5 mt-0.5">
+                          <span className="text-sm font-black text-[#991b1b] tabular-nums">
+                            {fs.salePrice.toLocaleString('vi-VN')} ₫
+                          </span>
+                          <span className="text-xs text-slate-400 line-through tabular-nums">
+                            {fs.originalPrice.toLocaleString('vi-VN')} ₫
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-rose-700 font-semibold mt-0.5">
+                          {isEn
+                            ? `${Math.max(0, fs.stockAllocated - fs.stockSold)} deals left`
+                            : `Còn ${Math.max(0, fs.stockAllocated - fs.stockSold)} suất ưu đãi`}
+                        </p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-rose-600 group-hover:translate-x-0.5 transition-all shrink-0 mr-1" />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* List of Traveloka-Style Horizontal Cards */}
             {isLoading ? (
@@ -829,11 +1061,18 @@ export function Search() {
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                         />
                         
-                        {/* Status / Badge overlay */}
+                        {/* Status / Single Clean Promo Badge Overlay on Image */}
                         <div className="absolute top-2.5 left-2.5">
-                          <span className="px-2.5 py-1 rounded-md bg-[#031d44]/90 backdrop-blur-xs text-white text-[13px] font-bold">
-                            {t.solasBadge}
-                          </span>
+                          {service.hasFlashSale ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-600/95 backdrop-blur-xs text-white text-[12px] font-extrabold shadow-sm">
+                              <Zap className="w-3.5 h-3.5 fill-amber-300 text-amber-300 shrink-0" />
+                              <span>Flash Sale -{service.flashSalePercent}%</span>
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-md bg-[#031d44]/90 backdrop-blur-xs text-white text-[13px] font-bold">
+                              {t.solasBadge}
+                            </span>
+                          )}
                         </div>
 
                         {/* Wishlist Heart */}
@@ -931,21 +1170,53 @@ export function Search() {
                       </div>
 
                       {/* Right: Commercial Pricing & Action Box (Traveloka Style) */}
-                      <div className="p-4 sm:p-5 sm:border-l sm:border-slate-100 flex flex-col justify-between items-start w-full sm:w-56 shrink-0 bg-slate-50/50 sm:bg-transparent">
+                      <div className="p-4 sm:p-5 sm:border-l sm:border-slate-100 flex flex-col justify-between items-start w-full sm:w-60 shrink-0 bg-slate-50/50 sm:bg-transparent">
                         
-                        {/* Price Display */}
+                        {/* Price Display (Honest Primary Flash Sale Price + Tasteful Shop Voucher Pill) */}
                         <div className="text-left w-full">
-                          {service.promotionalPrice && (
-                            <p className="text-[13px] text-slate-500 line-through tabular-nums font-medium">
-                              {service.promotionalPrice.toLocaleString('vi-VN')} ₫
+                          {service.strikethroughPrice && service.strikethroughPrice > service.effectivePrice && (
+                            <p className="text-[13px] text-slate-400 line-through tabular-nums font-medium">
+                              {service.strikethroughPrice.toLocaleString('vi-VN')} ₫
                             </p>
                           )}
                           <p className="text-xl sm:text-2xl font-black text-[#991b1b] tabular-nums tracking-tight">
-                            {service.price.toLocaleString('vi-VN')} ₫
+                            {service.effectivePrice.toLocaleString('vi-VN')} ₫
                           </p>
-                          <p className="text-[13px] text-slate-600">
+                          <p className="text-[12px] text-slate-600 mt-0.5">
                             {t.perGuest} <span className="text-emerald-700 font-medium">{t.insuranceIncluded}</span>
                           </p>
+
+                          {/* Second Badge: Compact Shop Voucher Pill + Estimated Price when eligible */}
+                          {service.bestVendorVoucher && (
+                            <div className="mt-2.5 pt-2 border-t border-slate-200/70 space-y-1">
+                              <button
+                                type="button"
+                                onClick={(e) => handleCopyCode(service.bestVendorVoucher!.code, e)}
+                                title={isEn ? 'Click to copy shop code' : 'Nhấn để sao chép mã giảm giá'}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 border border-amber-300/80 text-amber-900 text-[11px] font-bold transition-colors max-w-full cursor-pointer"
+                              >
+                                <Tag className="w-3 h-3 text-amber-600 shrink-0" />
+                                <span className="truncate">
+                                  {copiedCode === service.bestVendorVoucher.code
+                                    ? (isEn ? `Copied ${service.bestVendorVoucher.code}` : `Đã chép ${service.bestVendorVoucher.code}`)
+                                    : (isEn ? service.bestVendorVoucher.shortLabelEn : service.bestVendorVoucher.shortLabelVi)}
+                                </span>
+                              </button>
+                              {service.bestVendorVoucher.estimatedAfterVoucherPrice != null ? (
+                                <p className="text-[11px] text-emerald-700 font-semibold tabular-nums leading-snug">
+                                  {isEn
+                                    ? `Est. ${service.bestVendorVoucher.estimatedAfterVoucherPrice.toLocaleString('vi-VN')} ₫ w/ code`
+                                    : `Còn ~${service.bestVendorVoucher.estimatedAfterVoucherPrice.toLocaleString('vi-VN')} ₫ khi áp mã`}
+                                </p>
+                              ) : (service.bestVendorVoucher.conditionLabelVi || service.bestVendorVoucher.conditionLabelEn) ? (
+                                <p className="text-[11px] text-slate-500 font-medium leading-snug">
+                                  {isEn
+                                    ? `Applies on orders ${service.bestVendorVoucher.conditionLabelEn}`
+                                    : `Áp dụng cho ${service.bestVendorVoucher.conditionLabelVi}`}
+                                </p>
+                              ) : null}
+                            </div>
+                          )}
                         </div>
 
                         {/* CTA Button */}
