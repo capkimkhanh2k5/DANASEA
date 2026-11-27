@@ -2,6 +2,7 @@ package com.danasea.backend.modules.ai;
 
 import static org.assertj.core.api.Assertions.*;
 
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +18,7 @@ import org.springframework.web.client.RestClient;
 import com.danasea.backend.modules.ai.domain.models.DecisionTask;
 import com.danasea.backend.modules.ai.infrastructure.quyet.QuyetDecisionAdapter;
 import com.danasea.backend.modules.ai.infrastructure.quyet.QuyetProperties;
+import com.danasea.backend.modules.ai.support.AiAcceptanceRecorder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 
@@ -29,7 +31,7 @@ class QuyetDecisionAdapterTest {
     private final AtomicReference<String> authorization = new AtomicReference<>();
     private int status = 200;
     @BeforeEach void setup() throws Exception {
-        server = HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/decisions", exchange -> {
             received.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
@@ -93,7 +95,7 @@ class QuyetDecisionAdapterTest {
                     "review", "Hướng dẫn tốt", "complaint", "Tour đổi giờ", "context", "Du lịch Đà Nẵng", "service", "Kayak", "risk_signals", List.of("FAILED_PAYMENTS")));
             assertThat(result.available()).as(task.name()).isTrue(); assertThat(result.revision()).isEqualTo(REVISION);
             assertThat(result.suggestionOnly()).isTrue();
-            com.danasea.backend.modules.ai.support.AiAcceptanceRecorder.write(task.wireName(), Map.of(
+            AiAcceptanceRecorder.write(task.wireName(), Map.of(
                     "requested_model", result.model(), "model_revision", result.revision(),
                     "latency_ms", result.latencyMs(), "suggestion_only", result.suggestionOnly()));
         }

@@ -187,13 +187,15 @@ export const useAiModalStore = create<AiModalState>((set, get) => ({
     const isEn = useLanguageStore.getState().language === 'en';
     const activeConversationId = get().conversationId;
 
+    const guestLoginPrompt = isEn
+      ? 'Please sign in to continue chatting.'
+      : 'Vui lòng đăng nhập để tiếp tục trò chuyện.';
+
     if (isGuest && getGuestChatCount() >= GUEST_FREE_CHAT_LIMIT && !activeConversationId) {
       const limitNotice: AiChatMessage = {
         id: `ai-err-${Date.now()}`,
         role: 'ai',
-        content: isEn
-          ? `You have used all ${GUEST_FREE_CHAT_LIMIT} free messages. Please sign in to continue this conversation.`
-          : `Bạn đã sử dụng hết ${GUEST_FREE_CHAT_LIMIT} lượt hỏi miễn phí. Vui lòng đăng nhập để tiếp tục cuộc trò chuyện này.`,
+        content: guestLoginPrompt,
         requiresLogin: true,
         timestamp: Date.now(),
       };
@@ -257,16 +259,19 @@ export const useAiModalStore = create<AiModalState>((set, get) => ({
         };
       });
     } catch (err: unknown) {
-      console.error('[AI Chat] API request failed:', err);
       const apiError = err as { response?: { status?: number; data?: { message?: string; code?: string } } };
       const code = apiError.response?.data?.code;
       const limitHit = isGuest && (code === 'GUEST_CHAT_LIMIT_REACHED' || apiError.response?.status === 401);
       if (limitHit) {
         setGuestChatCount(GUEST_FREE_CHAT_LIMIT);
+      } else {
+        console.error('[AI Chat] API request failed:', err);
       }
-      const errorMessage = apiError.response?.data?.message || (isEn
-        ? 'AI service is currently unavailable or disconnected from language model. Please try again later.'
-        : 'Dịch vụ Trợ lý AI hiện không khả dụng hoặc chưa kết nối được máy chủ ngôn ngữ. Vui lòng thử lại sau.');
+      const errorMessage = limitHit
+        ? (apiError.response?.data?.message || guestLoginPrompt)
+        : (apiError.response?.data?.message || (isEn
+          ? 'AI service is currently unavailable or disconnected from language model. Please try again later.'
+          : 'Dịch vụ Trợ lý AI hiện không khả dụng hoặc chưa kết nối được máy chủ ngôn ngữ. Vui lòng thử lại sau.'));
 
       const systemErrorMessage: AiChatMessage = {
         id: `ai-err-${Date.now()}`,

@@ -11,7 +11,6 @@ import type {
   CopilotChatResponse,
   UpdateConversationMetaDto,
 } from '../types/adminAi';
-
 import { AI_TIMEOUT_CONFIG, getAdminAiError } from './adminAiErrors';
 
 export { AI_TIMEOUT_CONFIG, getAdminAiError };

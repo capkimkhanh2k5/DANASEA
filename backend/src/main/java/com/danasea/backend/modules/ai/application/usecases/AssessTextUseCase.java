@@ -5,13 +5,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 
-import com.danasea.backend.modules.ai.application.services.AiEntityReferenceResolver;
 import com.danasea.backend.modules.ai.application.ports.AssessmentCaseStorePort;
 import com.danasea.backend.modules.ai.application.ports.DecisionModelPort;
+import com.danasea.backend.modules.ai.application.services.AiEntityReferenceResolver;
 import com.danasea.backend.modules.ai.domain.models.AssessmentCase;
 import com.danasea.backend.modules.ai.domain.models.DecisionResult;
 import com.danasea.backend.modules.ai.domain.models.DecisionTask;
@@ -41,9 +43,9 @@ public class AssessTextUseCase {
         DecisionResult category = model.decide(DecisionTask.SERVICE_CATEGORY, Map.of("content", text));
         DecisionResult moderation = model.decide(DecisionTask.MODERATION, Map.of("content", text));
         String uuidStripped = AiEntityReferenceResolver.stripUuids(text);
-        List<String> contacts = java.util.stream.Stream.concat(
-                PHONE.matcher(uuidStripped).results().map(java.util.regex.MatchResult::group),
-                EXTERNAL_LINK_OR_EMAIL.matcher(text).results().map(java.util.regex.MatchResult::group)
+        List<String> contacts = Stream.concat(
+                PHONE.matcher(uuidStripped).results().map(MatchResult::group),
+                EXTERNAL_LINK_OR_EMAIL.matcher(text).results().map(MatchResult::group)
         ).distinct().toList();
         List<String> reasons = new ArrayList<>();
         if (!contacts.isEmpty()) reasons.add("EXTERNAL_CONTACT_DETECTED");

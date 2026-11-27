@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -102,7 +103,7 @@ class CustomerAiFeaturesTest {
         assertThatThrownBy(() -> new TravelContext("", null, null, 1, date, date, null, null,
                 Double.NaN, 108.0, null, List.of(), 10, 3, false)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new TravelContext("", null, null, 1, date, date, null, null,
-                null, null, null, java.util.Arrays.asList((String) null), 10, 3, false)).isInstanceOf(IllegalArgumentException.class);
+                null, null, null, Arrays.asList((String) null), 10, 3, false)).isInstanceOf(IllegalArgumentException.class);
     }
     @Test void itineraryHonorsAggregateBudgetOverlapAndTransferTime() {
         var first = service("First", "100000", 9, true);

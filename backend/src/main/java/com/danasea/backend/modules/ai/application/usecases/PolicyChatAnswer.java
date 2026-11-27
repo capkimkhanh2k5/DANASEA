@@ -2,6 +2,7 @@ package com.danasea.backend.modules.ai.application.usecases;
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -83,7 +84,7 @@ public class PolicyChatAnswer {
                 && (refund || POLICY.matcher(text).find() || HOURS.matcher(text).find())) {
             return new Reply(messages.get("ai.guest.login_required_for_orders", language),
                     "ai_cancellation_preview", "NEEDS_INPUT",
-                    Map.of("requiredInputs", java.util.List.of("AUTHENTICATION")));
+                    Map.of("requiredInputs", List.of("AUTHENTICATION")));
         }
         if (orderId != null && (refund || POLICY.matcher(text).find() || HOURS.matcher(text).find())) {
             return preview(orderId, actorId, vendorId, admin, language);

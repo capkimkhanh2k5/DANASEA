@@ -1,18 +1,20 @@
 package com.danasea.backend.modules.ai.application.usecases;
 
 import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.text.NumberFormat;
-import java.util.Arrays;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -382,7 +384,7 @@ public class ChatUseCase {
             cards.add(new AssistantArtifact(UUID.randomUUID().toString(),
                     "ai_cancellation_preview".equals(reply.tool()) ? "CUSTOMER_SUPPORT" : "POLICY",
                     reply.tool(), "AVAILABLE", facts, List.of(new AssistantArtifact.Source(
-                    reply.tool(), "BACKEND_TOOL", reply.tool(), java.time.OffsetDateTime.now())),
+                    reply.tool(), "BACKEND_TOOL", reply.tool(), OffsetDateTime.now())),
                     List.of(), List.of(), false));
         }
         return finish(conversationId, response, cards, readContext(conversationId));
@@ -438,7 +440,7 @@ public class ChatUseCase {
         String callId = UUID.randomUUID().toString();
         var card = new AssistantArtifact(callId, cardType, toolName, "AVAILABLE", facts,
                 List.of(new AssistantArtifact.Source(callId, "DANASEA_BACKEND", toolName + ":" + callId,
-                        java.time.OffsetDateTime.now())),
+                        OffsetDateTime.now())),
                 List.of(), List.of(), false);
         return finish(conversationId, response, List.of(card), readContext(conversationId));
     }
@@ -452,7 +454,7 @@ public class ChatUseCase {
                 Map.of("status", "UNKNOWN", "reason", "WAITING_FOR_FORECAST", "forecastHorizonDays", 16,
                         "plannerHorizonDays", 14, "bookingAuthorized", false, "requiresRevalidation", true),
                 List.of(new AssistantArtifact.Source(callId, "DANASEA_BACKEND", "ai_weather_slot:" + callId,
-                        java.time.OffsetDateTime.now())),
+                        OffsetDateTime.now())),
                 List.of(), List.of(), false);
         return finish(conversationId, response, List.of(card), readContext(conversationId));
     }
@@ -492,7 +494,7 @@ public class ChatUseCase {
         String callId = UUID.randomUUID().toString();
         var card = new AssistantArtifact(callId, "CUSTOMER_SUPPORT", "ai_customer_support", "AVAILABLE", facts,
                 List.of(new AssistantArtifact.Source(callId, "DANASEA_BACKEND", "ai_preferences:" + callId,
-                        java.time.OffsetDateTime.now())),
+                        OffsetDateTime.now())),
                 List.of(), List.of(), false);
         return finish(conversationId, response, List.of(card), readContext(conversationId));
     }
@@ -632,7 +634,7 @@ public class ChatUseCase {
                 return;
             }
             var quote = cards.stream().filter(card -> "SERVICE_DETAIL".equals(card.type()) && !card.sources().isEmpty())
-                    .map(card -> serviceQuote(card, replyLanguage)).filter(java.util.Objects::nonNull).findFirst();
+                    .map(card -> serviceQuote(card, replyLanguage)).filter(Objects::nonNull).findFirst();
             if (quote.isPresent()) {
                 response.setContent(quote.get());
                 return;

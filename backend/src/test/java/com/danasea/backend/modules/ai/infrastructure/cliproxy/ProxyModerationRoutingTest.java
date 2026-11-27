@@ -3,13 +3,15 @@ package com.danasea.backend.modules.ai.infrastructure.cliproxy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.List;
 import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -21,6 +23,7 @@ import org.springframework.web.client.RestClient;
 import com.danasea.backend.configs.properties.HttpClientProperties;
 import com.danasea.backend.modules.ai.domain.exceptions.AiModerationUnavailableException;
 import com.danasea.backend.modules.ai.infrastructure.cliproxy.configs.CliProxyProperties;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 
@@ -29,7 +32,7 @@ class ProxyModerationRoutingTest {
     @ValueSource(ints = {429, 503})
     void unavailablePrimaryUsesFallbackWithoutSkippingModeration(int primaryStatus) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
-        List<com.fasterxml.jackson.databind.JsonNode> requests = new ArrayList<>();
+        List<JsonNode> requests = new ArrayList<>();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/chat/completions", exchange -> {
             requests.add(mapper.readTree(exchange.getRequestBody()));
@@ -70,8 +73,8 @@ class ProxyModerationRoutingTest {
             path.set(exchange.getRequestURI().getPath());
             authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
             body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] response = mapper.writeValueAsBytes(java.util.Map.of("choices", List.of(
-                    java.util.Map.of("message", java.util.Map.of("content", output)))));
+            byte[] response = mapper.writeValueAsBytes(Map.of("choices", List.of(
+                    Map.of("message", Map.of("content", output)))));
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, response.length);
             exchange.getResponseBody().write(response);
@@ -103,7 +106,7 @@ class ProxyModerationRoutingTest {
                         try {
                             assertThat(mapper.readTree(body.get()).path("reasoning_effort").asText()).isEqualTo("high");
                             assertThat(mapper.readTree(body.get()).path("messages").path(1).path("content").asText()).hasSize(2000);
-                        } catch (java.io.IOException exception) {
+                        } catch (IOException exception) {
                             throw new AssertionError(exception);
                         }
                     });

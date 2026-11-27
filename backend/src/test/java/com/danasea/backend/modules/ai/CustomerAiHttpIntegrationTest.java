@@ -1,11 +1,15 @@
 package com.danasea.backend.modules.ai;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,17 +25,19 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.danasea.backend.modules.ai.application.ports.*;
 import com.danasea.backend.modules.ai.domain.exceptions.AiModerationUnavailableException;
 import com.danasea.backend.modules.ai.domain.models.DecisionResult;
-import com.danasea.backend.modules.ai.domain.services.ChatHistoryService;
 import com.danasea.backend.modules.ai.domain.models.TravelContext;
+import com.danasea.backend.modules.ai.domain.services.ChatHistoryService;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
+import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @AutoConfigureMockMvc
-@org.springframework.transaction.annotation.Transactional
+@Transactional
 class CustomerAiHttpIntegrationTest extends BaseSecurityIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
@@ -272,7 +278,7 @@ class CustomerAiHttpIntegrationTest extends BaseSecurityIntegrationTest {
                 .andExpect(jsonPath("$.cards[0].type").value("CUSTOMER_SUPPORT"))
                 .andExpect(jsonPath("$.cards[0].status").value("NEEDS_INPUT"));
 
-        var ownedConv = chatHistory.getOrCreateConversation(null, owner, com.danasea.backend.shared.i18n.SupportedLanguage.VI);
+        var ownedConv = chatHistory.getOrCreateConversation(null, owner, SupportedLanguage.VI);
         mvc.perform(post("/api/assistant/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"conversationId\":\"" + ownedConv.getId() + "\",\"message\":\"Xin chào\"}"))
@@ -348,32 +354,32 @@ class CustomerAiHttpIntegrationTest extends BaseSecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.responseStatus").value("ANSWERED"))
                 .andExpect(jsonPath("$.cards[0].type").value("CUSTOMER_SUPPORT"))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.allOf(
-                        org.hamcrest.Matchers.containsString("#ORD-7A2F1C4D"),
-                        org.hamcrest.Matchers.containsString("PAID"))));
+                .andExpect(jsonPath("$.message").value(allOf(
+                        containsString("#ORD-7A2F1C4D"),
+                        containsString("PAID"))));
 
         mvc.perform(post("/api/assistant/chat").with(user(owner.toString()).roles("CUSTOMER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":\"Trạng thái mã #SUB-EC938B9F\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.responseStatus").value("ANSWERED"))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.allOf(
-                        org.hamcrest.Matchers.containsString("#ORD-7A2F1C4D"),
-                        org.hamcrest.Matchers.containsString("#SUB-EC938B9F"))));
+                .andExpect(jsonPath("$.message").value(allOf(
+                        containsString("#ORD-7A2F1C4D"),
+                        containsString("#SUB-EC938B9F"))));
 
         mvc.perform(post("/api/assistant/chat").with(user(owner.toString()).roles("CUSTOMER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":\"Đơn DNS-7A2F1C4D của tôi thế nào?\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.responseStatus").value("ANSWERED"))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("#ORD-7A2F1C4D")));
+                .andExpect(jsonPath("$.message").value(containsString("#ORD-7A2F1C4D")));
 
         mvc.perform(post("/api/assistant/chat").with(user(owner.toString()).roles("CUSTOMER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":\"Đơn này thanh toán chưa?\",\"contextType\":\"ORDER\",\"contextId\":\"#ORD-7A2F1C4D\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.responseStatus").value("ANSWERED"))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("#ORD-7A2F1C4D")));
+                .andExpect(jsonPath("$.message").value(containsString("#ORD-7A2F1C4D")));
 
         mvc.perform(post("/api/assistant/chat").with(user(owner.toString()).roles("CUSTOMER"))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -381,18 +387,18 @@ class CustomerAiHttpIntegrationTest extends BaseSecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.responseStatus").value("ANSWERED"))
                 .andExpect(jsonPath("$.cards[0].type").value("ORDER_LIST"))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("#ORD-7A2F1C4D")));
+                .andExpect(jsonPath("$.message").value(containsString("#ORD-7A2F1C4D")));
 
         mvc.perform(post("/api/assistant/chat").with(user(other.toString()).roles("CUSTOMER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":\"Kiểm tra đơn hàng #ORD-7A2F1C4D\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cards[0].status").value("UNAVAILABLE"))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.anyOf(
-                                org.hamcrest.Matchers.containsString("Kayak test"),
-                                org.hamcrest.Matchers.containsString("600.000"),
-                                org.hamcrest.Matchers.containsString("600,000")))));
+                .andExpect(jsonPath("$.message").value(not(
+                        anyOf(
+                                containsString("Kayak test"),
+                                containsString("600.000"),
+                                containsString("600,000")))));
     }
 
 }

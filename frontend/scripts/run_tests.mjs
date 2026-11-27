@@ -1,9 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-
-const require = createRequire(import.meta.url);
-const { createJiti } = require('jiti');
+import { createJiti } from 'jiti';
 
 const rootDir = path.resolve(import.meta.dirname, '..');
 const srcDir = path.join(rootDir, 'src');

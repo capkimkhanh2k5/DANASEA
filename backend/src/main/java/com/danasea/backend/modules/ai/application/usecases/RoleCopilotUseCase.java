@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
@@ -1245,7 +1246,7 @@ public class RoleCopilotUseCase {
                 sb.append("; options=");
                 sb.append(d.options().stream()
                         .map(o -> sanitizeFactText(o.name(), 80) + " " + o.price() + " (" + o.pricingUnit() + ", " + o.status() + ")")
-                        .collect(java.util.stream.Collectors.joining(" | ")));
+                        .collect(Collectors.joining(" | ")));
             }
             return "SERVICE (verified, owned by this vendor): " + sb;
         }
