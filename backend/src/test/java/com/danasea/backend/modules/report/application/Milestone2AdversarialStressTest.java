@@ -51,6 +51,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import com.danasea.backend.modules.report.ReportFinancialTestFixtures;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Milestone 2 Adversarial Boundary, Stress & Integrity Test Suite")
@@ -153,18 +155,18 @@ class Milestone2AdversarialStressTest {
                             dt,
                             dt);
 
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findSubOrders(eq(timeRange), eq(null)))
                     .thenReturn(List.of(subOrder));
-            com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+            ReportFinancialTestFixtures.paidOrders(
                     reportDataPort, List.of(subOrder));
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefunds(eq(timeRange), eq(null)))
                     .thenReturn(List.of(refund));
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefundsBySubOrderIds(any()))
                     .thenReturn(List.of(refund));
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findMasterOrders(eq(timeRange)))
                     .thenReturn(List.of(masterOrder));
 
@@ -230,18 +232,18 @@ class Milestone2AdversarialStressTest {
                             dt,
                             dt);
 
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findSubOrders(eq(timeRange), any()))
                     .thenReturn(List.of(subOrder));
-            com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+            ReportFinancialTestFixtures.paidOrders(
                     reportDataPort, List.of(subOrder));
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefunds(eq(timeRange), any()))
                     .thenReturn(List.of(refund));
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefundsBySubOrderIds(any()))
                     .thenReturn(List.of(refund));
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findMasterOrders(eq(timeRange)))
                     .thenReturn(Collections.emptyList());
 
@@ -263,18 +265,18 @@ class Milestone2AdversarialStressTest {
         void shouldIncludeLeapDayInDailyZeroFill() {
             TimeRange leapRange = TimeRange.of(LocalDate.of(2024, 2, 27), LocalDate.of(2024, 3, 2));
 
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findSubOrders(eq(leapRange), any()))
                     .thenReturn(Collections.emptyList());
-            com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+            ReportFinancialTestFixtures.paidOrders(
                     reportDataPort, Collections.emptyList());
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefunds(eq(leapRange), any()))
                     .thenReturn(Collections.emptyList());
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefundsBySubOrderIds(any()))
                     .thenReturn(Collections.emptyList());
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findMasterOrders(eq(leapRange)))
                     .thenReturn(Collections.emptyList());
 
@@ -293,15 +295,15 @@ class Milestone2AdversarialStressTest {
         void shouldHandleFullYearDailyZeroFillEfficiently() {
             TimeRange fullYear = TimeRange.of(LocalDate.of(2025, 1, 1), LocalDate.of(2025, 12, 31));
 
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findSubOrders(eq(fullYear), any()))
                     .thenReturn(Collections.emptyList());
-            com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+            ReportFinancialTestFixtures.paidOrders(
                     reportDataPort, Collections.emptyList());
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefunds(eq(fullYear), any()))
                     .thenReturn(Collections.emptyList());
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefundsBySubOrderIds(any()))
                     .thenReturn(Collections.emptyList());
 
@@ -460,15 +462,15 @@ class Milestone2AdversarialStressTest {
                                 dt));
             }
 
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findSubOrders(eq(stormDay), eq(vendorId)))
                     .thenReturn(subOrders);
-            com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+            ReportFinancialTestFixtures.paidOrders(
                     reportDataPort, subOrders);
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefunds(eq(stormDay), eq(vendorId)))
                     .thenReturn(refunds);
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefundsBySubOrderIds(any()))
                     .thenReturn(refunds);
             when(reportDataPort.findServiceSlots(eq(stormDay), eq(vendorId)))
@@ -508,18 +510,18 @@ class Milestone2AdversarialStressTest {
         void shouldExportAccountingCsvWithValidEncodingAndBom() {
             TimeRange range = TimeRange.of(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 2));
 
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findSubOrders(eq(range), any()))
                     .thenReturn(Collections.emptyList());
-            com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+            ReportFinancialTestFixtures.paidOrders(
                     reportDataPort, Collections.emptyList());
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefunds(eq(range), any()))
                     .thenReturn(Collections.emptyList());
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findRefundsBySubOrderIds(any()))
                     .thenReturn(Collections.emptyList());
-            org.mockito.Mockito.lenient()
+            Mockito.lenient()
                     .when(reportDataPort.findMasterOrders(eq(range)))
                     .thenReturn(Collections.emptyList());
 

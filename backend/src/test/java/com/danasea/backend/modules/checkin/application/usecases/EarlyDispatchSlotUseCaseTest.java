@@ -29,6 +29,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import java.util.Map;
+import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -320,14 +323,14 @@ class EarlyDispatchSlotUseCaseTest {
         // Target: 08:30 (cap: 10, booked: 8 -> 2 seats left in Postgres, but Redis holds 2 seats)
         ServiceSlotJpaEntity targetSlot = buildSlot(targetSlotId, date, LocalTime.of(8, 30), LocalTime.of(10, 0), 10, 8, SlotStatus.OPEN);
 
-        org.springframework.data.redis.core.StringRedisTemplate redisTemplate = mock(org.springframework.data.redis.core.StringRedisTemplate.class);
-        org.springframework.data.redis.core.HashOperations hashOperations = mock(org.springframework.data.redis.core.HashOperations.class);
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        HashOperations hashOperations = mock(HashOperations.class);
         when(redisTemplate.opsForHash()).thenReturn(hashOperations);
 
         long futureExp = System.currentTimeMillis() + 600000;
         // Hold value formatted as "<exp>|PERSON_LIMIT:<qty>"
         when(hashOperations.entries("inventory:slot:" + targetSlotId + ":holds"))
-                .thenReturn(java.util.Map.of("hold1", futureExp + "|PERSON_LIMIT:2"));
+                .thenReturn(Map.of("hold1", futureExp + "|PERSON_LIMIT:2"));
 
         ReflectionTestUtils.setField(useCase, "redisTemplate", redisTemplate);
 

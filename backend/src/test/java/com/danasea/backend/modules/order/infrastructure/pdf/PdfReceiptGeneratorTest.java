@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import com.danasea.backend.modules.order.presentation.dtos.OrderReceiptItemResponse;
 import com.danasea.backend.modules.order.presentation.dtos.OrderReceiptResponse;
+import java.util.List;
 
 class PdfReceiptGeneratorTest {
     @Test
@@ -55,7 +56,7 @@ class PdfReceiptGeneratorTest {
         var item = new OrderReceiptItemResponse(UUID.randomUUID(),UUID.randomUUID(),"X".repeat(500)+" 🌊",1,
                 BigDecimal.TEN,BigDecimal.TEN,BigDecimal.ZERO,BigDecimal.TEN);
         var receipt = new OrderReceiptResponse(UUID.randomUUID(), "ORD-TEST", "REC-TEST", UUID.randomUUID(), BigDecimal.TEN,
-                BigDecimal.ZERO, "PAID",null,null,java.util.List.of(item));
+                BigDecimal.ZERO, "PAID",null,null,List.of(item));
         try (var document=Loader.loadPDF(new PdfReceiptGenerator().generate(receipt))) {
             assertTrue(new PDFTextStripper().getText(document).contains("TOTAL AMOUNT:"));
         }

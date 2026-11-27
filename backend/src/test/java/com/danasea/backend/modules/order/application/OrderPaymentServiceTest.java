@@ -3,7 +3,6 @@ package com.danasea.backend.modules.order.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -37,7 +36,6 @@ import com.danasea.backend.modules.booking.infrastructure.persistence.repositori
 import com.danasea.backend.modules.order.application.usecases.CreatePaymentIntentUseCase;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidWebhookException;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
-import com.danasea.backend.modules.order.domain.models.PaymentAttemptState;
 import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.models.PaymentStatus;

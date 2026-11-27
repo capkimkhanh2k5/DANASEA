@@ -7,7 +7,6 @@ import com.danasea.backend.modules.communication.application.dtos.NotificationCo
 import com.danasea.backend.modules.communication.application.usecases.SendNotificationUseCase;
 import com.danasea.backend.modules.communication.domain.ports.PushNotificationPort;
 import com.danasea.backend.modules.communication.infrastructure.persistence.entities.NotificationJpaEntity;
-import com.danasea.backend.modules.dispute.domain.models.DisputeStatus;
 import com.danasea.backend.modules.dispute.infrastructure.persistence.repositories.JpaDisputeRepository;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
@@ -64,6 +63,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import java.util.Random;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -1398,7 +1398,7 @@ class AutoCompleteSubOrdersUseCaseTest {
 
             for (int seed = 0; seed < 10; seed++) {
                 List<SubOrderStatus> shuffled = new ArrayList<>(templateStatuses);
-                Collections.shuffle(shuffled, new java.util.Random(seed));
+                Collections.shuffle(shuffled, new Random(seed));
 
                 MasterOrderJpaEntity master = new MasterOrderJpaEntity();
                 master.setId(mId);

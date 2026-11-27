@@ -40,6 +40,9 @@ import com.danasea.backend.modules.service.application.api.AiCatalogReadApi.Opti
 import com.danasea.backend.modules.service.application.api.AiCatalogReadApi.PublishedService;
 import com.danasea.backend.modules.service.application.api.AiCatalogReadApi.Slot;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
+import java.util.ArrayList;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 
 class ItineraryPlannerUpgradeTest {
     private final TravelDataPort data = mock(TravelDataPort.class);
@@ -137,12 +140,12 @@ class ItineraryPlannerUpgradeTest {
         when(store.transition(saved.id(), owner, 2, "STALE", "CANONICAL_SLOT_UNAVAILABLE")).thenReturn(stale);
         when(data.search(any())).thenReturn(List.of());
         planner.sourceChanged(impactedSlot, "SLOT:canonical:1", "CANONICAL_SLOT_UNAVAILABLE");
-        verify(store).propose(eq(saved.id()), eq(owner), eq(3L), org.mockito.ArgumentMatchers.argThat(next ->
+        verify(store).propose(eq(saved.id()), eq(owner), eq(3L), ArgumentMatchers.argThat(next ->
                 next.items().equals(plan.items().stream().filter(item -> !item.slotId().equals(impactedSlot)).toList())),
                 eq("CANONICAL_SLOT_UNAVAILABLE"), eq("SLOT:canonical:1"));
         when(store.hasSourceEvent(saved.id(), "SLOT:canonical:1")).thenReturn(true);
         planner.sourceChanged(impactedSlot, "SLOT:canonical:1", "CANONICAL_SLOT_UNAVAILABLE");
-        verify(store, org.mockito.Mockito.times(1)).transition(any(), any(), anyLong(), any(), any());
+        verify(store, Mockito.times(1)).transition(any(), any(), anyLong(), any(), any());
     }
 
     @Test void ongoingItineraryPreservesPastItemsAndOnlySearchesRemainingDates() {
@@ -155,7 +158,7 @@ class ItineraryPlannerUpgradeTest {
                 16.1, 108.2, 0, "NOT_REQUIRED", false, null);
         when(data.search(any())).thenReturn(List.of(futureService));
         var futurePlan = planner.propose(current, Set.of(), Set.of(), SupportedLanguage.VI);
-        var items = new java.util.ArrayList<>(futurePlan.items());
+        var items = new ArrayList<>(futurePlan.items());
         items.addFirst(past);
         var original = new ItineraryPlan("PROPOSED", pastContext, new BigDecimal("200"), List.copyOf(items), List.of(), "TEST", false);
         var saved = new Saved(UUID.randomUUID(), owner, 0, original, OffsetDateTime.now(), OffsetDateTime.now(), "ACCEPTED", false);
@@ -165,7 +168,7 @@ class ItineraryPlannerUpgradeTest {
         var result = planner.replan(saved.id(), owner, 0, null, Set.of(), Set.of(), "CHANGE", SupportedLanguage.VI);
         assertThat(result.proposal().plan().items()).contains(past);
         assertThat(result.proposal().plan().context()).isEqualTo(pastContext);
-        verify(data).search(org.mockito.ArgumentMatchers.argThat(query -> query.from().equals(LocalDate.now(TravelContext.ZONE))));
+        verify(data).search(ArgumentMatchers.argThat(query -> query.from().equals(LocalDate.now(TravelContext.ZONE))));
     }
 
     @Test void acceptedQuoteRejectsChangedSlotEndOrCoordinates() {

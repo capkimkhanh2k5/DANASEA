@@ -51,6 +51,7 @@ import com.danasea.backend.modules.service.domain.models.ServiceSlot;
 import com.danasea.backend.modules.service.domain.models.ServiceSlotUnit;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
+import java.util.Map;
 
 @Testcontainers(disabledWithoutDocker = true)
 class PrivateSlotRedisExclusivityIntegrationTest {
@@ -290,7 +291,7 @@ class PrivateSlotRedisExclusivityIntegrationTest {
                 .status(SlotStatus.OPEN)
                 .inventoryType(InventoryType.PERSON_LIMIT)
                 .servicePublished(true)
-                .options(java.util.Map.of(optionId, SlotValidationDetails.ServiceOptionValidationDetails.builder()
+                .options(Map.of(optionId, SlotValidationDetails.ServiceOptionValidationDetails.builder()
                         .id(optionId)
                         .name("Goi chung")
                         .optionType(OptionType.SHARED)

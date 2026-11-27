@@ -31,11 +31,12 @@ import com.danasea.backend.modules.ai.application.ports.TravelWeatherPort;
 import com.danasea.backend.modules.ai.domain.models.DecisionResult;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
 
 @AutoConfigureMockMvc
 @Transactional
 class CustomerEvidenceHttpIntegrationTest extends BaseSecurityIntegrationTest {
-    @Autowired jakarta.persistence.EntityManager entityManager;
+    @Autowired EntityManager entityManager;
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;

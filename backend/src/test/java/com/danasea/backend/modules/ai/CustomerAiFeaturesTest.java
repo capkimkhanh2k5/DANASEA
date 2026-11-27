@@ -27,6 +27,7 @@ import com.danasea.backend.modules.ai.domain.services.TravelQueryParser;
 import com.danasea.backend.modules.operation.application.api.AiReviewReadApi.ReviewEvidence;
 import com.danasea.backend.modules.service.application.api.AiCatalogReadApi.*;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
+import java.util.Arrays;
 
 class CustomerAiFeaturesTest {
     private final TravelDataPort data = mock(TravelDataPort.class);
@@ -102,7 +103,7 @@ class CustomerAiFeaturesTest {
         assertThatThrownBy(() -> new TravelContext("", null, null, 1, date, date, null, null,
                 Double.NaN, 108.0, null, List.of(), 10, 3, false)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new TravelContext("", null, null, 1, date, date, null, null,
-                null, null, null, java.util.Arrays.asList((String) null), 10, 3, false)).isInstanceOf(IllegalArgumentException.class);
+                null, null, null, Arrays.asList((String) null), 10, 3, false)).isInstanceOf(IllegalArgumentException.class);
     }
     @Test void itineraryHonorsAggregateBudgetOverlapAndTransferTime() {
         var first = service("First", "100000", 9, true);

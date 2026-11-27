@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 import com.danasea.backend.shared.i18n.LocalizedContentSelector;
 
 import org.springframework.beans.factory.annotation.Autowired;

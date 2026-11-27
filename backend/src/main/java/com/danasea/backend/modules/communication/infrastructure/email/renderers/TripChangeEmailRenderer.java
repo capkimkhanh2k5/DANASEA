@@ -24,8 +24,6 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaRefundRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRescheduleProposalRepository;
-import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
-import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.shared.i18n.LocalizedMessageService;

@@ -1,6 +1,10 @@
 package com.danasea.backend.modules.account.infrastructure.persistence.entities;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
 
 import com.danasea.backend.modules.account.domain.models.Role;
 import com.danasea.backend.shared.core.infrastructure.persistence.entities.BaseJpaEntity;

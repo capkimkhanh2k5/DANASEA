@@ -40,6 +40,8 @@ import com.danasea.backend.modules.vendor.infrastructure.persistence.repositorie
 import com.danasea.backend.security.authentication.domain.models.Authentication;
 import com.danasea.backend.security.authentication.infrastructure.security.JwtTokenProvider;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -70,7 +72,7 @@ public class ServiceOptionUpdateIntegrationTest extends BaseSecurityIntegrationT
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+    private StringRedisTemplate redisTemplate;
 
     private UserJpaEntity ownerUser;
     private VendorJpaEntity ownerVendor;
@@ -88,7 +90,7 @@ public class ServiceOptionUpdateIntegrationTest extends BaseSecurityIntegrationT
     @BeforeEach
     void setUp() {
         if (redisTemplate.getConnectionFactory() != null) {
-            redisTemplate.execute((org.springframework.data.redis.core.RedisCallback<Object>) connection -> {
+            redisTemplate.execute((RedisCallback<Object>) connection -> {
                 connection.serverCommands().flushDb();
                 return null;
             });

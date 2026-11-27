@@ -64,7 +64,6 @@ import com.danasea.backend.modules.ai.application.tools.VendorFeatureTool;
 import com.danasea.backend.modules.ai.application.usecases.AdminDisputeSummaryUseCase;
 import com.danasea.backend.modules.ai.application.usecases.AnalyzeTransactionRiskUseCase;
 import com.danasea.backend.modules.ai.application.usecases.AssessTextUseCase;
-import com.danasea.backend.modules.ai.domain.models.AssessmentCase;
 import com.danasea.backend.modules.ai.infrastructure.persistence.AssessmentCaseStoreAdapter;
 import com.danasea.backend.modules.ai.infrastructure.persistence.entities.AiAssessmentCaseJpaEntity;
 import com.danasea.backend.modules.ai.infrastructure.persistence.repositories.JpaAiAssessmentCaseRepository;
@@ -98,6 +97,14 @@ import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.danasea.backend.modules.ai.application.usecases.PolicyChatAnswer;
+import com.danasea.backend.modules.order.application.api.AiPolicyReader;
+import com.danasea.backend.modules.order.application.usecases.GetCancellationPreviewUseCase;
+import com.danasea.backend.modules.order.domain.services.RefundPolicyEngine;
+import com.danasea.backend.shared.i18n.LocalizedMessageService;
+import java.time.temporal.ChronoUnit;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 class VendorAdminAiFeaturesTest {
 
@@ -152,11 +159,11 @@ class VendorAdminAiFeaturesTest {
         roleCopilotUseCase = new RoleCopilotUseCase(
                 vendorAiData, reviewCoachingUseCase, slotAdvisorUseCase, listingOptimizerUseCase,
                 adminAiData, disputeSummaryUseCase, insightStore, llmClient, moderationPort, mapper,
-                new com.danasea.backend.modules.ai.application.usecases.PolicyChatAnswer(
-                        new com.danasea.backend.modules.order.application.api.AiPolicyReader(
-                                new com.danasea.backend.modules.order.domain.services.RefundPolicyEngine())::current,
-                        mock(com.danasea.backend.modules.order.application.usecases.GetCancellationPreviewUseCase.class),
-                        com.danasea.backend.shared.i18n.LocalizedMessageService.standalone()));
+                new PolicyChatAnswer(
+                        new AiPolicyReader(
+                                new RefundPolicyEngine())::current,
+                        mock(GetCancellationPreviewUseCase.class),
+                        LocalizedMessageService.standalone()));
 
         marineBriefingUseCase = new CustomerMarineBriefingUseCase(
                 masterOrderRepo, subOrderRepo, serviceRepo, slotRepo, marineWeather, insightStore, mapper);
@@ -274,7 +281,7 @@ class VendorAdminAiFeaturesTest {
         UUID foreignServiceId = UUID.randomUUID();
         when(vendorAiData.getService(vendorId, foreignServiceId)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> reviewCoachingUseCase.execute(vendorUserId, foreignServiceId, LocalDate.now().minusDays(30), LocalDate.now()))
-                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                .isInstanceOf(AccessDeniedException.class);
     }
 
     // ==================== 2. VENDOR LISTING OPTIMIZER TESTS ====================
@@ -565,7 +572,7 @@ class VendorAdminAiFeaturesTest {
             List<?> list = (List<?>) art.get("data");
             assertThat(list).hasSize(3); // All 3 vendors retained, including 0đ Kajin
             assertThat(art.get("period")).isEqualTo(Map.of("from", today.minusDays(29).toString(), "to", today.toString()));
-            assertThat(java.time.temporal.ChronoUnit.DAYS.between(today.minusDays(29), today) + 1).isEqualTo(30);
+            assertThat(ChronoUnit.DAYS.between(today.minusDays(29), today) + 1).isEqualTo(30);
         });
 
         // 2. Kiểu B: Thống kê doanh thu từng đối tác tháng 10/2026
@@ -1038,8 +1045,8 @@ class VendorAdminAiFeaturesTest {
                 .isInstanceOf(AccessDeniedException.class);
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = {
+    @ParameterizedTest
+    @ValueSource(strings = {
             "chính sách đổi tra đang như nào", "chính sách hoàn tiền" })
     void vendorPolicyRepliesUseCanonicalRules(String question) {
         stubVendorPolicyConversation();
@@ -1131,11 +1138,11 @@ class VendorAdminAiFeaturesTest {
         return new RoleCopilotUseCase(
                 vendorAiData, reviewCoachingUseCase, slotAdvisorUseCase, listingOptimizerUseCase,
                 adminAiData, disputeSummaryUseCase, insightStore, llmClient, moderationPort, mapper,
-                new com.danasea.backend.modules.ai.application.usecases.PolicyChatAnswer(
-                        new com.danasea.backend.modules.order.application.api.AiPolicyReader(
-                                new com.danasea.backend.modules.order.domain.services.RefundPolicyEngine())::current,
-                        mock(com.danasea.backend.modules.order.application.usecases.GetCancellationPreviewUseCase.class),
-                        com.danasea.backend.shared.i18n.LocalizedMessageService.standalone()),
+                new PolicyChatAnswer(
+                        new AiPolicyReader(
+                                new RefundPolicyEngine())::current,
+                        mock(GetCancellationPreviewUseCase.class),
+                        LocalizedMessageService.standalone()),
                 textUseCase, riskReadPort, caseStore, riskUseCase);
     }
 
@@ -1147,7 +1154,7 @@ class VendorAdminAiFeaturesTest {
 
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
                 new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "TOP_RATED")));
-        org.mockito.Mockito.doReturn(new DecisionResult(
+        Mockito.doReturn(new DecisionResult(
                 true, DecisionTask.MODERATION.wireName(), "quyet", "rev1", "v1", 5.0,
                 Map.of("external_payment", new DecisionResult.Answer("noul", null, null, 0.85, null, Map.of())),
                 null, true)).when(decisionModel).decide(eq(DecisionTask.MODERATION), any());

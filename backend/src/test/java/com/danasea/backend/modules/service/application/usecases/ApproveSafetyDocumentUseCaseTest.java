@@ -1,6 +1,5 @@
 package com.danasea.backend.modules.service.application.usecases;
 
-import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,6 +23,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import com.danasea.backend.modules.service.domain.exceptions.InvalidDocumentStateException;
 
 @ExtendWith(MockitoExtension.class)
 class ApproveSafetyDocumentUseCaseTest {
@@ -247,7 +247,7 @@ class ApproveSafetyDocumentUseCaseTest {
         documentEntity.setStatus(DocStatus.WITHDRAWN);
         when(safetyDocumentRepository.findByIdAndServiceId(documentId, serviceId)).thenReturn(Optional.of(documentEntity));
 
-        assertThrows(com.danasea.backend.modules.service.domain.exceptions.InvalidDocumentStateException.class, () ->
+        assertThrows(InvalidDocumentStateException.class, () ->
                 useCase.approve(serviceId, documentId, adminId)
         );
     }
@@ -258,7 +258,7 @@ class ApproveSafetyDocumentUseCaseTest {
         documentEntity.setStatus(DocStatus.APPROVED);
         when(safetyDocumentRepository.findByIdAndServiceId(documentId, serviceId)).thenReturn(Optional.of(documentEntity));
 
-        assertThrows(com.danasea.backend.modules.service.domain.exceptions.InvalidDocumentStateException.class, () ->
+        assertThrows(InvalidDocumentStateException.class, () ->
                 useCase.reject(serviceId, documentId, adminId, "Late rejection")
         );
     }

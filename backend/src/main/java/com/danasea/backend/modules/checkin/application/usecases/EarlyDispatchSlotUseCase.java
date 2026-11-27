@@ -11,7 +11,6 @@ import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundExceptio
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
-import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceOptionRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;

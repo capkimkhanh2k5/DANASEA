@@ -16,7 +16,6 @@ import com.danasea.backend.modules.service.presentation.dtos.CategoryTreeRespons
 import com.danasea.backend.modules.service.presentation.dtos.CreateCategoryRequest;
 import com.danasea.backend.modules.service.presentation.dtos.UpdateCategoryRequest;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -1,6 +1,5 @@
 package com.danasea.backend.modules.communication.infrastructure.email.renderers;
 
-import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;

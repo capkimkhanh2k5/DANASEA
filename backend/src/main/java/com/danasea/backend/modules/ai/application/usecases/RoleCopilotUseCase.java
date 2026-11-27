@@ -46,6 +46,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -1162,7 +1163,7 @@ public class RoleCopilotUseCase {
                 sb.append("; options=");
                 sb.append(d.options().stream()
                         .map(o -> sanitizeFactText(o.name(), 80) + " " + o.price() + " (" + o.pricingUnit() + ", " + o.status() + ")")
-                        .collect(java.util.stream.Collectors.joining(" | ")));
+                        .collect(Collectors.joining(" | ")));
             }
             return "SERVICE (verified, owned by this vendor): " + sb;
         }

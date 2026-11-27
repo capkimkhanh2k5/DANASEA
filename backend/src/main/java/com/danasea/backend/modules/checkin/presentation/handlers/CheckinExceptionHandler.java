@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import com.danasea.backend.modules.checkin.presentation.dtos.EligibleSubOrderCandidate;
+import java.util.List;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(basePackages = "com.danasea.backend.modules.checkin")
@@ -40,7 +42,7 @@ public class CheckinExceptionHandler extends LocalizedExceptionHandlerSupport {
             String code,
             String message,
             UUID masterOrderId,
-            java.util.List<com.danasea.backend.modules.checkin.presentation.dtos.EligibleSubOrderCandidate> eligibleSubOrders
+            List<EligibleSubOrderCandidate> eligibleSubOrders
     ) {}
 
     @ExceptionHandler(InvalidQrSignatureException.class)

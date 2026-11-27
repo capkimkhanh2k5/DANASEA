@@ -1,13 +1,7 @@
 package com.danasea.backend.modules.communication;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,13 +24,13 @@ import com.danasea.backend.modules.communication.application.email.Transactional
 import com.danasea.backend.modules.communication.application.email.TransactionalEmailSender;
 import com.danasea.backend.modules.communication.domain.models.EmailDeliveryMode;
 import com.danasea.backend.modules.communication.domain.models.EmailDeliveryStatus;
-import com.danasea.backend.modules.communication.domain.models.TransactionalEmailFamily;
 import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.communication.infrastructure.email.TransactionalEmailClaimService;
 import com.danasea.backend.modules.communication.infrastructure.email.TransactionalEmailProperties;
 import com.danasea.backend.modules.communication.infrastructure.email.TransactionalEmailWorker;
 import com.danasea.backend.modules.communication.infrastructure.email.entities.TransactionalEmailDeliveryJpaEntity;
 import com.danasea.backend.modules.communication.infrastructure.email.repositories.JpaTransactionalEmailDeliveryRepository;
+import org.mockito.ArgumentMatchers;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionalEmailWorkerTest {
@@ -120,9 +114,9 @@ class TransactionalEmailWorkerTest {
         worker.processIndividualEmail(id, EmailDeliveryMode.LIVE);
 
         verify(claimService).recordFinalOutcome(
-                org.mockito.ArgumentMatchers.eq(id),
+                ArgumentMatchers.eq(id),
                 any(),
-                org.mockito.ArgumentMatchers.argThat(result ->
+                ArgumentMatchers.argThat(result ->
                         result.status() == EmailDeliveryStatus.SKIPPED
                                 && "UNVERIFIED_EMAIL".equals(result.errorCode())
                 ),
@@ -142,15 +136,15 @@ class TransactionalEmailWorkerTest {
         UUID bookingEmailId = UUID.randomUUID();
         TransactionalEmailDeliveryJpaEntity bookingEntity = createEntity(TransactionalEmailType.BOOKING_CONFIRMED, recipientKey, null);
         bookingEntity.setId(bookingEmailId);
-        when(claimService.claimForDelivery(org.mockito.ArgumentMatchers.eq(bookingEmailId), any(), any(), any()))
+        when(claimService.claimForDelivery(ArgumentMatchers.eq(bookingEmailId), any(), any(), any()))
                 .thenReturn(Optional.of(bookingEntity));
 
         worker.processIndividualEmail(bookingEmailId, EmailDeliveryMode.LIVE);
 
         verify(claimService).recordFinalOutcome(
-                org.mockito.ArgumentMatchers.eq(bookingEmailId),
+                ArgumentMatchers.eq(bookingEmailId),
                 any(),
-                org.mockito.ArgumentMatchers.argThat(result ->
+                ArgumentMatchers.argThat(result ->
                         result.status() == EmailDeliveryStatus.SKIPPED
                                 && "ACCOUNT_LOCKED".equals(result.errorCode())
                 ),
@@ -161,7 +155,7 @@ class TransactionalEmailWorkerTest {
         UUID cancelEmailId = UUID.randomUUID();
         TransactionalEmailDeliveryJpaEntity cancelEntity = createEntity(TransactionalEmailType.TRIP_CANCELLED, recipientKey, null);
         cancelEntity.setId(cancelEmailId);
-        when(claimService.claimForDelivery(org.mockito.ArgumentMatchers.eq(cancelEmailId), any(), any(), any()))
+        when(claimService.claimForDelivery(ArgumentMatchers.eq(cancelEmailId), any(), any(), any()))
                 .thenReturn(Optional.of(cancelEntity));
         when(renderer.render(any(), any())).thenReturn(
                 RenderedEmail.builder().to("locked@example.com").subject("Hủy chuyến").textBody("Body").build()
@@ -172,9 +166,9 @@ class TransactionalEmailWorkerTest {
 
         verify(smtpSender).send(any());
         verify(claimService).recordFinalOutcome(
-                org.mockito.ArgumentMatchers.eq(cancelEmailId),
+                ArgumentMatchers.eq(cancelEmailId),
                 any(),
-                org.mockito.ArgumentMatchers.argThat(result -> result.status() == EmailDeliveryStatus.ACCEPTED),
+                ArgumentMatchers.argThat(result -> result.status() == EmailDeliveryStatus.ACCEPTED),
                 any()
         );
     }
@@ -202,12 +196,12 @@ class TransactionalEmailWorkerTest {
         worker.processIndividualEmail(id, EmailDeliveryMode.LIVE);
 
         verify(claimService).recordRetryableFailure(
-                org.mockito.ArgumentMatchers.eq(id),
+                ArgumentMatchers.eq(id),
                 any(),
-                org.mockito.ArgumentMatchers.eq("CONNECT_FAILED"),
-                org.mockito.ArgumentMatchers.eq("Connection refused"),
+                ArgumentMatchers.eq("CONNECT_FAILED"),
+                ArgumentMatchers.eq("Connection refused"),
                 any(), // nextAttemptAt scheduled
-                org.mockito.ArgumentMatchers.eq(false),
+                ArgumentMatchers.eq(false),
                 any()
         );
     }
@@ -234,9 +228,9 @@ class TransactionalEmailWorkerTest {
         worker.processIndividualEmail(id, EmailDeliveryMode.LIVE);
 
         verify(claimService).recordFinalOutcome(
-                org.mockito.ArgumentMatchers.eq(id),
+                ArgumentMatchers.eq(id),
                 any(),
-                org.mockito.ArgumentMatchers.argThat(result ->
+                ArgumentMatchers.argThat(result ->
                         result.status() == EmailDeliveryStatus.UNKNOWN
                                 && "SMTP_TIMEOUT_UNCERTAIN".equals(result.errorCode())
                 ),

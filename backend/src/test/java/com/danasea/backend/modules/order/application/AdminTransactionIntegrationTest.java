@@ -64,6 +64,8 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 
 import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+import java.time.ZoneOffset;
+import org.mockito.ArgumentMatchers;
 
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=validate"})
 @ActiveProfiles("test")
@@ -195,7 +197,7 @@ class AdminTransactionIntegrationTest extends AbstractExternalInfrastructureInte
         var payment = seed(PaymentProvider.VNPAY);
         var boundary = OffsetDateTime.parse("2026-10-09T03:00:00Z");
         jdbc.update("UPDATE master_orders SET created_at = ? WHERE id = ?", boundary, payment.getMasterOrderId());
-        assertThat(service.getAdminOrders(null, null, null, null, boundary.withOffsetSameInstant(java.time.ZoneOffset.ofHours(7)),
+        assertThat(service.getAdminOrders(null, null, null, null, boundary.withOffsetSameInstant(ZoneOffset.ofHours(7)),
                 boundary, PageRequest.of(0, 20)).getContent()).hasSize(1);
     }
 
@@ -427,7 +429,7 @@ class AdminTransactionIntegrationTest extends AbstractExternalInfrastructureInte
         when(gateway.queryPayment(any(), anyString(), any())).thenReturn(
                 new PaymentCaptureResult(false, null, null, null, "CREATED", "Buyer has not approved"));
         assertThat(service.reconcilePayment(payment.getId())).isFalse();
-        when(gateway.captureOrder(org.mockito.ArgumentMatchers.eq(PaymentProvider.PAYPAL), org.mockito.ArgumentMatchers.eq(payment.getProviderOrderId()), anyString())).thenReturn(success(payment));
+        when(gateway.captureOrder(ArgumentMatchers.eq(PaymentProvider.PAYPAL), ArgumentMatchers.eq(payment.getProviderOrderId()), anyString())).thenReturn(success(payment));
         var customerId = orders.findById(payment.getMasterOrderId()).orElseThrow().getCustomerId();
         assertThat(service.capturePayPalOrder(customerId, payment.getId(), payment.getProviderOrderId(), "first-capture-after-query").status())
                 .isEqualTo(PaymentStatus.SUCCESS);

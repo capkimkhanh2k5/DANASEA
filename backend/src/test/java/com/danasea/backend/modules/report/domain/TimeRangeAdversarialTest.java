@@ -21,6 +21,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.TimeZone;
+import java.time.Duration;
 
 @DisplayName("TimeRange Adversarial & Boundary Stress Test Suite")
 class TimeRangeAdversarialTest {
@@ -72,7 +73,7 @@ class TimeRangeAdversarialTest {
 
             // Kiểm chứng khoảng nano giữa start và end trong 1 ngày là đúng 86,400,000,000,000 - 1
             // ns
-            long nanosDifference = java.time.Duration.between(start, end).toNanos();
+            long nanosDifference = Duration.between(start, end).toNanos();
             assertThat(nanosDifference).isEqualTo(86_399_999_999_999L);
         }
 

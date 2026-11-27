@@ -41,6 +41,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RequestRefundUseCase Unit Tests")
@@ -64,7 +66,7 @@ class RequestRefundUseCaseTest {
     @BeforeEach
     void setUp() {
         refunds = mock(JpaRefundRepository.class);
-        org.mockito.Mockito.lenient().when(refunds.save(any())).thenAnswer(inv -> {
+        Mockito.lenient().when(refunds.save(any())).thenAnswer(inv -> {
             RefundJpaEntity refund = inv.getArgument(0); refund.setId(UUID.randomUUID()); return refund;
         });
         useCase = new RequestRefundUseCase(
@@ -115,7 +117,7 @@ class RequestRefundUseCaseTest {
         assertThat(results.get(0).amount()).isEqualByComparingTo("100.00");
         assertThat(results.get(0).refundPercentage()).isEqualByComparingTo("100.0");
         assertThat(results.get(0).status()).isEqualTo(RefundStatus.PENDING);
-        var persisted = org.mockito.ArgumentCaptor.forClass(RefundJpaEntity.class);
+        var persisted = ArgumentCaptor.forClass(RefundJpaEntity.class);
         verify(refunds).save(persisted.capture());
         assertThat(persisted.getValue().getSubOrderId()).isEqualTo(subOrderId);
         assertThat(persisted.getValue().getPaymentId()).isEqualTo(canonical.getId());

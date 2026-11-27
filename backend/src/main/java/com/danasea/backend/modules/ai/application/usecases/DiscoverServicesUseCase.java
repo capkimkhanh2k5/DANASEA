@@ -7,7 +7,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.Instant;
-import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.danasea.backend.modules.ai.application.api.CustomerPreferenceReadApi;
 import com.danasea.backend.modules.ai.domain.models.TravelCriteria;

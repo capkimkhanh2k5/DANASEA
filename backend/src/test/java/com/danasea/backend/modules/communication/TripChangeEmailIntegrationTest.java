@@ -2,7 +2,6 @@ package com.danasea.backend.modules.communication;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -58,7 +57,6 @@ import com.danasea.backend.modules.order.domain.models.RefundStatus;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.RefundJpaEntity;
-import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderDisruptionJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaRefundRepository;

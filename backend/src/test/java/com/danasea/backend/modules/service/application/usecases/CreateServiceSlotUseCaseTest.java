@@ -54,6 +54,10 @@ import com.danasea.backend.modules.service.domain.models.ServiceOption;
 import com.danasea.backend.modules.service.domain.ports.ServiceOptionRepositoryPort;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotResponse;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotOptionSummaryResponse;
+import com.danasea.backend.shared.presentation.ApiConflictException;
+import java.util.Map;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 class CreateServiceSlotUseCaseTest {
@@ -85,7 +89,7 @@ class CreateServiceSlotUseCaseTest {
                 .optionType(OptionType.SHARED)
                 .status(OptionStatus.ACTIVE)
                 .build();
-        org.mockito.Mockito.lenient().when(optionsPort.findById(defaultOptionId)).thenReturn(Optional.of(defaultOption));
+        Mockito.lenient().when(optionsPort.findById(defaultOptionId)).thenReturn(Optional.of(defaultOption));
     }
 
     @Test
@@ -431,7 +435,7 @@ class CreateServiceSlotUseCaseTest {
                 InventoryType.PERSON_LIMIT, 10, null, optionId);
 
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, req))
-                .isInstanceOfSatisfying(com.danasea.backend.shared.i18n.LocalizedException.class,
+                .isInstanceOfSatisfying(LocalizedException.class,
                         error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_private_requires_shared_capacity_units"));
     }
 
@@ -554,7 +558,7 @@ class CreateServiceSlotUseCaseTest {
         ServiceSlotResponse res = useCase.execute(userId, serviceId, req);
 
         assertThat(res.options()).hasSize(2);
-        assertThat(res.options().stream().map(com.danasea.backend.modules.service.presentation.dtos.ServiceSlotOptionSummaryResponse::id).toList())
+        assertThat(res.options().stream().map(ServiceSlotOptionSummaryResponse::id).toList())
                 .containsExactly(standardOptId, vipOptId);
         verify(slots).saveSlotOptions(eq(res.id()), eq(List.of(standardOptId, vipOptId)));
     }
@@ -591,7 +595,7 @@ class CreateServiceSlotUseCaseTest {
         ServiceSlotResponse res = useCase.execute(userId, serviceId, req);
 
         assertThat(res.options()).hasSize(2);
-        assertThat(res.options().stream().map(com.danasea.backend.modules.service.presentation.dtos.ServiceSlotOptionSummaryResponse::name).toList())
+        assertThat(res.options().stream().map(ServiceSlotOptionSummaryResponse::name).toList())
                 .containsExactly("Shared Ticket", "Private Charter");
         verify(slots).saveSlotOptions(eq(res.id()), eq(List.of(sharedOptId, privateOptId)));
     }
@@ -729,7 +733,7 @@ class CreateServiceSlotUseCaseTest {
 
     @Test
     void createBatchAttachesUnitEquipmentTransactionallyAndPropagatesConflicts() {
-        EquipmentAssignmentService equipmentService = org.mockito.Mockito.mock(EquipmentAssignmentService.class);
+        EquipmentAssignmentService equipmentService = Mockito.mock(EquipmentAssignmentService.class);
         CreateServiceSlotUseCase withEquipment = new CreateServiceSlotUseCase(
                 services, slots, vendors, scheduleStore, optionsPort, equipmentService);
         authorize();
@@ -746,12 +750,12 @@ class CreateServiceSlotUseCaseTest {
         assertThat(res).hasSize(1);
         assertThat(res.get(0).units()).hasSize(1);
         assertThat(res.get(0).units().get(0).equipmentId()).isEqualTo(eqId);
-        verify(equipmentService).attachGenerated(eq(vendorId), eq(res.get(0).id()), eq(java.util.Map.of(1, eqId)));
+        verify(equipmentService).attachGenerated(eq(vendorId), eq(res.get(0).id()), eq(Map.of(1, eqId)));
 
-        org.mockito.Mockito.doThrow(EquipmentAssignmentService.conflict("overlap"))
+        Mockito.doThrow(EquipmentAssignmentService.conflict("overlap"))
                 .when(equipmentService).attachGenerated(any(), any(), any());
         assertThatThrownBy(() -> withEquipment.createBatch(userId, serviceId, List.of(req)))
-                .isInstanceOf(com.danasea.backend.shared.presentation.ApiConflictException.class)
+                .isInstanceOf(ApiConflictException.class)
                 .hasMessageContaining("overlap");
     }
 

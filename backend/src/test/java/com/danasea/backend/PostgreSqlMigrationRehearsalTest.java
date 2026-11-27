@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.HexFormat;
 
 @Testcontainers
 class PostgreSqlMigrationRehearsalTest {
@@ -289,7 +290,7 @@ class PostgreSqlMigrationRehearsalTest {
             }
             counts.put(table, count);
         }
-        return new Snapshot(counts, java.util.HexFormat.of().formatHex(hash.digest()));
+        return new Snapshot(counts, HexFormat.of().formatHex(hash.digest()));
     }
 
     private static String coordinateHash(Connection conn, String schema) throws Exception {
@@ -300,7 +301,7 @@ class PostgreSqlMigrationRehearsalTest {
                 for (int i = 1; i <= 3; i++) hash.update(String.valueOf(rs.getString(i)).getBytes(StandardCharsets.UTF_8));
             }
         }
-        return java.util.HexFormat.of().formatHex(hash.digest());
+        return HexFormat.of().formatHex(hash.digest());
     }
 
     private static void awaitWaitingLocks(String url, String schema, int expected) throws Exception {

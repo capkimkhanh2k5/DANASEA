@@ -57,6 +57,7 @@ import com.danasea.backend.modules.order.presentation.dtos.PaymentResponse;
 import com.danasea.backend.modules.order.presentation.dtos.RefundDetailResponse;
 import com.danasea.backend.modules.order.presentation.dtos.RefundRequest;
 import com.danasea.backend.modules.order.presentation.dtos.RefundResponse;
+import java.util.Arrays;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OrderController Unit Tests")
@@ -102,7 +103,7 @@ class OrderControllerTest {
     }
 
     private void mockSecurityUser(UUID userId, String... roles) {
-        var authorities = java.util.Arrays.stream(roles)
+        var authorities = Arrays.stream(roles)
                 .map(SimpleGrantedAuthority::new)
                 .toList();
         var auth = new UsernamePasswordAuthenticationToken(userId.toString(), "credentials", authorities);

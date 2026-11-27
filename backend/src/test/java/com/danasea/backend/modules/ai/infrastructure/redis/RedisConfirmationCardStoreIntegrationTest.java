@@ -30,6 +30,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import java.util.concurrent.Future;
 
 @Testcontainers
 class RedisConfirmationCardStoreIntegrationTest {
@@ -147,7 +148,7 @@ class RedisConfirmationCardStoreIntegrationTest {
         CountDownLatch start = new CountDownLatch(1);
         List<String> winners = new ArrayList<>();
         try (var workers = Executors.newFixedThreadPool(contenders)) {
-            List<java.util.concurrent.Future<Optional<String>>> results = new ArrayList<>();
+            List<Future<Optional<String>>> results = new ArrayList<>();
             for (int i = 0; i < contenders; i++) {
                 RedisConfirmationCardStore contender = i % 2 == 0 ? writer : independentReader;
                 results.add(workers.submit(() -> {

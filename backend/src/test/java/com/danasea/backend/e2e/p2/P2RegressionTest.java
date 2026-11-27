@@ -26,11 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.concurrent.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.AfterEach;
@@ -42,7 +38,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.danasea.backend.e2e.BaseE2ETest;
 import com.danasea.backend.modules.booking.application.usecases.ConfirmBookingUseCase;
 import com.danasea.backend.modules.communication.infrastructure.jobs.TripReminderJob;
-import com.danasea.backend.modules.communication.infrastructure.persistence.repositories.JpaNotificationRepository;
 import com.danasea.backend.modules.order.application.OrderPaymentService;
 import com.danasea.backend.modules.order.application.PaymentWebhookSigner;
 import com.danasea.backend.modules.order.application.RefundProcessingService;

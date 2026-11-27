@@ -8,11 +8,12 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
 
 public interface JpaSubOrderDisruptionRepository extends JpaRepository<SubOrderDisruptionJpaEntity, UUID> {
     Optional<SubOrderDisruptionJpaEntity> findBySubOrderIdAndSourceKey(UUID subOrderId, String sourceKey);
     Optional<SubOrderDisruptionJpaEntity> findBySubOrderIdAndStatus(UUID subOrderId, String status);
-    List<SubOrderDisruptionJpaEntity> findBySubOrderIdInAndStatus(java.util.Collection<UUID> subOrderIds, String status);
+    List<SubOrderDisruptionJpaEntity> findBySubOrderIdInAndStatus(Collection<UUID> subOrderIds, String status);
     List<SubOrderDisruptionJpaEntity> findTop100ByStatusAndDecisionDeadlineLessThanEqualOrderByDecisionDeadlineAsc(
             String status, OffsetDateTime now);
 }

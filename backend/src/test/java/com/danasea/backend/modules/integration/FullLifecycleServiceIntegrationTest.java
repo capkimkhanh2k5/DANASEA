@@ -84,6 +84,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import org.mockito.Mockito;
 
 /**
  * FullLifecycleServiceIntegrationTest
@@ -746,7 +747,7 @@ public class FullLifecycleServiceIntegrationTest {
             UUID id = inv.getArgument(0);
             return Optional.ofNullable(subOrderStore.get(id));
         });
-        org.mockito.Mockito.lenient().when(subOrderRepository.findByIdForUpdate(any())).thenAnswer(inv -> {
+        Mockito.lenient().when(subOrderRepository.findByIdForUpdate(any())).thenAnswer(inv -> {
             UUID id = inv.getArgument(0);
             return Optional.ofNullable(subOrderStore.get(id));
         });
@@ -776,7 +777,7 @@ public class FullLifecycleServiceIntegrationTest {
             UUID id = inv.getArgument(0);
             return Optional.ofNullable(slotStore.get(id));
         });
-        org.mockito.Mockito.lenient().when(slotRepository.findByIdForUpdate(any())).thenAnswer(inv -> {
+        Mockito.lenient().when(slotRepository.findByIdForUpdate(any())).thenAnswer(inv -> {
             UUID id = inv.getArgument(0);
             return Optional.ofNullable(slotStore.get(id));
         });

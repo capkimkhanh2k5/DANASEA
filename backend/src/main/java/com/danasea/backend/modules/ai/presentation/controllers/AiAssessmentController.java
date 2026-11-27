@@ -1,7 +1,6 @@
 package com.danasea.backend.modules.ai.presentation.controllers;
 
 import java.util.Map;
-import java.util.UUID;
 
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;

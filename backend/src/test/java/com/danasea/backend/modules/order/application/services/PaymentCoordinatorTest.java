@@ -1,6 +1,5 @@
 package com.danasea.backend.modules.order.application.services;
 
-import com.danasea.backend.modules.booking.domain.models.BookingStatus;
 import com.danasea.backend.modules.booking.domain.ports.InventoryLockPort;
 import com.danasea.backend.modules.booking.infrastructure.persistence.entities.BookingJpaEntity;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
@@ -15,7 +14,6 @@ import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.models.PaymentStatus;
 import com.danasea.backend.modules.order.domain.ports.PaymentCancelResult;
-import com.danasea.backend.modules.order.domain.ports.PaymentCaptureResult;
 import com.danasea.backend.modules.order.domain.ports.PaymentGatewayPort;
 import com.danasea.backend.modules.order.domain.ports.PaymentIntentResult;
 import com.danasea.backend.modules.order.domain.ports.SubOrderRepositoryPort;
@@ -34,7 +32,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.math.BigDecimal;

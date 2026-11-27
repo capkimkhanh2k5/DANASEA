@@ -10,7 +10,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.danasea.backend.modules.account.application.api.AccountInternalApi;
-import com.danasea.backend.modules.audit.application.ports.AuditLogPort;
 import com.danasea.backend.modules.account.domain.models.Role;
 import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.admin.domain.exceptions.UserNotFoundException;

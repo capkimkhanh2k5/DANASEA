@@ -5,7 +5,6 @@ import java.util.UUID;
 
 import com.danasea.backend.modules.service.application.dtos.ServiceResult;
 import com.danasea.backend.modules.service.application.usecases.helpers.ServiceResultMapper;
-import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedException;
 import com.danasea.backend.modules.service.domain.models.Service;
 import com.danasea.backend.modules.service.domain.models.ServiceImage;

@@ -4,9 +4,7 @@ import com.danasea.backend.modules.account.application.api.AccountInternalApi;
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 
 import com.danasea.backend.modules.account.domain.models.User;
-import com.danasea.backend.modules.audit.infrastructure.persistence.entities.AuditLogJpaEntity;
 import com.danasea.backend.security.authentication.application.ports.PasswordHasher;
-import com.danasea.backend.security.authorization.domain.exceptions.AccessDeniedException;
 import com.danasea.backend.security.authentication.domain.exceptions.InvalidCredentialsException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

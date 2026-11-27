@@ -6,8 +6,6 @@ import com.danasea.backend.modules.communication.application.usecases.CreateOrGe
 import com.danasea.backend.modules.communication.application.usecases.GetConversationsUseCase;
 import com.danasea.backend.modules.communication.application.usecases.GetMessagesUseCase;
 import com.danasea.backend.modules.communication.application.usecases.SendMessageUseCase;
-import com.danasea.backend.modules.communication.domain.exceptions.ConversationNotFoundException;
-import com.danasea.backend.modules.communication.domain.exceptions.UnauthorizedChatAccessException;
 import com.danasea.backend.modules.communication.presentation.handlers.CommunicationExceptionHandler;
 import com.danasea.backend.shared.i18n.LocalizedMessageService;
 import com.danasea.backend.shared.presentation.GlobalExceptionHandler;

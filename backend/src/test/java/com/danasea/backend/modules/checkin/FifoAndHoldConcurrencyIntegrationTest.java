@@ -38,6 +38,7 @@ import com.danasea.backend.modules.service.domain.models.InventoryType;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
+import org.junit.jupiter.api.Assertions;
 
 @DisplayName("FifoAndHoldConcurrencyIntegrationTest — Real Redis & PostgreSQL Invariant Verification")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -221,7 +222,7 @@ class FifoAndHoldConcurrencyIntegrationTest extends BaseSecurityIntegrationTest 
 
         EarlyDispatchRequest request = new EarlyDispatchRequest(subOrderId, slotAId, "Early dispatch with corrupted inventory");
 
-        org.junit.jupiter.api.Assertions.assertThrows(InvalidCheckinStateException.class, () -> {
+        Assertions.assertThrows(InvalidCheckinStateException.class, () -> {
             earlyDispatchSlotUseCase.execute(request, staffUserId);
         });
 

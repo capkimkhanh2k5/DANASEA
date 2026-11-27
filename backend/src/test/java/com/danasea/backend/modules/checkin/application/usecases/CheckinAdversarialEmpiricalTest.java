@@ -3,12 +3,9 @@ package com.danasea.backend.modules.checkin.application.usecases;
 import com.danasea.backend.modules.booking.domain.ports.VendorLookupPort;
 import com.danasea.backend.modules.checkin.domain.exceptions.InvalidCheckinStateException;
 import com.danasea.backend.modules.checkin.domain.exceptions.InvalidQrSignatureException;
-import com.danasea.backend.modules.checkin.domain.exceptions.InvalidQrTokenException;
 import com.danasea.backend.modules.checkin.domain.exceptions.QrTokenAlreadyUsedException;
 import com.danasea.backend.modules.checkin.domain.exceptions.QrTokenExpiredException;
-import com.danasea.backend.modules.checkin.domain.exceptions.UnauthorizedCheckinAccessException;
 import com.danasea.backend.modules.checkin.domain.exceptions.UnauthorizedVendorCheckinException;
-import com.danasea.backend.modules.checkin.domain.models.QrTokenPayload;
 import com.danasea.backend.modules.checkin.domain.services.QrTokenSigner;
 import com.danasea.backend.modules.checkin.infrastructure.persistence.entities.CheckinTokenJpaEntity;
 import com.danasea.backend.modules.checkin.infrastructure.persistence.repositories.JpaCheckinTokenRepository;
@@ -65,6 +62,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import java.util.Locale;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CheckinAdversarialEmpiricalTest — Rigorous Stress & Boundary Verification for Milestone 3 (EPIC-07 R3)")
@@ -295,7 +293,7 @@ class CheckinAdversarialEmpiricalTest {
             OffsetDateTime expiredBy1s = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(1);
             String expiredToken = qrTokenSigner.generateToken(subOrderId, expiredBy1s);
 
-            LocaleContextHolder.setLocale(java.util.Locale.ENGLISH);
+            LocaleContextHolder.setLocale(Locale.ENGLISH);
             try {
                 assertThatThrownBy(() -> verifyCheckinUseCase.execute(new VerifyCheckinRequest(expiredToken), staffId))
                         .isInstanceOf(QrTokenExpiredException.class)

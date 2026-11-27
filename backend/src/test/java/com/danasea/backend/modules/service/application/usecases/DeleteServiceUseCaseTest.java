@@ -18,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.danasea.backend.modules.service.domain.exceptions.InvalidServiceStateException;
-import com.danasea.backend.modules.service.domain.exceptions.UnauthorizedServiceAccessException;
 import com.danasea.backend.modules.service.domain.models.Service;
 import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.domain.ports.ServiceImageRepositoryPort;

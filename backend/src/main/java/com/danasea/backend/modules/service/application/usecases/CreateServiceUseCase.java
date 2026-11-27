@@ -19,6 +19,7 @@ import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import com.danasea.backend.modules.vendor.domain.models.VerificationStatus;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import com.danasea.backend.modules.service.domain.models.OperationType;
 
 @RequiredArgsConstructor
 public class CreateServiceUseCase {
@@ -67,7 +68,7 @@ public class CreateServiceUseCase {
                 .price(cmd.price())
                 .durationMinutes(cmd.durationMinutes())
                 .capacityPerSlot(cmd.capacityPerSlot())
-                .operationType(cmd.operationType() != null ? cmd.operationType() : com.danasea.backend.modules.service.domain.models.OperationType.FIXED_DEPARTURE)
+                .operationType(cmd.operationType() != null ? cmd.operationType() : OperationType.FIXED_DEPARTURE)
                 .locationName(cmd.locationName())
                 .address(cmd.address())
                 .latitude(cmd.latitude())

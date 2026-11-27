@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 
 import com.danasea.backend.modules.ai.domain.services.TravelQueryParser;
 import com.danasea.backend.modules.report.domain.models.TimeRange;
+import java.time.DayOfWeek;
 
 final class CopilotRequest {
     private static final Pattern REVENUE = words("doanh thu|gmv|revenue|turnover");
@@ -304,11 +305,11 @@ final class CopilotRequest {
         }
 
         if (matches(THIS_WEEK, normalized)) {
-            LocalDate monday = today.with(java.time.DayOfWeek.MONDAY);
+            LocalDate monday = today.with(DayOfWeek.MONDAY);
             return TimeRange.of(monday, today);
         }
         if (matches(LAST_WEEK, normalized)) {
-            LocalDate prevMonday = today.minusWeeks(1).with(java.time.DayOfWeek.MONDAY);
+            LocalDate prevMonday = today.minusWeeks(1).with(DayOfWeek.MONDAY);
             return TimeRange.of(prevMonday, prevMonday.plusDays(6));
         }
         if (matches(THIS_MONTH, normalized)) return TimeRange.of(today.withDayOfMonth(1), today);

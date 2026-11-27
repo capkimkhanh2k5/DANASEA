@@ -3,7 +3,9 @@ package com.danasea.backend.modules.account.infrastructure.persistence.entities;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 
 import com.danasea.backend.shared.core.infrastructure.persistence.entities.BaseJpaEntity;
 

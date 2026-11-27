@@ -30,8 +30,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import java.nio.charset.StandardCharsets;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
-@ExtendWith({MockitoExtension.class, org.springframework.boot.test.system.OutputCaptureExtension.class})
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 @DisplayName("CliProxyLlmClient Unit Tests")
 public class CliProxyLlmClientTest {
 
@@ -232,10 +235,10 @@ public class CliProxyLlmClientTest {
     }
 
     @Test
-    void upstreamErrorBodyIsNotExposedInLogsOrFinalException(org.springframework.boot.test.system.CapturedOutput output) {
+    void upstreamErrorBodyIsNotExposedInLogsOrFinalException(CapturedOutput output) {
         String sensitive = "upstream-error-credential-must-not-leak";
         var failure = new RestClientResponseException("upstream failure: " + sensitive, HttpStatusCode.valueOf(500),
-                "failure", null, sensitive.getBytes(java.nio.charset.StandardCharsets.UTF_8), java.nio.charset.StandardCharsets.UTF_8);
+                "failure", null, sensitive.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
         when(responseSpec.body(eq(CliProxyDto.ChatResponse.class))).thenThrow(failure);
         CliProxyException thrown = assertThrows(CliProxyException.class,
                 () -> cliProxyLlmClient.generateResponse(List.of()));

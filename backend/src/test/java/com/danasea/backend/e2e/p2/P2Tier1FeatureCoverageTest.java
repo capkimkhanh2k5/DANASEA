@@ -4,7 +4,6 @@ import java.util.Map;
 import com.danasea.backend.modules.order.domain.models.RefundStatus;
 import com.danasea.backend.modules.order.domain.events.RefundCompletedEvent;
 import com.danasea.backend.modules.communication.presentation.dtos.NotificationResponse;
-import com.danasea.backend.modules.communication.domain.ports.PushNotificationPort;
 import com.danasea.backend.e2e.BaseE2ETest;
 import com.danasea.backend.modules.communication.domain.models.NotificationChannel;
 import com.danasea.backend.modules.communication.domain.models.NotificationStatus;
@@ -22,8 +21,6 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.lang.reflect.Field;
 
 @DisplayName("P2 E2E Tier 1: Feature Coverage (R1 - R6 in Isolation)")
 public class P2Tier1FeatureCoverageTest extends BaseE2ETest {
@@ -335,7 +333,7 @@ public class P2Tier1FeatureCoverageTest extends BaseE2ETest {
 
         NotificationJpaEntity updated = notificationRepository.findById(sampleNotificationCustomer.getId()).orElseThrow();
         if (isFieldPresent(NotificationJpaEntity.class, "isRead")) {
-            java.lang.reflect.Field field = NotificationJpaEntity.class.getDeclaredField("isRead");
+            Field field = NotificationJpaEntity.class.getDeclaredField("isRead");
             field.setAccessible(true);
             assertThat(field.getBoolean(updated)).isTrue();
         }

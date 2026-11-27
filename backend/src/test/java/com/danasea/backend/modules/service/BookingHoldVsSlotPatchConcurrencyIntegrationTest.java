@@ -62,6 +62,7 @@ import com.danasea.backend.modules.vendor.domain.models.VerificationStatus;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
+import org.springframework.data.redis.core.RedisCallback;
 
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @ActiveProfiles("test")
@@ -96,7 +97,7 @@ public class BookingHoldVsSlotPatchConcurrencyIntegrationTest extends BaseSecuri
     @BeforeEach
     void setUp() {
         if (redisTemplate.getConnectionFactory() != null) {
-            redisTemplate.execute((org.springframework.data.redis.core.RedisCallback<Object>) connection -> {
+            redisTemplate.execute((RedisCallback<Object>) connection -> {
                 connection.serverCommands().flushDb();
                 return null;
             });

@@ -37,11 +37,15 @@ import com.danasea.backend.modules.weather.application.api.AiItineraryAlertReadA
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.danasea.backend.shared.i18n.SupportedLanguage;
+import jakarta.persistence.EntityManager;
+import java.math.BigDecimal;
+import java.util.ArrayList;
 
 @AutoConfigureMockMvc
 @Transactional
 class ItineraryLifecycleHttpIntegrationTest extends BaseSecurityIntegrationTest {
-    @Autowired jakarta.persistence.EntityManager entityManager;
+    @Autowired EntityManager entityManager;
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;
@@ -128,7 +132,7 @@ class ItineraryLifecycleHttpIntegrationTest extends BaseSecurityIntegrationTest 
     @Test void persistedSlotEventMarksStaleAndCreatesOneProposalPreservingUnaffectedItems() throws Exception {
         JsonNode saved = plan();
         UUID id = UUID.fromString(saved.path("id").asText());
-        planner.accept(id, owner, 0, com.danasea.backend.shared.i18n.SupportedLanguage.VI);
+        planner.accept(id, owner, 0, SupportedLanguage.VI);
         var original = planner.get(id, owner).plan();
         UUID orderId = UUID.randomUUID();
         jdbc.update("insert into master_orders(id,customer_id,total_amount,status,created_at,updated_at) values(?,?,200000,'PAID',now(),now())", orderId, owner);
@@ -149,7 +153,7 @@ class ItineraryLifecycleHttpIntegrationTest extends BaseSecurityIntegrationTest 
         entityManager.flush();
         assertThat(jdbc.queryForObject("select count(*) from notifications where user_id=? and type='AI_ITINERARY_SOURCE_CHANGED'", Integer.class, owner)).isEqualTo(1);
         assertThat(jdbc.queryForObject("select status from master_orders where id=?", String.class, orderId)).isEqualTo("PAID");
-        assertThat(jdbc.queryForObject("select total_amount from master_orders where id=?", java.math.BigDecimal.class, orderId)).isEqualByComparingTo("200000");
+        assertThat(jdbc.queryForObject("select total_amount from master_orders where id=?", BigDecimal.class, orderId)).isEqualByComparingTo("200000");
         assertThat(jdbc.queryForObject("select count(*) from ai_itinerary_items where itinerary_id=?", Integer.class, id)).isEqualTo(2);
     }
 
@@ -192,7 +196,7 @@ class ItineraryLifecycleHttpIntegrationTest extends BaseSecurityIntegrationTest 
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"query\":\"Tôi muốn tìm các dịch vụ chèo SUP tại Đà Nẵng vào ngày mai\",\"partySize\":2,\"from\":\"" + date + "\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-        List<String> u13Ids = new java.util.ArrayList<>();
+        List<String> u13Ids = new ArrayList<>();
         u13.path("candidates").forEach(c -> u13Ids.add(c.path("service").path("id").asText()));
         assertThat(u13Ids).contains(supService.toString()).doesNotContain(kayakService.toString(), diveService.toString());
 
@@ -201,7 +205,7 @@ class ItineraryLifecycleHttpIntegrationTest extends BaseSecurityIntegrationTest 
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"query\":\"Tôi muốn trải nghiệm nhẹ nhàng, không biết bơi và không thích lặn sâu\",\"partySize\":2,\"from\":\"" + date + "\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-        List<String> u17Ids = new java.util.ArrayList<>();
+        List<String> u17Ids = new ArrayList<>();
         u17.path("candidates").forEach(c -> u17Ids.add(c.path("service").path("id").asText()));
         assertThat(u17.path("status").asText()).isEqualTo("AVAILABLE");
         assertThat(u17Ids).contains(sonTraMarine.toString()).doesNotContain(diveService.toString());
@@ -216,7 +220,7 @@ class ItineraryLifecycleHttpIntegrationTest extends BaseSecurityIntegrationTest 
         List<String> pairedIds = List.of(firstAltItems.get(0).path("serviceId").asText(), firstAltItems.get(1).path("serviceId").asText());
         assertThat(pairedIds).containsExactlyInAnyOrder(supService.toString(), sonTraMarine.toString());
         assertThat(firstAltItems.get(1).path("estimatedTravelMinutes").asInt()).isGreaterThanOrEqualTo(15);
-        List<String> tradeOffs = new java.util.ArrayList<>();
+        List<String> tradeOffs = new ArrayList<>();
         u24.path("alternatives").get(0).path("tradeOffs").forEach(node -> tradeOffs.add(node.asText()));
         assertThat(tradeOffs).anyMatch(entry -> entry.startsWith("REJECTION_COUNTS:"));
     }

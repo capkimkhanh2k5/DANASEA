@@ -1,7 +1,6 @@
 package com.danasea.backend.modules.integration;
 
 import com.danasea.backend.modules.booking.domain.ports.VendorLookupPort;
-import com.danasea.backend.modules.checkin.domain.services.QrTokenSigner;
 import com.danasea.backend.modules.checkin.infrastructure.persistence.entities.CheckinTokenJpaEntity;
 import com.danasea.backend.modules.checkin.infrastructure.persistence.repositories.JpaCheckinTokenRepository;
 import com.danasea.backend.modules.dispute.application.services.DisputeWindowService;
@@ -35,7 +34,6 @@ import com.danasea.backend.modules.settlement.application.dtos.SettlementRespons
 import com.danasea.backend.modules.settlement.application.usecases.GenerateSettlementUseCase;
 import com.danasea.backend.modules.settlement.application.usecases.GetSettlementsUseCase;
 import com.danasea.backend.modules.settlement.domain.models.LineItemExclusionReason;
-import com.danasea.backend.modules.settlement.domain.models.SettlementStatus;
 import com.danasea.backend.modules.settlement.domain.services.SettlementCalculationEngine;
 import com.danasea.backend.modules.settlement.infrastructure.persistence.entities.SettlementJpaEntity;
 import com.danasea.backend.modules.settlement.infrastructure.persistence.entities.SettlementLineItemJpaEntity;
@@ -55,7 +53,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;

@@ -19,6 +19,8 @@ import com.danasea.backend.modules.ai.infrastructure.quyet.QuyetDecisionAdapter;
 import com.danasea.backend.modules.ai.infrastructure.quyet.QuyetProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+import com.danasea.backend.modules.ai.support.AiAcceptanceRecorder;
+import java.net.InetSocketAddress;
 
 class QuyetDecisionAdapterTest {
     private static final String REVISION = "233167bba5df61b5375a522bf8a042d8d2189379";
@@ -29,7 +31,7 @@ class QuyetDecisionAdapterTest {
     private final AtomicReference<String> authorization = new AtomicReference<>();
     private int status = 200;
     @BeforeEach void setup() throws Exception {
-        server = HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/decisions", exchange -> {
             received.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
@@ -93,7 +95,7 @@ class QuyetDecisionAdapterTest {
                     "review", "Hướng dẫn tốt", "complaint", "Tour đổi giờ", "context", "Du lịch Đà Nẵng", "service", "Kayak", "risk_signals", List.of("FAILED_PAYMENTS")));
             assertThat(result.available()).as(task.name()).isTrue(); assertThat(result.revision()).isEqualTo(REVISION);
             assertThat(result.suggestionOnly()).isTrue();
-            com.danasea.backend.modules.ai.support.AiAcceptanceRecorder.write(task.wireName(), Map.of(
+            AiAcceptanceRecorder.write(task.wireName(), Map.of(
                     "requested_model", result.model(), "model_revision", result.revision(),
                     "latency_ms", result.latencyMs(), "suggestion_only", result.suggestionOnly()));
         }

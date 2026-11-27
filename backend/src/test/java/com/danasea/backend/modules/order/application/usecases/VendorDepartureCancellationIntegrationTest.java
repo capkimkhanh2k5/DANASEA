@@ -33,6 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.time.temporal.ChronoUnit;
+import org.springframework.web.server.ResponseStatusException;
 
 class VendorDepartureCancellationIntegrationTest extends BaseE2ETest {
     @MockitoBean LettuceBasedProxyManager<byte[]> proxyManager;
@@ -55,9 +57,9 @@ class VendorDepartureCancellationIntegrationTest extends BaseE2ETest {
 
         var first = cancellations.cancel(vendorUserA.getId(), serviceId, slotId, "Engine failure");
         assertThat(cancellations.cancel(vendorUserA.getId(), serviceId, slotId, "Engine failure").cancelledAt().toInstant())
-                .isEqualTo(first.cancelledAt().toInstant().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+                .isEqualTo(first.cancelledAt().toInstant().truncatedTo(ChronoUnit.MICROS));
         assertThatThrownBy(() -> cancellations.cancel(vendorUserA.getId(), serviceId, slotId, "Different"))
-                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+                .isInstanceOf(ResponseStatusException.class);
         cancellations.process();
         cancellations.process();
 

@@ -6,6 +6,12 @@ import com.danasea.backend.modules.flashsale.domain.FlashSalePricing.Policy;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import com.danasea.backend.modules.flashsale.domain.FlashSale;
+import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
+import com.danasea.backend.modules.settlement.domain.exceptions.InvalidCommissionRateException;
+import com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext;
+import com.danasea.backend.modules.settlement.domain.services.SettlementCalculationEngine;
+import java.time.Instant;
 
 class FlashSalePricingTest {
     private static BigDecimal n(String value) { return new BigDecimal(value); }
@@ -44,29 +50,29 @@ class FlashSalePricingTest {
         assertThat(s.customerPayable()).isEqualByComparingTo(s.vendorReceivable().add(s.platformContribution()));
     }
     @Test void missingSettlementSnapshotCannotInventTenPercent() {
-        var context=com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext.builder()
-                .subtotalAmount(n("500000")).status(com.danasea.backend.modules.order.domain.models.SubOrderStatus.COMPLETED).build();
-        assertThatThrownBy(()->new com.danasea.backend.modules.settlement.domain.services.SettlementCalculationEngine().calculateLineItem(context))
-                .isInstanceOf(com.danasea.backend.modules.settlement.domain.exceptions.InvalidCommissionRateException.class);
+        var context=SubOrderCalculationContext.builder()
+                .subtotalAmount(n("500000")).status(SubOrderStatus.COMPLETED).build();
+        assertThatThrownBy(()->new SettlementCalculationEngine().calculateLineItem(context))
+                .isInstanceOf(InvalidCommissionRateException.class);
     }
     @Test void domainCannotReactivateCancelledTerms() {
-        var start=java.time.Instant.now();
-        var sale=new com.danasea.backend.modules.flashsale.domain.FlashSale(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),
+        var start=Instant.now();
+        var sale=new FlashSale(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),
                 "DRAFT",n("30000"),start,start.plusSeconds(3000),1,n("30000"),null,null,UUID.randomUUID());
         assertThatThrownBy(()->sale.cancelled().enabled(n("500000"),UUID.randomUUID()))
                 .hasMessageContaining("FLASH_SALE_TERMS_IMMUTABLE");
     }
     @Test void exactTimeWindowAndExistingSettlementPreserveFunding() {
-        var start=java.time.Instant.parse("2026-10-25T02:00:00Z"); var end=start.plusSeconds(47*60);
-        var sale=new com.danasea.backend.modules.flashsale.domain.FlashSale(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),
+        var start=Instant.parse("2026-10-25T02:00:00Z"); var end=start.plusSeconds(47*60);
+        var sale=new FlashSale(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),
                 "ENABLED",n("30000"),start,end,1,n("30000"),n("500000"),UUID.randomUUID(),UUID.randomUUID());
         assertThat(sale.activeAt(start.minusNanos(1))).isFalse(); assertThat(sale.activeAt(start)).isTrue();
         assertThat(sale.activeAt(end.minusNanos(1))).isTrue(); assertThat(sale.activeAt(end)).isFalse();
-        var context=com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext.builder()
+        var context=SubOrderCalculationContext.builder()
                 .subtotalAmount(n("500000")).commissionBasisAmount(n("500000")).commissionRate(n("0.10"))
                 .platformDiscountAmount(n("30000")).finalAmount(n("470000"))
-                .status(com.danasea.backend.modules.order.domain.models.SubOrderStatus.COMPLETED).build();
-        var engine=new com.danasea.backend.modules.settlement.domain.services.SettlementCalculationEngine();
+                .status(SubOrderStatus.COMPLETED).build();
+        var engine=new SettlementCalculationEngine();
         assertThat(engine.calculateLineItem(context).getNetAmount()).isEqualByComparingTo("450000");
         context.setRefundAmount(n("235000"));
         assertThat(engine.calculateLineItem(context).getNetAmount()).isEqualByComparingTo("225000");

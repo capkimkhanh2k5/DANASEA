@@ -32,6 +32,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.*;
 import org.springframework.test.context.bean.override.mockito.*;
+import java.sql.Date;
+import java.sql.Time;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
     "spring.flyway.enabled=true","spring.jpa.hibernate.ddl-auto=validate","spring.autoconfigure.exclude=",
@@ -97,7 +99,7 @@ class FlashSaleHttpIntegrationTest extends BaseFlashSaleIntegrationTest {
     UUID slot(String type,int capacity) {
         UUID id=UUID.randomUUID();
         int hour=8+db.queryForObject("SELECT count(*) FROM service_slots WHERE service_id=?",Integer.class,service);
-        db.update("INSERT INTO service_slots(id,service_id,date,start_time,end_time,capacity,booked_count,status,inventory_type,created_at,updated_at) VALUES (?,?,?,?,?,?,0,'OPEN',?,now(),now())",id,service,java.sql.Date.valueOf(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(5)),java.sql.Time.valueOf(LocalTime.of(hour,0)),java.sql.Time.valueOf(LocalTime.of(hour+1,0)),capacity,type); return id;
+        db.update("INSERT INTO service_slots(id,service_id,date,start_time,end_time,capacity,booked_count,status,inventory_type,created_at,updated_at) VALUES (?,?,?,?,?,?,0,'OPEN',?,now(),now())",id,service,Date.valueOf(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(5)),Time.valueOf(LocalTime.of(hour,0)),Time.valueOf(LocalTime.of(hour+1,0)),capacity,type); return id;
     }
     Terms terms(UUID option,int quota,int budget,OffsetDateTime start,OffsetDateTime end) { return new Terms(service,option,n("30000"),start,end,quota,BigDecimal.valueOf(budget)); }
     UUID campaign(UUID option,int quota,int budget) {

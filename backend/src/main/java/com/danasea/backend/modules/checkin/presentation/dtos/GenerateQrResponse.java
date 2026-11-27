@@ -1,6 +1,5 @@
 package com.danasea.backend.modules.checkin.presentation.dtos;
 
-import lombok.NoArgsConstructor;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;

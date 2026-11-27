@@ -33,7 +33,6 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotUnitRepository;
 
-import lombok.RequiredArgsConstructor;
 
 @Component
 public class ServiceSlotAdapter implements ServiceSlotPort {

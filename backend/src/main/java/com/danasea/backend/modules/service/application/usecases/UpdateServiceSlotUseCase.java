@@ -40,7 +40,6 @@ import com.danasea.backend.modules.service.presentation.dtos.UpdateServiceSlotRe
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
 @Component
 public class UpdateServiceSlotUseCase {

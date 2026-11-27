@@ -50,6 +50,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.util.Arrays;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ConversationController MockMvc Tests")
@@ -102,7 +103,7 @@ class ConversationControllerTest {
     }
 
     private void mockSecurityUser(UUID userId, String... roles) {
-        var authorities = java.util.Arrays.stream(roles)
+        var authorities = Arrays.stream(roles)
                 .map(SimpleGrantedAuthority::new)
                 .toList();
         var auth = new UsernamePasswordAuthenticationToken(userId.toString(), "credentials", authorities);

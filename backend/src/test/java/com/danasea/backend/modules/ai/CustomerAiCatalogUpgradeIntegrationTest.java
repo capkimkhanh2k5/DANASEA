@@ -30,6 +30,7 @@ import com.danasea.backend.modules.ai.domain.models.TravelContext;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.danasea.backend.modules.service.application.api.AiCatalogReadApi;
 
 @AutoConfigureMockMvc
 @Transactional
@@ -116,7 +117,7 @@ class CustomerAiCatalogUpgradeIntegrationTest extends BaseSecurityIntegrationTes
         UUID acceptable = service("Acceptable older service", 10, 16.1, 108.2, 1, true);
         jdbc.update("update services set weather_sensitive=true where category_id=?", category);
         when(weather.assess(any(), any())).thenAnswer(call -> {
-            var candidate = (com.danasea.backend.modules.service.application.api.AiCatalogReadApi.PublishedService) call.getArgument(0);
+            var candidate = (AiCatalogReadApi.PublishedService) call.getArgument(0);
             boolean safe = candidate.id().equals(acceptable);
             return new TravelWeatherPort.Assessment(safe ? "ACCEPTABLE" : "UNSAFE", safe, false, null, null, "FULL");
         });

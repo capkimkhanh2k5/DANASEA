@@ -11,6 +11,7 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
 import org.junit.platform.launcher.listeners.TestExecutionSummary;
+import java.util.Arrays;
 
 public class FinancialMutationLauncher {
 
@@ -51,7 +52,7 @@ public class FinancialMutationLauncher {
                 String testName = failure.getTestIdentifier().getDisplayName().replace("\"", "\\\"");
                 boolean assertion = exception instanceof AssertionError && failure.getTestIdentifier().isTest()
                         && failure.getTestIdentifier().getSource().filter(MethodSource.class::isInstance)
-                        .map(MethodSource.class::cast).map(method -> java.util.Arrays.stream(exception.getStackTrace())
+                        .map(MethodSource.class::cast).map(method -> Arrays.stream(exception.getStackTrace())
                                 .anyMatch(frame -> frame.getClassName().equals(method.getClassName())
                                         && frame.getMethodName().equals(method.getMethodName()))).orElse(false);
                 failureDetails.add(String.format("{\"test\":\"%s\",\"type\":\"%s\",\"message\":\"%s\",\"assertion\":%s}", testName, type, msg, assertion));

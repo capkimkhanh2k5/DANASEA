@@ -22,11 +22,9 @@ import com.danasea.backend.modules.checkin.infrastructure.persistence.repositori
 import com.danasea.backend.modules.checkin.presentation.dtos.EligibleSubOrderCandidate;
 import com.danasea.backend.modules.checkin.presentation.dtos.VerifyCheckinRequest;
 import com.danasea.backend.modules.checkin.presentation.dtos.VerifyCheckinResponse;
-import com.danasea.backend.modules.communication.application.dtos.NotificationCommand;
 import com.danasea.backend.modules.communication.application.email.EmailRequest;
 import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
 import com.danasea.backend.modules.communication.application.usecases.SendNotificationUseCase;
-import com.danasea.backend.modules.communication.domain.models.NotificationChannel;
 import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.communication.domain.ports.PushNotificationPort;
 import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
@@ -46,7 +44,6 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotUnitRepository;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
-import com.danasea.backend.shared.i18n.LocalizedMessageRef;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -65,6 +62,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 
 @Slf4j
 @Service
@@ -317,7 +315,7 @@ public class VerifyCheckinUseCase {
                             String sName = "Dịch vụ Danasea";
                             if (serviceRepository != null && s.getServiceId() != null) {
                                 sName = serviceRepository.findById(s.getServiceId())
-                                        .map(com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity::getName)
+                                        .map(ServiceJpaEntity::getName)
                                         .orElse(sName);
                             }
                             LocalDate slotDate = null;

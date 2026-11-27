@@ -3,7 +3,6 @@ package com.danasea.backend.modules.weather;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -34,6 +33,7 @@ import com.danasea.backend.modules.weather.domain.models.WeatherCache;
 import com.danasea.backend.modules.weather.infrastructure.jobs.FetchWeatherJob;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 @ExtendWith(MockitoExtension.class)
 class FetchWeatherJobTest {
@@ -54,7 +54,7 @@ class FetchWeatherJobTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+        objectMapper.registerModule(new JavaTimeModule());
         job = new FetchWeatherJob(weatherProviderPort, weatherCacheRepositoryPort, objectMapper);
     }
 

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 
 import com.danasea.backend.modules.service.domain.models.ServiceStatus;
-import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.util.*;

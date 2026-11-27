@@ -14,8 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.ExchangeRateJpaEntity;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;

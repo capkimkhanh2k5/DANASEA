@@ -17,6 +17,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import com.danasea.backend.modules.settlement.domain.exceptions.InvalidPayoutRequestStateException;
+import com.danasea.backend.modules.settlement.domain.exceptions.PayoutAmountExceedsBalanceException;
+import com.danasea.backend.modules.settlement.domain.exceptions.PayoutRequestNotFoundException;
+import com.danasea.backend.modules.settlement.domain.exceptions.SettlementNotFinalizedException;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(basePackages = "com.danasea.backend.modules.settlement")
@@ -70,26 +74,26 @@ public class SettlementExceptionHandler extends LocalizedExceptionHandlerSupport
                 .body(error("FORBIDDEN_SETTLEMENT_ACCESS"));
     }
 
-    @ExceptionHandler(com.danasea.backend.modules.settlement.domain.exceptions.PayoutRequestNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handlePayoutRequestNotFound(com.danasea.backend.modules.settlement.domain.exceptions.PayoutRequestNotFoundException ex) {
+    @ExceptionHandler(PayoutRequestNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handlePayoutRequestNotFound(PayoutRequestNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(error("PAYOUT_REQUEST_NOT_FOUND"));
     }
 
-    @ExceptionHandler(com.danasea.backend.modules.settlement.domain.exceptions.PayoutAmountExceedsBalanceException.class)
-    public ResponseEntity<ErrorResponse> handlePayoutAmountExceedsBalance(com.danasea.backend.modules.settlement.domain.exceptions.PayoutAmountExceedsBalanceException ex) {
+    @ExceptionHandler(PayoutAmountExceedsBalanceException.class)
+    public ResponseEntity<ErrorResponse> handlePayoutAmountExceedsBalance(PayoutAmountExceedsBalanceException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(error("PAYOUT_AMOUNT_EXCEEDS_BALANCE"));
     }
 
-    @ExceptionHandler(com.danasea.backend.modules.settlement.domain.exceptions.InvalidPayoutRequestStateException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidPayoutRequestState(com.danasea.backend.modules.settlement.domain.exceptions.InvalidPayoutRequestStateException ex) {
+    @ExceptionHandler(InvalidPayoutRequestStateException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPayoutRequestState(InvalidPayoutRequestStateException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(error("INVALID_PAYOUT_REQUEST_STATE"));
     }
 
-    @ExceptionHandler(com.danasea.backend.modules.settlement.domain.exceptions.SettlementNotFinalizedException.class)
-    public ResponseEntity<ErrorResponse> handleSettlementNotFinalized(com.danasea.backend.modules.settlement.domain.exceptions.SettlementNotFinalizedException ex) {
+    @ExceptionHandler(SettlementNotFinalizedException.class)
+    public ResponseEntity<ErrorResponse> handleSettlementNotFinalized(SettlementNotFinalizedException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(error("SETTLEMENT_NOT_FINALIZED"));
     }

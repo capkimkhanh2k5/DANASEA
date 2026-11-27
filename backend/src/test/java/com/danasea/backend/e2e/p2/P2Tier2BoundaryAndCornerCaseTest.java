@@ -3,17 +3,12 @@ package com.danasea.backend.e2e.p2;
 import com.danasea.backend.e2e.BaseE2ETest;
 import com.danasea.backend.modules.account.domain.models.Role;
 import com.danasea.backend.modules.account.infrastructure.persistence.entities.UserJpaEntity;
-import com.danasea.backend.modules.communication.domain.models.NotificationChannel;
-import com.danasea.backend.modules.communication.domain.models.NotificationStatus;
 import com.danasea.backend.modules.communication.infrastructure.persistence.entities.NotificationJpaEntity;
 import com.danasea.backend.modules.order.domain.events.PaymentSuccessEvent;
-import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
-import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.danasea.backend.modules.service.presentation.CatalogController;
 import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
-import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -30,6 +25,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.lang.reflect.Field;
+import java.util.Map;
 
 @DisplayName("P2 E2E Tier 2: Boundary, Corner Cases & Security Regressions (R1 - R6)")
 public class P2Tier2BoundaryAndCornerCaseTest extends BaseE2ETest {
@@ -262,7 +259,7 @@ public class P2Tier2BoundaryAndCornerCaseTest extends BaseE2ETest {
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isIn(403, 404));
 
         if (isFieldPresent(NotificationJpaEntity.class, "isRead")) {
-            java.lang.reflect.Field field = NotificationJpaEntity.class.getDeclaredField("isRead");
+            Field field = NotificationJpaEntity.class.getDeclaredField("isRead");
             field.setAccessible(true);
             NotificationJpaEntity check = notificationRepository.findById(sampleNotificationCustomer.getId()).orElseThrow();
             assertThat(field.getBoolean(check)).isFalse();
@@ -345,12 +342,12 @@ public class P2Tier2BoundaryAndCornerCaseTest extends BaseE2ETest {
         if (isClassPresent("com.danasea.backend.modules.communication.domain.ports.PushNotificationPort")) {
             Class<?> portClass = Class.forName("com.danasea.backend.modules.communication.domain.ports.PushNotificationPort");
             Object pushPort = applicationContext.getBean(portClass);
-            Method sendMethod = portClass.getMethod("sendPush", UUID.class, String.class, String.class, java.util.Map.class);
+            Method sendMethod = portClass.getMethod("sendPush", UUID.class, String.class, String.class, Map.class);
 
             String complexTitle = "🌊 [Danasea Alert] Tour Lặn San Hô & Ngắm Hoàng Hôn ☀️";
             String complexBody = "Chào quý khách! Chuyến đi của bạn tại Bãi Bụt - Bán đảo Sơn Trà sẽ bắt đầu lúc 08:00 sáng mai. Xin vui lòng mang theo kem chống nắng!";
 
-            Object result = sendMethod.invoke(pushPort, customerUser.getId(), complexTitle, complexBody, java.util.Map.of("category", "DIVING", "promoCode", "DANANG#2026"));
+            Object result = sendMethod.invoke(pushPort, customerUser.getId(), complexTitle, complexBody, Map.of("category", "DIVING", "promoCode", "DANANG#2026"));
             assertThat(result).isEqualTo(false);
         }
     }

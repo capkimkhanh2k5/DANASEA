@@ -12,7 +12,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.danasea.backend.modules.booking.domain.exceptions.BookingHoldExpiredException;
-import com.danasea.backend.modules.booking.domain.exceptions.InvalidBookingStateException;
 import com.danasea.backend.modules.booking.domain.exceptions.UnauthorizedBookingAccessException;
 
 import static org.assertj.core.api.Assertions.assertThat;

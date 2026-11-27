@@ -12,7 +12,13 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.service.presentation.dtos.SafetyDocumentResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,6 +26,7 @@ import com.danasea.backend.modules.service.domain.ports.VendorPort;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @RestController
 @RequestMapping("/api/vendor/services/{serviceId}/safety-documents")
@@ -43,7 +50,7 @@ public class VendorSafetyDocumentController {
         this(uploadSafetyDocumentUseCase, null, null, getSafetyDocumentsUseCase, serviceRepository, vendorPort, fileStoragePort);
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public VendorSafetyDocumentController(
             UploadSafetyDocumentUseCase uploadSafetyDocumentUseCase,
             WithdrawSafetyDocumentUseCase withdrawSafetyDocumentUseCase,

@@ -4,7 +4,11 @@ import com.danasea.backend.modules.ai.domain.models.AiMessageRole;
 import java.util.UUID;
 
 import com.danasea.backend.shared.core.infrastructure.persistence.entities.BaseJpaEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 

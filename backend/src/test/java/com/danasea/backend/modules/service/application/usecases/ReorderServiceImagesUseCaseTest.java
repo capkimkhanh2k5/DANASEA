@@ -13,7 +13,6 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.danasea.backend.modules.service.domain.exceptions.ImageNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.UnauthorizedServiceAccessException;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceImageJpaEntity;

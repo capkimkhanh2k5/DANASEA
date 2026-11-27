@@ -1,7 +1,6 @@
 package com.danasea.backend.modules.dispute.presentation.controllers;
 
 import com.danasea.backend.modules.dispute.application.usecases.UploadDisputeEvidenceUseCase;
-import com.danasea.backend.modules.dispute.presentation.dtos.EvidenceUploadResponse;
 import com.danasea.backend.modules.dispute.presentation.handlers.DisputeExceptionHandler;
 import com.danasea.backend.modules.service.application.ports.FileStoragePort;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;

@@ -33,6 +33,8 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import com.danasea.backend.modules.report.ReportFinancialTestFixtures;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GetAdminDashboardUseCase Platform Analytics & Alert Tests")
@@ -106,15 +108,15 @@ class GetAdminDashboardUseCaseTest {
                         dt,
                         dt);
 
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), eq(null)))
                 .thenReturn(List.of(o1, o2, o3));
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, List.of(o1, o2, o3));
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), eq(null)))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
         when(reportDataPort.findServiceSlots(eq(timeRange), eq(null)))
@@ -237,15 +239,15 @@ class GetAdminDashboardUseCaseTest {
                         98,
                         SlotStatus.OPEN);
 
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), eq(null)))
                 .thenReturn(orders);
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, orders);
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), eq(null)))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
         when(reportDataPort.findServiceSlots(eq(timeRange), eq(null))).thenReturn(List.of(slot));
@@ -262,15 +264,15 @@ class GetAdminDashboardUseCaseTest {
     @Test
     @DisplayName("An toàn khi toàn sàn không có đơn nào (không lỗi chia cho 0)")
     void shouldHandleEmptySystemWithoutExceptions() {
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findSubOrders(eq(timeRange), any()))
                 .thenReturn(Collections.emptyList());
-        com.danasea.backend.modules.report.ReportFinancialTestFixtures.paidOrders(
+        ReportFinancialTestFixtures.paidOrders(
                 reportDataPort, Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefunds(eq(timeRange), any()))
                 .thenReturn(Collections.emptyList());
-        org.mockito.Mockito.lenient()
+        Mockito.lenient()
                 .when(reportDataPort.findRefundsBySubOrderIds(any()))
                 .thenReturn(Collections.emptyList());
         when(reportDataPort.findServiceSlots(eq(timeRange), any()))

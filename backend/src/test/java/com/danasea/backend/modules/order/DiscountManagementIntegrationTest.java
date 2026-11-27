@@ -18,11 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.danasea.backend.modules.order.application.dtos.CreateOrderCommand;
@@ -32,7 +27,6 @@ import com.danasea.backend.modules.order.application.usecases.CreateOrderUseCase
 import com.danasea.backend.modules.order.application.usecases.DiscountPreviewUseCase;
 import com.danasea.backend.modules.order.application.usecases.VendorDiscountCodeUseCase;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidDiscountException;
-import com.danasea.backend.modules.order.domain.models.DiscountCode;
 import com.danasea.backend.modules.order.domain.models.DiscountScope;
 import com.danasea.backend.modules.order.domain.models.DiscountSponsorType;
 import com.danasea.backend.modules.order.domain.models.DiscountType;

@@ -1,7 +1,6 @@
 package com.danasea.backend.modules.operation;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -9,8 +8,6 @@ import com.danasea.backend.modules.account.domain.models.Role;
 import com.danasea.backend.modules.account.infrastructure.persistence.entities.UserJpaEntity;
 import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository;
 import com.danasea.backend.modules.operation.application.usecases.*;
-import com.danasea.backend.modules.operation.domain.models.Review;
-import com.danasea.backend.modules.operation.infrastructure.persistence.entities.ReviewJpaEntity;
 import com.danasea.backend.modules.operation.infrastructure.persistence.repositories.JpaReviewRepository;
 import com.danasea.backend.modules.operation.presentation.dtos.*;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;

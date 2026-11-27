@@ -2,7 +2,6 @@ package com.danasea.backend.modules.service.application.usecases;
 
 import com.danasea.backend.modules.service.application.dtos.RecentlyViewedResult;
 import com.danasea.backend.modules.service.domain.models.RecentlyViewed;
-import com.danasea.backend.modules.service.domain.models.Service;
 import com.danasea.backend.modules.service.domain.ports.RecentlyViewedRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceImageRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;

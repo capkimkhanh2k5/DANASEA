@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collections;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("JpaReportDataAdapter Persistence Layer Tests")
@@ -268,7 +269,7 @@ class JpaReportDataAdapterTest {
                 .thenReturn(objectArrayQuery);
         when(objectArrayQuery.setParameter("toDate", timeRange.getTo()))
                 .thenReturn(objectArrayQuery);
-        when(objectArrayQuery.getResultList()).thenReturn(java.util.Collections.singletonList(row));
+        when(objectArrayQuery.getResultList()).thenReturn(Collections.singletonList(row));
 
         List<ServiceSlotRecord> results = adapter.findServiceSlots(timeRange, null);
 
